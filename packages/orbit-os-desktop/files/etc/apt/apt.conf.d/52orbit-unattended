@@ -1,0 +1,5 @@
+// Orbit OS: security updates install automatically (Ubuntu's own origins only).
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+Unattended-Upgrade::Automatic-Reboot "false";

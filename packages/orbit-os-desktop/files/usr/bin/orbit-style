@@ -1,0 +1,22 @@
+#!/bin/sh
+# orbit-style glass|graphite|light [--reduce-transparency on|off]
+# Switches icon theme, GTK + shell theme and default wallpaper together.
+set -eu
+style=${1:-}
+case "$style" in
+  glass)    icons=orbit;          gtk=Orbit-graphite; scheme=prefer-dark;  wp=orbit-glass ;;
+  graphite) icons=orbit-graphite; gtk=Orbit-graphite; scheme=prefer-dark;  wp=orbit-graphite ;;
+  light)    icons=orbit-light;    gtk=Orbit-light;    scheme=prefer-light; wp=orbit-light ;;
+  "") gsettings get org.orbit-os.desktop style; exit 0 ;;
+  *) echo "usage: orbit-style glass|graphite|light [--reduce-transparency on|off]" >&2; exit 2 ;;
+esac
+gsettings set org.gnome.desktop.interface icon-theme "$icons"
+gsettings set org.gnome.desktop.interface gtk-theme "$gtk"
+gsettings set org.gnome.desktop.interface color-scheme "$scheme"
+gsettings set org.gnome.shell.extensions.user-theme name "$gtk"
+gsettings set org.gnome.desktop.background picture-uri-dark "file:///usr/share/backgrounds/orbit/$wp.png"
+gsettings set org.gnome.desktop.background picture-uri "file:///usr/share/backgrounds/orbit/$wp.png"
+gsettings set org.orbit-os.desktop style "$style"
+if [ "${2:-}" = "--reduce-transparency" ]; then
+  exec /usr/lib/orbit-os/orbit-transparency "${3:-on}"
+fi

@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""Orbit Settings front page: one calm page linking into GNOME Settings.
+
+It does not replace gnome-control-center; every row opens the real panel.
+Only Orbit's own switches (style, transparency, Inbox sorting) live here.
+"""
+import subprocess, sys
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gio, Gtk
+
+PANELS = [  # (title, subtitle, icon, gnome-control-center panel)
+    ("Appearance", "Theme, wallpaper, dark mode", "preferences-desktop-appearance-symbolic", "ubuntu"),
+    ("Displays", "Resolution, scale, night light", "video-display-symbolic", "display"),
+    ("Network", "Wi-Fi, wired, VPN", "network-wireless-symbolic", "wifi"),
+    ("Power", "Battery, power mode, suspend", "battery-symbolic", "power"),
+    ("Fingerprint", "Enroll a finger for login and sudo", "fingerprint-symbolic", "system"),
+    ("Updates", "Security updates and software", "software-update-available-symbolic", None),
+    ("Privacy", "Screen lock, location, file history", "preferences-system-privacy-symbolic", "privacy"),
+    ("Accessibility", "Large text, reduce motion, screen reader", "preferences-desktop-accessibility-symbolic", "universal-access"),
+]
+
+
+def open_panel(panel):
+    if panel is None:
+        subprocess.Popen(["gnome-software", "--mode=updates"])
+    elif panel == "system":
+        subprocess.Popen(["gnome-control-center", "users"])  # fingerprint lives in Users on GNOME 46
+    else:
+        subprocess.Popen(["gnome-control-center", panel])
+
+
+class Win(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Orbit Settings", default_width=560, default_height=720)
+        s = Gio.Settings.new("org.orbit-os.desktop")
+        page = Adw.PreferencesPage()
+
+        look = Adw.PreferencesGroup(title="Orbit")
+        style = Adw.ComboRow(title="Style", subtitle="Icons, shell theme and wallpaper change together",
+                             model=Gtk.StringList.new(["Glass", "Graphite", "Light"]))
+        names = ["glass", "graphite", "light"]
+        style.set_selected(names.index(s.get_string("style")))
+        style.connect("notify::selected", lambda r, _: subprocess.run(["orbit-style", names[r.get_selected()]]))
+        look.add(style)
+        rt = Adw.SwitchRow(title="Reduce transparency", subtitle="Solid colors instead of frosted glass")
+        rt.set_active(s.get_boolean("reduce-transparency"))
+        rt.connect("notify::active", lambda r, _: subprocess.run(
+            ["/usr/lib/orbit-os/orbit-transparency", "on" if r.get_active() else "off"]))
+        look.add(rt)
+        inbox = Adw.SwitchRow(title="Sort Inbox automatically",
+                              subtitle="Moves files by type; every move is logged and can be undone")
+        inbox.set_active(s.get_boolean("inbox-sorter"))
+
+        def on_inbox(r, _):
+            s.set_boolean("inbox-sorter", r.get_active())
+            subprocess.run(["systemctl", "--user", "enable" if r.get_active() else "disable", "--now",
+                            "orbit-inbox-sorter.timer"])
+        inbox.connect("notify::active", on_inbox)
+        look.add(inbox)
+        page.add(look)
+
+        sys_group = Adw.PreferencesGroup(title="System")
+        for title, sub, icon, panel in PANELS:
+            row = Adw.ActionRow(title=title, subtitle=sub, activatable=True)
+            row.add_prefix(Gtk.Image.new_from_icon_name(icon))
+            row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
+            row.connect("activated", lambda _r, p=panel: open_panel(p))
+            sys_group.add(row)
+        page.add(sys_group)
+        tb = Adw.ToolbarView()
+        tb.add_top_bar(Adw.HeaderBar())
+        tb.set_content(page)
+        self.set_content(tb)
+
+
+app = Adw.Application(application_id="org.orbit_os.Settings")
+app.connect("activate", lambda a: Win(a).present())
+sys.exit(app.run(sys.argv))

@@ -1,0 +1,66 @@
+# Orbit OS defaults. Users can change all of these; nothing is locked.
+[org/gnome/desktop/interface]
+gtk-theme='Orbit-graphite'
+icon-theme='orbit'
+color-scheme='prefer-dark'
+font-name='Inter 10'
+document-font-name='Inter 10'
+monospace-font-name='JetBrains Mono 11'
+enable-hot-corners=false
+accent-color='slate'
+
+[org/gnome/desktop/background]
+picture-uri='file:///usr/share/backgrounds/orbit/orbit-light.png'
+picture-uri-dark='file:///usr/share/backgrounds/orbit/orbit-glass.png'
+picture-options='zoom'
+
+[org/gnome/desktop/screensaver]
+picture-uri='file:///usr/share/backgrounds/orbit/orbit-graphite.png'
+
+[org/gnome/desktop/privacy]
+report-technical-problems=false
+send-software-usage-stats=false
+remember-recent-files=true
+
+[org/gnome/desktop/sound]
+event-sounds=false
+
+[org/gnome/shell]
+enabled-extensions=['ubuntu-dock@ubuntu.com', 'blur-my-shell@aunetx', 'orbit-launcher@orbit-os', 'user-theme@gnome-shell-extensions.gcampax.github.com']
+favorite-apps=['org.gnome.Nautilus.desktop', 'firefox-esr.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.TextEditor.desktop', 'org.keepassxc.KeePassXC.desktop', 'orbit-settings.desktop']
+welcome-dialog-last-shown-version='999'
+
+[org/gnome/shell/extensions/user-theme]
+name='Orbit-graphite'
+
+[org/gnome/shell/extensions/dash-to-dock]
+dock-position='LEFT'
+extend-height=true
+dock-fixed=true
+dash-max-icon-size=36
+show-trash=false
+show-mounts=false
+custom-theme-shrink=true
+transparency-mode='FIXED'
+background-opacity=0.0
+running-indicator-style='DOTS'
+
+[org/gnome/shell/extensions/blur-my-shell]
+sigma=14
+brightness=0.85
+
+[org/gnome/mutter]
+experimental-features=['scale-monitor-framebuffer']
+
+[org/gnome/desktop/wm/keybindings]
+switch-input-source=['<Super><Alt>space']
+switch-input-source-backward=@as []
+
+[org/gnome/terminal/legacy/profiles:]
+default='b1dcc9dd-5262-4d8d-a863-c897e6d979b9'
+list=['b1dcc9dd-5262-4d8d-a863-c897e6d979b9']
+
+[org/orbit-os/desktop]
+style='glass'
+reduce-transparency=false
+inbox-sorter=false

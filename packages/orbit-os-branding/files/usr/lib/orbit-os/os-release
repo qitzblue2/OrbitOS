@@ -1,0 +1,12 @@
+PRETTY_NAME="Orbit OS 1.0 (based on Ubuntu 24.04 LTS)"
+NAME="Orbit OS"
+VERSION_ID="1.0"
+VERSION="1.0 (based on Ubuntu 24.04 LTS)"
+VERSION_CODENAME=noble
+ID=orbit
+ID_LIKE="ubuntu debian"
+UBUNTU_CODENAME=noble
+HOME_URL="https://github.com/qitzblue2/OrbitOS"
+SUPPORT_URL="https://github.com/qitzblue2/OrbitOS/blob/main/README.md"
+BUG_REPORT_URL="https://github.com/qitzblue2/OrbitOS/issues"
+LOGO=orbit-launcher

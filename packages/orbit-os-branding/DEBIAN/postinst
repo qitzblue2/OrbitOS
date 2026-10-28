@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+  # os-release belongs to base-files; divert rather than overwrite.
+  dpkg-divert --package orbit-os-branding --add --rename --divert /usr/lib/os-release.ubuntu /usr/lib/os-release
+  cp /usr/lib/orbit-os/os-release /usr/lib/os-release
+  update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth \
+    /usr/share/plymouth/themes/orbit/orbit.plymouth 150
+  update-alternatives --set default.plymouth /usr/share/plymouth/themes/orbit/orbit.plymouth
+  for t in orbit orbit-graphite orbit-light; do gtk-update-icon-cache -q -f /usr/share/icons/$t || true; done
+  if [ -f /etc/default/grub ] && ! grep -q orbit /etc/default/grub; then
+    printf '\n# Orbit OS\nGRUB_THEME=/boot/grub/themes/orbit/theme.txt\n' >> /etc/default/grub
+    mkdir -p /boot/grub/themes && cp -r /usr/share/grub/themes/orbit /boot/grub/themes/
+    command -v update-grub >/dev/null && [ -d /boot/grub ] && update-grub 2>/dev/null || true
+  fi
+  command -v update-initramfs >/dev/null && update-initramfs -u 2>/dev/null || true
+fi

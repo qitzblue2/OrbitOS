@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+  dconf update
+  glib-compile-schemas /usr/share/glib-2.0/schemas
+  # Firewall: deny incoming, allow outgoing. No ports opened.
+  ufw --force default deny incoming >/dev/null
+  ufw --force default allow outgoing >/dev/null
+  ufw --force enable >/dev/null 2>&1 || true   # fails harmlessly inside a chroot; re-enabled at first boot
+  systemctl enable ufw.service >/dev/null 2>&1 || true
+  # Fingerprint for login, lock screen and sudo (password stays a fallback).
+  pam-auth-update --enable fprintd --package >/dev/null 2>&1 || true
+  # SSH stays off unless the user installs and enables it.
+  systemctl disable --now ssh.service ssh.socket >/dev/null 2>&1 || true
+  # New users get the ~/Home layout from /etc/skel (copied by the package).
+fi

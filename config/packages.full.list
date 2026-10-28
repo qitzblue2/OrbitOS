@@ -1,0 +1,8 @@
+# Extra in the full image only (optional, see DECISIONS.md D-12)
+libreoffice-writer
+libreoffice-calc
+libreoffice-impress
+libreoffice-gnome
+flatpak
+gnome-software-plugin-flatpak
+wine64

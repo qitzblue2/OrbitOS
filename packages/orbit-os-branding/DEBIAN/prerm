@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+if [ "$1" = remove ]; then
+  rm -f /usr/lib/os-release
+  dpkg-divert --package orbit-os-branding --remove --rename --divert /usr/lib/os-release.ubuntu /usr/lib/os-release
+  update-alternatives --remove default.plymouth /usr/share/plymouth/themes/orbit/orbit.plymouth || true
+  sed -i '/^# Orbit OS$/d;/GRUB_THEME=.*orbit/d' /etc/default/grub 2>/dev/null || true
+fi

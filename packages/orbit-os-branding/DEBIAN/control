@@ -1,0 +1,11 @@
+Package: orbit-os-branding
+Version: @VERSION@
+Architecture: all
+Maintainer: Orbit OS builder <root@localhost>
+Depends: fonts-inter, fonts-jetbrains-mono, plymouth, plymouth-label, librsvg2-common
+Section: misc
+Priority: optional
+Description: Orbit OS branding (based on Ubuntu 24.04 LTS)
+ Wallpapers, Plymouth boot splash, GDM and shell theme, GRUB theme, the
+ orbit icon themes (Glass, Graphite, Light) and the Orbit OS os-release
+ identity. All generated from branding/tokens.json.

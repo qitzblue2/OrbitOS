@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Orbit OS first login
+Exec=/usr/lib/orbit-os/orbit-first-login
+NoDisplay=true
+X-GNOME-Autostart-Phase=Initialization

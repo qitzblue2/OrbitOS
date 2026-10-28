@@ -1,0 +1,12 @@
+# Off by default. Enable with: systemctl --user enable --now orbit-inbox-sorter.timer
+# (or the switch on the Orbit Settings page). A timer, not a .path unit, so files
+# still downloading do not cause a re-trigger loop.
+[Unit]
+Description=Sort ~/Home/Inbox every two minutes
+
+[Timer]
+OnStartupSec=1min
+OnUnitActiveSec=2min
+
+[Install]
+WantedBy=timers.target

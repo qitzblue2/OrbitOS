@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Orbit OS transparency auto-detect
+Exec=/bin/sh -c '[ "$(gsettings get org.orbit-os.desktop reduce-transparency)" = true ] || /usr/lib/orbit-os/orbit-transparency auto'
+NoDisplay=true

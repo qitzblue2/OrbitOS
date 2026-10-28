@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Orbit OS first-run welcome
+Exec=/usr/lib/orbit-os/orbit-welcome
+NoDisplay=true
+X-GNOME-Autostart-Phase=Application

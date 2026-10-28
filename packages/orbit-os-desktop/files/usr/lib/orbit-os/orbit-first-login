@@ -1,0 +1,23 @@
+#!/bin/sh
+# Runs once per user at first login: sidebar bookmarks + folder icons.
+# Nautilus reads custom icons from GIO metadata, not .directory files.
+set -u
+stamp="${XDG_STATE_HOME:-$HOME/.local/state}/orbit/first-login.done"
+[ -e "$stamp" ] && exit 0
+mkdir -p "$(dirname "$stamp")" "$HOME/.config/gtk-3.0"
+if [ -f "$HOME/.config/gtk-3.0/bookmarks.in" ]; then
+  sed "s|@HOME@|$HOME|g" "$HOME/.config/gtk-3.0/bookmarks.in" >> "$HOME/.config/gtk-3.0/bookmarks"
+  rm -f "$HOME/.config/gtk-3.0/bookmarks.in"
+fi
+H="$HOME/Home"
+for d in Projects Spaces Notes Inbox; do
+  low=$(printf %s "$d" | tr 'A-Z' 'a-z')
+  [ -d "$H/$d" ] && gio set "$H/$d" metadata::custom-icon-name "folder-$low" 2>/dev/null
+done
+for s in Personal Work Study; do
+  low=$(printf %s "$s" | tr 'A-Z' 'a-z')
+  [ -d "$H/Spaces/$s" ] && gio set "$H/Spaces/$s" metadata::custom-icon-name "folder-space-$low" 2>/dev/null
+done
+find "$H" -name .keep -delete 2>/dev/null
+: # user-dirs.dirs already points at ~/Home; auto-update is disabled in user-dirs.conf
+touch "$stamp"

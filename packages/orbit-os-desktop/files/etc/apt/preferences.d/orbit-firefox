@@ -1,0 +1,4 @@
+# Firefox comes from Mozilla's signed APT repo (firefox-esr), never the snap transitional deb.
+Package: firefox*
+Pin: release o=Ubuntu
+Pin-Priority: -1

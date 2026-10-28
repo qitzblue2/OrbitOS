@@ -1,0 +1,17 @@
+Package: orbit-os-desktop
+Version: @VERSION@
+Architecture: all
+Maintainer: Orbit OS builder <root@localhost>
+Depends: orbit-os-branding (= @VERSION@), orbit-launcher (= @VERSION@), gnome-shell (>= 46), gnome-shell (<< 47),
+ gnome-shell-extension-ubuntu-dock, gnome-shell-extensions,
+ python3-gi, gir1.2-adw-1, gir1.2-gtk-4.0, fprintd, libpam-fprintd, power-profiles-daemon, fwupd,
+ bluez, thermald, intel-media-va-driver, ufw, unattended-upgrades, dconf-cli
+Recommends: gnome-shell-extension-blur-my-shell, @RECOMMENDS@
+Section: metapackages
+Priority: optional
+Description: Orbit OS desktop (based on Ubuntu 24.04 LTS)
+ Installs and configures the Orbit OS desktop on Ubuntu 24.04: theme and
+ dconf defaults, Orbit Launcher, Orbit Settings, first-run welcome, the
+ ~/Home folder layout for new users, firewall on, fingerprint PAM,
+ automatic security updates. Install it on an existing Ubuntu 24.04
+ system to convert it.

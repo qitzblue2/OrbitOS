@@ -1,0 +1,176 @@
+# Installing Orbit OS — a beginner's guide
+
+Read each step to the end before you type anything. Lines in grey boxes are commands: copy them exactly. "Expected" shows what you should see. "If it fails" tells you what to do.
+
+> **Golden rule:** until step 7, nothing touches your disks. Steps 1–6 only build, test and boot *live*.
+
+---
+
+## 1. What you need
+- A USB stick of **8 GB or more**. Everything on it will be erased. The full image is about 6 GB.
+- A computer to build on: Ubuntu 24.04, or any Linux with Docker, with about **35 GB free disk**. Alternatively, a downloaded ISO.
+- The **i7-8700K desktop**, used as the first real test machine, and the **EliteBook 830 G7**.
+- For step 7: an external drive for **backups**, and your Windows **BitLocker recovery key**. To find the key, sign in at https://account.microsoft.com/devices/recoverykey and write it down.
+
+## 2. Build the ISO and check it
+```bash
+git clone https://github.com/qitzblue2/OrbitOS.git
+```
+```bash
+cd OrbitOS
+```
+```bash
+./build.sh
+```
+- To build on an Ubuntu 24.04 machine or VM without Docker, run `sudo ./build.sh --host`.
+- For the smaller image, run `ORBIT_VARIANT=lite ./build.sh`.
+
+The build takes 30–90 minutes. **Expected** at the end:
+```
+[orbit] done: out/orbit-os-1.0.0-full-amd64.iso (6.0G)
+<64 hex characters>  orbit-os-1.0.0-full-amd64.iso
+```
+Check the result:
+```bash
+cd out && sha256sum -c orbit-os-1.0.0-full-amd64.iso.sha256
+```
+**Expected:** `orbit-os-1.0.0-full-amd64.iso: OK`
+
+**If it fails:**
+
+| Message | What to do |
+|---|---|
+| `SHA256SUMS signature invalid` or `ISO checksum mismatch` | The Ubuntu download is damaged or was tampered with. Delete `work/iso-src/` and run the build again. |
+| `snapshot service unreachable` | Check your internet connection. Retry later. |
+| `no space left on device` | Free up disk space (35 GB is needed). Run `sudo rm -rf work/` to remove old build files. |
+| `need docker or podman` | Install Docker, or use `sudo ./build.sh --host` on Ubuntu 24.04. |
+
+## 3. Test it in a virtual machine first
+Automatic test:
+```bash
+sudo apt install qemu-system-x86 ovmf socat
+```
+```bash
+tests/vm-boot-test.sh out/orbit-os-1.0.0-full-amd64.iso
+```
+**Expected:** `[vm-test] PASS: desktop after …s`. Screenshots are saved in `tests/screenshots/<date>/`.
+
+By hand, with VirtualBox:
+1. Create a new VM: type Linux, Ubuntu 64-bit, 4 GB RAM, 25 GB disk, and tick **Enable EFI**.
+2. Attach the ISO and start the VM.
+3. You should see the boot menu ("Try or Install Orbit OS"), then a dark screen with a pulsing Orbit logo, then the desktop. The desktop has a pink, purple and blue wallpaper, a slim dock on the left, and the installer window.
+4. Close the installer window to keep exploring in live mode.
+
+**If it fails:** if you get a black screen in VirtualBox, set Graphics Controller to **VMSVGA** with 128 MB of video memory, or choose "Orbit OS (safe graphics)" in the boot menu.
+
+## 4. Write the USB stick safely
+> ⚠️ **Writing to the wrong device erases it.** Unplug every other USB drive first.
+
+- **Easiest (any OS):** use **balenaEtcher**. Choose *Flash from file* → the ISO → *Select target* → your USB stick (check the size matches!) → *Flash*.
+- **Windows:** use **Rufus**. Pick the stick, pick the ISO, partition scheme **GPT**, write in **DD mode** if Rufus asks.
+- **Linux (`dd`):** find the stick first:
+  ```bash
+  lsblk -d -o NAME,SIZE,MODEL,TRAN
+  ```
+  The stick is the line with `TRAN` = `usb` and the right size, for example `sdb 14.9G SanDisk usb`. Then write the image, replacing `sdX` with that name:
+  ```bash
+  sudo dd if=out/orbit-os-1.0.0-full-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
+  ```
+  Never use `nvme0n1` or `sda` unless you are **certain** it is the stick.
+
+## 5. Boot the desktop PC (i7-8700K) in live mode
+1. Plug in the USB stick and power on the PC.
+2. Open the boot menu by pressing the right key at power-on. It is usually **F12**, **F11** or **F8**; on ASUS boards it is **F8**, on MSI **F11**, on Gigabyte **F12**.
+3. Choose the entry for the USB stick that starts with **UEFI**.
+4. You can leave **Secure Boot on**: Orbit OS uses Ubuntu's signed boot loader. If you see "Verification failed", see Troubleshooting.
+5. Choose **Try or Install Orbit OS**. When the installer window appears, click **Try Orbit OS**, or just close the window.
+6. Open a terminal (the Terminal icon in the dock) and run:
+   ```bash
+   /cdrom/tools/hardware-check.sh 2>/dev/null || curl -fsSLO https://raw.githubusercontent.com/qitzblue2/OrbitOS/main/tools/hardware-check.sh && bash hardware-check.sh
+   ```
+   **Expected:** sections with `[ OK ]`, `[WARN]` and `[FAIL]` lines. Copy the output into `HARDWARE-TEST.md` under "Desktop".
+
+## 6. Test the EliteBook in live mode only
+1. Boot the laptop from the stick: press **F9** at the HP logo (or **Esc**, then F9). Do *not* install anything.
+2. Go through the checklist in `HARDWARE-TEST.md`: Wi-Fi, Bluetooth, sleep (close the lid, wait 30 s, open it), fingerprint, camera, the brightness, volume and mute keys, and the battery.
+3. Run `hardware-check.sh` as in step 5.
+4. For battery draw, unplug the charger, set the screen to 50%, leave the laptop idle for 5 minutes, then run:
+   ```bash
+   sudo powertop --time=60
+   ```
+   Write down the "discharge rate" figure.
+
+> Fingerprint enrollment does not persist in live mode. To test it, enroll in Settings → Users → Fingerprint Login, then lock the screen (Super+L) and unlock with your finger.
+
+## 7. Install
+### 7a. Required first: back up
+- Copy your files to an external drive, **then unplug that drive**.
+- On Windows, run *Create a recovery drive* (it needs a separate USB stick).
+- **If BitLocker is on, suspend it:** open Control Panel → BitLocker → **Suspend protection**. Without this, Windows will ask for the recovery key after installing, and dual boot can fail. Make sure you have the recovery key written down (see step 1).
+
+### 7b. Start the installer
+Double-click **Install Orbit OS**. A warning appears: type `I HAVE A BACKUP` exactly, then follow the screens.
+- When asked for the app selection, choose **Extended selection**. This includes all Orbit apps. *Default selection* gives a bare system without them.
+- Tick **Install third-party software** only if you need Wi-Fi or graphics drivers that do not work without it. Your machines do not need it.
+
+### 7c. Choose ONE of the two safe options
+**Option A — install next to Windows (dual boot).**
+1. In Windows, open *Disk Management*, right-click C: → **Shrink Volume**, and shrink by at least **60 GB**. Leave the freed space unallocated.
+2. In the installer, choose **Install Orbit OS alongside Windows Boot Manager**, or *Manual installation* → select the free space.
+3. GRUB will show Windows in its menu.
+
+**Option B — replace Windows (erases EVERYTHING on the disk).**
+1. Choose **Erase disk and install Orbit OS**.
+2. Optional: *Advanced features* → **Use LVM and encryption** (recommended for the laptop) → set a passphrase you will not forget. Without it, the data is gone.
+
+The last screen lists every change to your disks. Read it, then click **Install**. Nothing is written before this click.
+
+## 8. First boot
+1. Log in. The **Welcome** window opens. Pick **Glass**, **Graphite** or **Light**, set the language and keyboard, and enroll a fingerprint (only offered if the reader is supported).
+2. Open **Software → Updates** and install everything. Reboot if asked.
+3. Your folders live in **~/Home**: Desktop, Documents, Downloads, Pictures, Music, Videos, Projects, Spaces (Personal, Work, Study), Notes and Inbox.
+4. Optional: in **Orbit Settings**, turn on **Sort Inbox automatically**. Files dropped in Inbox are moved by type every two minutes. To undo all moves, run `/usr/lib/orbit-os/orbit-inbox-sorter --undo`.
+5. Press **Super** or **Super+Space** for the launcher: type an app name, a file name, a setting, or a sum like `12*7`.
+
+## 9. Update, rebuild and customize
+- **Updates:** security updates install automatically. For everything else, use Software → Updates, or `sudo apt update && sudo apt upgrade`.
+- **Change colors:** edit `branding/tokens.json`. A whole new theme is three values under `seed_themes` (ground, ink, accent). Then run:
+  ```bash
+  ./build.sh --debs-only
+  ```
+  ```bash
+  sudo apt install ./out/orbit-os-*.deb ./out/orbit-launcher_*.deb
+  ```
+- **Add apps to the image:** add the package names to `config/packages.base.list` (or `packages.full.list`), then run `./build.sh` again.
+- **Convert an existing Ubuntu 24.04 install:** install the three .deb files from `out/` with the `apt install` command above.
+
+## 10. Recovery
+- **Rescue shell:** boot the USB stick → Try Orbit OS → open a terminal. Your installed disk can be mounted from Files.
+- **Restore GRUB** (for example, after Windows overwrote it). From the live session:
+  ```bash
+  sudo mount /dev/nvme0n1pX /mnt
+  ```
+  Replace `X` with your root partition; check with `lsblk -f`.
+  ```bash
+  sudo mount /dev/nvme0n1p1 /mnt/boot/efi
+  ```
+  ```bash
+  for d in dev proc sys run; do sudo mount --bind /$d /mnt/$d; done
+  ```
+  ```bash
+  sudo chroot /mnt grub-install && sudo chroot /mnt update-grub
+  ```
+  With encryption, unlock first: `sudo cryptsetup open /dev/nvme0n1pX root`, then mount `/dev/mapper/ubuntu--vg-ubuntu--lv` (or what `lsblk` shows).
+- **Get back to Windows:** in the firmware boot menu (F9 on HP), choose **Windows Boot Manager**. To make Windows the default, change the boot order in the BIOS setup. To remove Orbit OS completely, boot a Windows recovery drive, delete the Linux partitions in Disk Management, and run `bcdedit /enum firmware` to remove the leftover "ubuntu" boot entry.
+
+## 11. Troubleshooting
+| Problem | Try this |
+|---|---|
+| Black screen after boot menu | At the boot menu, choose **safe graphics**. Or press `e`, add `nomodeset` after `quiet splash`, then F10. |
+| No Wi-Fi | Run `rfkill list`. If it says *blocked*, press the airplane-mode key, or run `rfkill unblock all`. Then check `hardware-check.sh` → Network for the driver. |
+| No sound | Settings → Sound → choose the right output. Run `wpctl status`. For the EliteBook, make sure the kernel is current: `uname -r` should show the HWE kernel. |
+| Suspend does not work or does not wake | Run `cat /sys/power/mem_sleep`. If `s2idle` misbehaves, update the BIOS through Software → Updates (fwupd). Report the result in HARDWARE-TEST.md. |
+| Fingerprint not detected | Run `lsusb` and note the ID (e.g. `06cb:00f9`), then look it up at https://fprint.freedesktop.org/supported-devices.html. Unsupported means password only. Do not install random drivers. |
+| "Verification failed" / Secure Boot error | Make sure you wrote the ISO in DD mode. If the problem persists, check the date and time in the BIOS. As a **last** resort, turn Secure Boot off temporarily, then report it. |
+| GRUB does not list Windows | Run `sudo sed -i 's/^#\?GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub`, then `sudo update-grub`. |
+| Glass looks laggy | Orbit Settings → **Reduce transparency**. |

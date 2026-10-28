@@ -1,0 +1,6 @@
+work/
+out/
+*.pyc
+__pycache__/
+icons/build/
+branding/build/

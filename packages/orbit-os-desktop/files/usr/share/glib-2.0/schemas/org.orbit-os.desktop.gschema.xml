@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.orbit-os.desktop" path="/org/orbit-os/desktop/">
+    <key name="style" type="s"><choices><choice value="glass"/><choice value="graphite"/><choice value="light"/></choices>
+      <default>'glass'</default><summary>Glass, Graphite or Light</summary></key>
+    <key name="reduce-transparency" type="b"><default>false</default><summary>Solid surfaces instead of blur</summary></key>
+    <key name="inbox-sorter" type="b"><default>false</default><summary>Sort ~/Home/Inbox automatically</summary></key>
+    <key name="welcome-done" type="b"><default>false</default><summary>First-run welcome completed</summary></key>
+  </schema>
+</schemalist>

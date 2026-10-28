@@ -1,0 +1,10 @@
+Package: orbit-launcher
+Version: @VERSION@
+Architecture: all
+Maintainer: Orbit OS builder <root@localhost>
+Depends: gnome-shell (>= 46), gnome-shell (<< 47)
+Section: gnome
+Priority: optional
+Description: Orbit Launcher GNOME Shell extension
+ App launcher on Super / Super+Space with search over apps, files,
+ settings and calculations, plus named, colored app folders.

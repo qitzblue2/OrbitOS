@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""First-run welcome: theme, language, keyboard layout, fingerprint.
+
+Language and keyboard open the real GNOME panels (no reimplementation).
+Fingerprint enrollment is only offered when fprintd reports a device.
+"""
+import subprocess, sys
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gio, Gtk
+
+
+def has_fingerprint():
+    try:
+        out = subprocess.run(["fprintd-list", subprocess.getoutput("id -un")],
+                             capture_output=True, text=True, timeout=5).stdout
+        return "found" in out.lower() and "no devices" not in out.lower()
+    except Exception:
+        return False
+
+
+class Welcome(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Welcome to Orbit OS", default_width=520, default_height=560)
+        self.s = Gio.Settings.new("org.orbit-os.desktop")
+        page = Adw.PreferencesPage()
+        g = Adw.PreferencesGroup(title="Welcome to Orbit OS",
+                                 description="A few choices. You can change all of them later in Orbit Settings.")
+        style = Adw.ComboRow(title="Style", model=Gtk.StringList.new(["Glass", "Graphite", "Light"]))
+        style.connect("notify::selected", lambda r, _: subprocess.run(
+            ["orbit-style", ["glass", "graphite", "light"][r.get_selected()]]))
+        g.add(style)
+        for title, panel in [("Language and region", "region"), ("Keyboard layout", "keyboard")]:
+            row = Adw.ActionRow(title=title, activatable=True)
+            row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
+            row.connect("activated", lambda _r, p=panel: subprocess.Popen(["gnome-control-center", p]))
+            g.add(row)
+        fp = Adw.ActionRow(title="Enroll a fingerprint", activatable=True)
+        if has_fingerprint():
+            fp.set_subtitle("Use your finger to log in, unlock and approve sudo")
+            fp.connect("activated", lambda *_: subprocess.Popen(["gnome-control-center", "users"]))
+        else:
+            fp.set_subtitle("No supported fingerprint reader found; your password works everywhere")
+            fp.set_sensitive(False)
+        g.add(fp)
+        page.add(g)
+        done = Gtk.Button(label="Done", css_classes=["suggested-action", "pill"], halign=Gtk.Align.CENTER,
+                          margin_bottom=24)
+        done.connect("clicked", self.finish)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        hb = Adw.HeaderBar()
+        box.append(hb)
+        page.set_vexpand(True)
+        box.append(page)
+        box.append(done)
+        self.set_content(box)
+
+    def finish(self, *_):
+        self.s.set_boolean("welcome-done", True)
+        self.close()
+
+
+app = Adw.Application(application_id="org.orbit_os.Welcome")
+app.connect("activate", lambda a: Welcome(a).present())
+if Gio.Settings.new("org.orbit-os.desktop").get_boolean("welcome-done") and "--force" not in sys.argv:
+    sys.exit(0)
+sys.exit(app.run([sys.argv[0]]))

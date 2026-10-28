@@ -1,0 +1,6 @@
+[Unit]
+Description=Orbit Inbox sorter (moves ~/Home/Inbox files by type)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/orbit-os/orbit-inbox-sorter

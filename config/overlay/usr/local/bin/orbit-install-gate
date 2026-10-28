@@ -1,0 +1,18 @@
+#!/bin/sh
+# Shown before Ubuntu's installer. The installer itself also shows a review page
+# listing every disk change before it writes anything.
+if [ "${1:-}" = "" ]; then exit 2; fi
+msg="Installing can ERASE disks.
+
+Before you continue:
+  • Back up everything you care about (see INSTALL.md step 7).
+  • If Windows uses BitLocker, suspend it first.
+  • Use 'Try Orbit OS' if you only want to test.
+
+Type  I HAVE A BACKUP  to open the installer."
+ans=$(zenity --entry --title="Install Orbit OS" --text="$msg" --width=460 2>/dev/null) || exit 0
+if [ "$ans" = "I HAVE A BACKUP" ]; then
+  exec "$@"
+fi
+zenity --info --title="Install Orbit OS" --text="Not confirmed. Nothing was changed." --width=360 2>/dev/null
+exit 0

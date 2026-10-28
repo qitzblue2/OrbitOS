@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.orbit-launcher" path="/org/gnome/shell/extensions/orbit-launcher/">
+    <key name="toggle-launcher" type="as">
+      <default><![CDATA[['<Super>space']]]></default>
+      <summary>Open Orbit Launcher</summary>
+    </key>
+    <key name="replace-overview-key" type="b">
+      <default>true</default>
+      <summary>Open the launcher instead of the overview when Super is tapped</summary>
+    </key>
+    <key name="folders" type="s">
+      <default>'[{"name":"Office","color":"#5aa6ff","apps":["libreoffice-writer.desktop","libreoffice-calc.desktop","libreoffice-impress.desktop"]},{"name":"Utilities","color":"#4fd1c0","apps":["org.gnome.Calculator.desktop","org.gnome.SystemMonitor.desktop","org.gnome.DiskUtility.desktop","org.gnome.FileRoller.desktop"]}]'</default>
+      <summary>App folders as JSON: [{name, color, apps[]}]</summary>
+    </key>
+    <key name="file-search-root" type="s">
+      <default>'Home'</default>
+      <summary>Folder (relative to $HOME) searched for files</summary>
+    </key>
+  </schema>
+</schemalist>

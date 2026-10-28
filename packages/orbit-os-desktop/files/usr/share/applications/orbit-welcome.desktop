@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome to Orbit OS
+Exec=/usr/lib/orbit-os/orbit-welcome --force
+Icon=orbit-launcher
+Categories=Settings;GTK;

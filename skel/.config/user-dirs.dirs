@@ -1,0 +1,9 @@
+# Orbit OS layout: all user folders live under ~/Home
+XDG_DESKTOP_DIR="$HOME/Home/Desktop"
+XDG_DOCUMENTS_DIR="$HOME/Home/Documents"
+XDG_DOWNLOAD_DIR="$HOME/Home/Downloads"
+XDG_PICTURES_DIR="$HOME/Home/Pictures"
+XDG_MUSIC_DIR="$HOME/Home/Music"
+XDG_VIDEOS_DIR="$HOME/Home/Videos"
+XDG_TEMPLATES_DIR="$HOME/Home/Documents/Templates"
+XDG_PUBLICSHARE_DIR="$HOME/Home/Public"

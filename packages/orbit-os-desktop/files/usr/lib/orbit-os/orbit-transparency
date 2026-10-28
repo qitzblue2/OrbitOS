@@ -1,0 +1,24 @@
+#!/bin/sh
+# orbit-transparency on|off|auto — "on" means reduce transparency (solid surfaces).
+set -eu
+mode=${1:-auto}
+if [ "$mode" = auto ]; then
+  mode=off
+  # GNOME 46 has no separate reduce-transparency key: follow reduce-motion (enable-animations)
+  # and high contrast, and treat software rendering as a weak GPU.
+  [ "$(gsettings get org.gnome.desktop.interface enable-animations)" = false ] && mode=on
+  [ "$(gsettings get org.gnome.desktop.a11y.interface high-contrast)" = true ] && mode=on
+  if command -v glxinfo >/dev/null && glxinfo -B 2>/dev/null | grep -qiE 'llvmpipe|softpipe'; then mode=on; fi
+fi
+ext=blur-my-shell@aunetx
+if [ "$mode" = on ]; then
+  gnome-extensions disable "$ext" 2>/dev/null || true
+  gsettings set org.gnome.shell.extensions.dash-to-dock transparency-mode "'FIXED'"
+  gsettings set org.gnome.shell.extensions.dash-to-dock background-opacity 1.0
+  gsettings set org.orbit-os.desktop reduce-transparency true
+else
+  gnome-extensions enable "$ext" 2>/dev/null || true
+  gsettings set org.gnome.shell.extensions.dash-to-dock background-opacity 0.0
+  gsettings set org.orbit-os.desktop reduce-transparency false
+fi
+echo "reduce-transparency: $mode"

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Orbit Settings
+Comment=Appearance, display, network, power, fingerprint, updates and privacy
+Exec=/usr/lib/orbit-os/orbit-settings
+Icon=orbit-settings
+Categories=Settings;GTK;
+Keywords=theme;glass;transparency;inbox;

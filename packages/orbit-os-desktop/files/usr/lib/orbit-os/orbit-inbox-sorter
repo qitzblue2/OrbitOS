@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Move files from ~/Home/Inbox into Documents/Pictures/Videos/Music by type.
+
+Every move is appended to ~/.local/state/orbit/inbox-moves.tsv
+(timestamp, source, destination). `orbit-inbox-sorter --undo` reverses the log.
+Never overwrites: name clashes get a " (2)" suffix. Files still being
+written (modified in the last 10 s) are skipped until the next run.
+"""
+import mimetypes, os, pathlib, shutil, sys, time
+
+HOME = pathlib.Path.home() / "Home"
+INBOX = HOME / "Inbox"
+LOG = pathlib.Path(os.environ.get("XDG_STATE_HOME", pathlib.Path.home() / ".local/state")) / "orbit/inbox-moves.tsv"
+TARGETS = {"image": "Pictures", "video": "Videos", "audio": "Music"}
+
+
+def dest_for(p):
+    mt, _ = mimetypes.guess_type(p.name)
+    major = (mt or "").split("/")[0]
+    return HOME / TARGETS.get(major, "Documents")
+
+
+def unique(d, name):
+    t = d / name
+    stem, suf, n = t.stem, t.suffix, 2
+    while t.exists():
+        t = d / f"{stem} ({n}){suf}"
+        n += 1
+    return t
+
+
+def sort_once():
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    for p in sorted(INBOX.iterdir()) if INBOX.is_dir() else []:
+        if not p.is_file() or p.name.startswith(".") or p.suffix in (".part", ".crdownload"):
+            continue
+        if time.time() - p.stat().st_mtime < 10:
+            continue
+        d = dest_for(p)
+        d.mkdir(parents=True, exist_ok=True)
+        t = unique(d, p.name)
+        shutil.move(str(p), str(t))
+        with LOG.open("a") as f:
+            f.write(f"{int(time.time())}\t{p}\t{t}\n")
+
+
+def undo():
+    if not LOG.exists():
+        return
+    lines = LOG.read_text().splitlines()
+    for line in reversed(lines):
+        _, src, dst = line.split("\t")
+        if pathlib.Path(dst).exists() and not pathlib.Path(src).exists():
+            shutil.move(dst, src)
+    LOG.rename(LOG.with_suffix(f".undone-{int(time.time())}"))
+
+
+if __name__ == "__main__":
+    undo() if "--undo" in sys.argv else sort_once()

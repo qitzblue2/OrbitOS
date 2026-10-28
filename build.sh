@@ -55,11 +55,15 @@ build_debs() {
   cp -a "$WORK/branding/wallpapers/"*.png "$b/files/usr/share/backgrounds/orbit/"
   cp -a "$WORK/branding/plymouth/orbit" "$b/files/usr/share/plymouth/themes/"
   cp -a "$WORK/branding/grub/orbit" "$b/files/usr/share/grub/themes/"
-  command -v rsvg-convert >/dev/null && \
-    rsvg-convert -w 128 -h 128 "$WORK/icons/orbit/scalable/apps/orbit-launcher.svg" \
-      -o "$b/files/usr/share/plymouth/themes/orbit/logo.png" || \
-    python3 -c "import cairosvg,sys;cairosvg.svg2png(url=sys.argv[1],write_to=sys.argv[2],output_width=128,output_height=128)" \
-      "$WORK/icons/orbit/scalable/apps/orbit-launcher.svg" "$b/files/usr/share/plymouth/themes/orbit/logo.png"
+  # Boot logo: your own branding/boot-logo/logo.png|svg wins; else the launcher glyph.
+  local logo_out="$b/files/usr/share/plymouth/themes/orbit/logo.png" logo_src
+  if [ -f "$HERE/branding/boot-logo/logo.png" ]; then
+    cp "$HERE/branding/boot-logo/logo.png" "$logo_out"; log "boot logo: branding/boot-logo/logo.png"
+  else
+    logo_src="$HERE/branding/boot-logo/logo.svg"
+    [ -f "$logo_src" ] || logo_src="$WORK/icons/orbit/scalable/apps/orbit-launcher.svg"
+    rsvg-convert -w 192 -h 192 "$logo_src" -o "$logo_out"; log "boot logo: $logo_src"
+  fi
   python3 - "$b/files/usr/share/gnome-background-properties/orbit.xml" <<'PY'
 import sys
 names = ["glass", "lagoon", "graphite", "light"]
@@ -78,6 +82,7 @@ PY
   cp -a "$HERE/packages/orbit-os-desktop" "$d"
   mkdir -p "$d/files/etc/skel"
   cp -a "$HERE/skel/." "$d/files/etc/skel/"
+  install -D -m 755 "$HERE/tools/hardware-check.sh" "$d/files/usr/bin/orbit-hardware-check"
   local rec="keepassxc, gnome-calendar, loupe, evince"
   [ "$VARIANT" = full ] && rec="$rec, flatpak, libreoffice-writer"
   for p in orbit-os-branding orbit-launcher orbit-os-desktop; do
@@ -190,6 +195,13 @@ customize_layer() {
 customize_layer minimal.standard 10-desktop.chroot.sh minimal
 customize_layer minimal.standard.live 20-live.chroot.sh minimal.standard minimal
 
+# The live boot splash comes from casper/initrd, not the squashfs: use the one
+# regenerated in the live chroot (it contains casper + the Orbit Plymouth theme).
+newinitrd=$(ls -t "$L/minimal.standard.live"/boot/initrd.img-* 2>/dev/null | head -1)
+[ -n "$newinitrd" ] || die "live chroot did not produce an initrd"
+cp "$newinitrd" "$X/casper/initrd"
+rm -f "$L/minimal.standard.live"/boot/initrd.img-*
+
 # ---------- stage E: repack ----------
 for sq in minimal.standard minimal.standard.live; do
   log "repacking $sq.squashfs"
@@ -203,6 +215,7 @@ done
 # Live-boot menu text only: signed shim/GRUB/kernel binaries are untouched.
 sed -i "s/Try or Install Ubuntu/Try or Install Orbit OS/g; s/Ubuntu (safe graphics)/Orbit OS (safe graphics)/g" \
   "$X/boot/grub/grub.cfg" "$X/boot/grub/loopback.cfg" 2>/dev/null || true
+install -D -m 755 "$HERE/tools/hardware-check.sh" "$X/tools/hardware-check.sh"
 printf 'Orbit OS %s (based on Ubuntu 24.04 LTS) - %s amd64\n' "$ORBIT_VERSION" "$VARIANT" > "$X/.disk/info"
 
 if [ "$VARIANT" = lite ]; then

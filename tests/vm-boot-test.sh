@@ -3,10 +3,10 @@
 #
 #   tests/vm-boot-test.sh out/orbit-os-1.0.0-full-amd64.iso [timeout_s]
 #
-# Pass criteria (both required):
-#   1. the serial console reports graphical.target (systemd status on ttyS0)
-#   2. a screenshot shows a rendered desktop: not mostly black, many colors,
-#      and the Orbit wallpaper hue present (checked by tests/screen_check.py)
+# Pass criterion: two consecutive screenshots (20 s apart) both look like a
+# rendered desktop: not mostly black, many colors, mid-tones from the wallpaper
+# (tests/screen_check.py). The Ubuntu live kernel does not log to ttyS0, so the
+# serial log is kept as evidence (GRUB output) but is not required.
 # Uses KVM when /dev/kvm exists; otherwise TCG (slow: allow 20+ min).
 # Never attaches a real disk: the only disk is a throwaway qcow2 in a temp dir.
 set -euo pipefail
@@ -30,13 +30,18 @@ qemu-system-x86_64 "${args[@]}" &
 QPID=$!
 shot() { echo "screendump $1" | socat - UNIX-CONNECT:"$T/mon" >/dev/null 2>&1 || true; }
 # GRUB: the default entry boots after its timeout; nothing to type.
-start=$(date +%s); i=0; graphical=0
+start=$(date +%s); i=0; graphical=0; streak=0
 while :; do
   sleep 20; i=$((i+1))
   shot "$T/s.ppm"
   [ -s "$T/s.ppm" ] && python3 -c "from PIL import Image;import sys;Image.open(sys.argv[1]).save(sys.argv[2])" "$T/s.ppm" "$OUTD/shot-$(printf %03d $i).png"
   grep -q "graphical.target" "$OUTD/serial.log" 2>/dev/null && graphical=1
-  if [ $graphical = 1 ] && [ -f "$OUTD/shot-$(printf %03d $i).png" ] && python3 "$HERE/screen_check.py" "$OUTD/shot-$(printf %03d $i).png"; then
+  if [ -f "$OUTD/shot-$(printf %03d $i).png" ] && python3 "$HERE/screen_check.py" "$OUTD/shot-$(printf %03d $i).png"; then
+    streak=$((streak+1))
+  else
+    streak=0
+  fi
+  if [ $streak -ge 2 ]; then
     echo "[vm-test] PASS: desktop after $(( $(date +%s) - start ))s — screenshots in $OUTD"; exit 0
   fi
   if [ $(( $(date +%s) - start )) -gt "$TIMEOUT" ]; then

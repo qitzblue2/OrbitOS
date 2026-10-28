@@ -1,0 +1,16 @@
+#!/bin/sh
+# orbit-set-boot-logo IMAGE.png|IMAGE.svg — use your own startup logo (run with sudo).
+set -eu
+img=${1:?usage: sudo orbit-set-boot-logo IMAGE.png|IMAGE.svg}
+[ "$(id -u)" = 0 ] || { echo "run with sudo" >&2; exit 1; }
+[ -f "$img" ] || { echo "no such file: $img" >&2; exit 1; }
+dst=/usr/share/plymouth/themes/orbit/logo.png
+[ -f "$dst" ] && [ ! -f "$dst.orig" ] && cp "$dst" "$dst.orig"
+case "$img" in
+  *.svg|*.SVG) rsvg-convert -w 192 -h 192 "$img" -o "$dst" ;;
+  *.png|*.PNG) cp "$img" "$dst" ;;
+  *) echo "use a .png or .svg file" >&2; exit 1 ;;
+esac
+chmod 644 "$dst"
+update-initramfs -u
+echo "Boot logo set. Reboot to see it. Undo: sudo orbit-set-boot-logo $dst.orig"

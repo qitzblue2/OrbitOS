@@ -141,6 +141,11 @@ The last screen lists every change to your disks. Read it, then click **Install*
   ```bash
   sudo apt install ./out/orbit-os-*.deb ./out/orbit-launcher_*.deb
   ```
+- **Your own startup logo:** save it as `branding/boot-logo/logo.png` (transparent, about 192 px) or `logo.svg`, then run `./build.sh`. On an installed system, no rebuild is needed:
+  ```bash
+  sudo orbit-set-boot-logo ~/Pictures/my-logo.png
+  ```
+  Then reboot. See `branding/boot-logo/README.md`.
 - **Add apps to the image:** add the package names to `config/packages.base.list` (or `packages.full.list`), then run `./build.sh` again.
 - **Convert an existing Ubuntu 24.04 install:** install the three .deb files from `out/` with the `apt install` command above.
 

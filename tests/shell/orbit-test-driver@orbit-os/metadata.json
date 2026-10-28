@@ -1,0 +1,6 @@
+{
+  "uuid": "orbit-test-driver@orbit-os",
+  "name": "Orbit test driver (tests only, never shipped)",
+  "description": "Drives a headless GNOME Shell through the Orbit desktop and saves screenshots.",
+  "shell-version": ["46"]
+}

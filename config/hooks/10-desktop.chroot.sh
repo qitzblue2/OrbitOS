@@ -71,7 +71,8 @@ else
 fi
 
 say "installing Orbit packages"
-$APT install /tmp/orbit/orbit-os-branding_*.deb /tmp/orbit/orbit-launcher_*.deb /tmp/orbit/orbit-os-desktop_*.deb
+$APT install /tmp/orbit/orbit-os-branding_*.deb /tmp/orbit/orbit-launcher_*.deb /tmp/orbit/orbit-apps_*.deb \
+  /tmp/orbit/orbit-shell-extensions_*.deb /tmp/orbit/orbit-os-desktop_*.deb
 
 say "Firefox: drop the snap seed (a .deb from Mozilla is installed instead); keep the snap store out of the way"
 seed=/var/lib/snapd/seed/seed.yaml

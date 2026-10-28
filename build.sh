@@ -77,15 +77,34 @@ PY
   cp -a "$HERE/packages/orbit-launcher/DEBIAN" "$l/"
   cp -a "$HERE/packages/orbit-launcher/orbit-launcher@orbit-os" "$l/files/usr/share/gnome-shell/extensions/"
   glib-compile-schemas "$l/files/usr/share/gnome-shell/extensions/orbit-launcher@orbit-os/schemas" 2>/dev/null || true
+  # orbit-apps (Python/GTK apps) + orbit-shell-extensions
+  local oa="$stage/orbit-apps"
+  cp -a "$HERE/packages/orbit-apps" "$oa"
+  mkdir -p "$oa/files/usr/lib/orbit-os/python" "$oa/files/usr/share/orbit-os"
+  cp -a "$HERE/packages/orbit-apps/src/orbit" "$oa/files/usr/lib/orbit-os/python/"
+  find "$oa/files/usr/lib/orbit-os/python" -name __pycache__ -prune -exec rm -rf {} +
+  cp "$HERE/packages/orbit-apps/data/store-catalog.json" "$oa/files/usr/share/orbit-os/"
+  mkdir -p "$b/files/usr/share/orbit-os"
+  cp "$HERE/branding/tokens.json" "$b/files/usr/share/orbit-os/tokens.json"
+  local se="$stage/orbit-shell-extensions"
+  mkdir -p "$se/files/usr/share/gnome-shell/extensions"
+  cp -a "$HERE/packages/orbit-shell-extensions/DEBIAN" "$se/"
+  for ext in "$HERE"/packages/orbit-shell-extensions/*@orbit-os; do
+    cp -a "$ext" "$se/files/usr/share/gnome-shell/extensions/"
+    [ -d "$ext/schemas" ] && glib-compile-schemas "$se/files/usr/share/gnome-shell/extensions/$(basename "$ext")/schemas"
+  done
   # orbit-os-desktop (+ skel)
   local d="$stage/orbit-os-desktop"
   cp -a "$HERE/packages/orbit-os-desktop" "$d"
   mkdir -p "$d/files/etc/skel"
   cp -a "$HERE/skel/." "$d/files/etc/skel/"
   install -D -m 755 "$HERE/tools/hardware-check.sh" "$d/files/usr/bin/orbit-hardware-check"
+  # single source of truth for desktop defaults: config/dconf
+  install -D -m 644 "$HERE/config/dconf/db/local.d/00-orbit" "$d/files/etc/dconf/db/local.d/00-orbit"
+  install -D -m 644 "$HERE/config/dconf/profile/user" "$d/files/etc/dconf/profile/user"
   local rec="keepassxc, gnome-calendar, loupe, evince"
   [ "$VARIANT" = full ] && rec="$rec, flatpak, libreoffice-writer"
-  for p in orbit-os-branding orbit-launcher orbit-os-desktop; do
+  for p in orbit-os-branding orbit-launcher orbit-apps orbit-shell-extensions orbit-os-desktop; do
     local s="$stage/$p" root="$stage/$p.root"
     mkdir -p "$root"; cp -a "$s/files/." "$root/"; cp -a "$s/DEBIAN" "$root/"
     sed -i "s/@VERSION@/$ver/g; s/@RECOMMENDS@/$rec/" "$root/DEBIAN/control"

@@ -132,8 +132,12 @@ def shell_css(s, glass=True):
     fb, t, g = s["fill_base"], TOKENS, TOKENS["glass"]
     panel = rgba(s["panel"], 0.55) if glass else s["panel"]
     menu = rgba(s["menu"], s["menu_alpha"]) if glass else s["raised"]
-    return f"""/* Orbit OS shell theme — generated. Imports the stock shell theme and overrides colors. */
-@import url("resource:///org/gnome/shell/theme/gnome-shell.css");
+    # No @import of the stock theme: GNOME's user-theme extension already loads it as the
+    # default stylesheet underneath this one. Importing it again re-adds every stock rule
+    # *after* ours in the same layer, and those copies win (tests/shell/run-desktop-shots.sh
+    # showed the toggles staying GNOME-blue).
+    lit, lit_text = s["lit"], s["lit_text"]
+    rules = f"""
 stage {{ font-family: "{t['type']['ui_font']}", sans-serif; font-size: {t['type']['ui_size_px']}px; color: {s['text']}; }}
 #panel {{ background-color: {panel}; height: {t['space']['control_max'] - 4}px; }}
 #panel .panel-button {{ color: {s['text']}; border-radius: {t['radius']['sm']}px; }}
@@ -143,12 +147,27 @@ stage {{ font-family: "{t['type']['ui_font']}", sans-serif; font-size: {t['type'
   background-color: {menu}; color: {s['text']};
   border: 1px solid {rgba(fb, s['border_strong_alpha'])}; border-radius: {t['radius']['lg']}px; }}
 .popup-menu-item:hover, .popup-menu-item:focus {{ background-color: {rgba(fb, s['row_hover'] * 2)}; }}
-.quick-toggle:checked {{ background-color: {s['lit']}; color: {s['lit_text']}; }}
+.quick-toggle, .quick-menu-toggle .quick-toggle-arrow {{ background-color: {rgba(fb, s['fill_active'])}; color: {s['text']}; }}
+.quick-toggle:hover, .quick-menu-toggle .quick-toggle-arrow:hover {{ background-color: {rgba(fb, s['fill_pressed'])}; }}
+.quick-toggle:checked, .quick-menu-toggle .quick-toggle-arrow:checked,
+.quick-toggle:hover:checked, .quick-menu-toggle .quick-toggle-arrow:hover:checked,
+.quick-toggle:focus:checked, .quick-menu-toggle .quick-toggle-arrow:focus:checked,
+.quick-toggle:active:checked, .quick-menu-toggle .quick-toggle-arrow:active:checked {{
+  background-color: {lit}; color: {lit_text}; }}
+.quick-menu-toggle .quick-toggle-arrow:checked {{ border-left: 1px solid {rgba(lit_text, 0.15)}; }}
+.quick-settings .icon-button {{ background-color: {rgba(fb, s['fill_active'])}; }}
+.toggle-switch:checked {{ background-color: {lit}; }}
+.slider {{ -barlevel-active-background-color: {lit}; }}
+.calendar .calendar-day.calendar-today, .calendar .calendar-day.calendar-today:hover {{ background-color: {lit}; color: {lit_text}; }}
 #dash, .dash-background {{ background-color: {menu}; border-radius: {t['radius']['lg']}px; }}
 .search-entry {{ background-color: {rgba(fb, s['fill_rest'])}; color: {s['text']}; border-radius: {t['radius']['md']}px; }}
 .app-well-app-label, .overview-tile .overview-label {{ text-shadow: 0 1px 2px {rgba(g['scrim'], 0.6)}; }}
 .login-dialog {{ background-color: {rgba(g['scrim'], g['scrim_alpha']) if glass else s['canvas']}; }}
 """
+    # Plain selectors only: a `stage ...` descendant prefix matches nothing in St and silently
+    # disables the rule (verified in GNOME Shell 46 by tests/shell/run-desktop-shots.sh).
+    return ('/* Orbit OS shell theme (generated). Overrides on top of the stock GNOME Shell theme,\n'
+            '   which the user-theme extension loads underneath. */\n' + rules)
 
 
 # ---------- terminal (GNOME Terminal dconf profile) ----------

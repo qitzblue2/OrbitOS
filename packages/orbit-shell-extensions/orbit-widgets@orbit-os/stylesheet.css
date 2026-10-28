@@ -1,0 +1,26 @@
+/* Glass values mirror branding/tokens.json "glass"; .solid = Reduce transparency. */
+.orbit-widget {
+  background-color: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 22px;
+  padding: 18px 22px;
+  min-width: 230px;
+  spacing: 6px;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(40, 10, 90, 0.28);
+  text-shadow: 0 1px 2px rgba(18, 10, 38, 0.55);
+}
+.orbit-widget:hover { background-color: rgba(255, 255, 255, 0.18); }
+.orbit-widget:dragging { background-color: rgba(255, 255, 255, 0.24); }
+.orbit-widget.solid { background-color: #26262a; border-color: rgba(255, 255, 255, 0.13); text-shadow: none; }
+.orbit-widget-big { font-size: 46px; font-weight: 300; }
+.orbit-widget-title { font-size: 14px; font-weight: 700; }
+.orbit-widget-sub { font-size: 13px; color: rgba(255, 255, 255, 0.86); }
+.orbit-widget-row { spacing: 12px; }
+.orbit-widget-grid { spacing-rows: 2px; spacing-columns: 2px; padding-top: 6px; }
+.orbit-widget-dow { font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.7); text-align: center; }
+.orbit-widget-day { font-size: 12px; min-width: 26px; min-height: 22px; text-align: center; border-radius: 999px; }
+.orbit-widget-day.today { background-color: #ededf0; color: #161619; font-weight: 700; text-shadow: none; }
+.orbit-widget-meter { spacing: 4px; padding-top: 6px; }
+.orbit-widget-track { height: 6px; border-radius: 999px; background-color: rgba(255, 255, 255, 0.2); min-width: 190px; }
+.orbit-widget-fill { height: 6px; border-radius: 999px; background-color: #ededf0; }

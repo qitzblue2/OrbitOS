@@ -1,0 +1,4 @@
+# Orbit OS defaults. Your own choices in ~/.config/mimeapps.list always win.
+[Default Applications]
+inode/directory=orbit-files.desktop;org.gnome.Nautilus.desktop;
+text/markdown=orbit-notes.desktop;org.gnome.TextEditor.desktop;

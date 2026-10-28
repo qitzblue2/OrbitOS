@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name=Screenshot
+GenericName=Screenshot Tool
+Comment=Capture the screen and add arrows, boxes and text
+Exec=orbit-screenshot %F
+Icon=orbit-screenshot
+Categories=GTK;Graphics;2DGraphics;RasterGraphics;
+StartupNotify=true
+DBusActivatable=false
+MimeType=image/png;image/jpeg;
+Keywords=capture;annotate;snip;print screen;
+Actions=capture;
+
+[Desktop Action capture]
+Name=Capture Area
+Exec=orbit-screenshot --capture

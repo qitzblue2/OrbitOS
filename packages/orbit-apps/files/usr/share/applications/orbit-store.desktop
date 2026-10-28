@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Store
+GenericName=App Store
+Comment=Hand-picked apps from Ubuntu and Flathub
+Exec=orbit-store
+Icon=orbit-store
+Categories=GTK;Settings;PackageManager;
+StartupNotify=true
+DBusActivatable=false
+Keywords=install;apps;software;flathub;

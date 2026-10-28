@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Spaces
+GenericName=Workspace Profiles
+Comment=Switch folder, wallpaper, dock and notifications in one click
+Exec=orbit-spaces
+Icon=orbit-spaces
+Categories=GTK;Settings;DesktopSettings;
+StartupNotify=true
+DBusActivatable=false
+Keywords=personal;work;study;profile;

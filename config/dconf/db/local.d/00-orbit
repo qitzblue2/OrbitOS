@@ -26,8 +26,8 @@ remember-recent-files=true
 event-sounds=false
 
 [org/gnome/shell]
-enabled-extensions=['ubuntu-dock@ubuntu.com', 'blur-my-shell@aunetx', 'orbit-launcher@orbit-os', 'user-theme@gnome-shell-extensions.gcampax.github.com']
-favorite-apps=['org.gnome.Nautilus.desktop', 'firefox-esr.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.TextEditor.desktop', 'org.keepassxc.KeePassXC.desktop', 'orbit-settings.desktop']
+enabled-extensions=['ubuntu-dock@ubuntu.com', 'blur-my-shell@aunetx', 'orbit-launcher@orbit-os', 'orbit-control-center@orbit-os', 'orbit-widgets@orbit-os', 'orbit-clipboard@orbit-os', 'user-theme@gnome-shell-extensions.gcampax.github.com']
+favorite-apps=['orbit-files.desktop', 'firefox-esr.desktop', 'orbit-notes.desktop', 'org.gnome.Terminal.desktop', 'orbit-store.desktop', 'org.keepassxc.KeePassXC.desktop', 'orbit-settings.desktop']
 welcome-dialog-last-shown-version='999'
 
 [org/gnome/shell/extensions/user-theme]
@@ -49,8 +49,46 @@ running-indicator-style='DOTS'
 sigma=14
 brightness=0.85
 
+[org/gnome/shell/extensions/blur-my-shell/popup]
+# Keep Orbit's colors on menus: without this, Blur my Shell restyles Quick Settings toggles
+# GNOME-blue with !important (found with tests/shell/run-desktop-shots.sh)
+preserve-shell-theme=true
+
 [org/gnome/mutter]
 experimental-features=['scale-monitor-framebuffer']
+
+[org/gnome/shell/keybindings]
+# Super+V is Orbit Clipboard; the notification list keeps GNOME's other key, Super+M
+toggle-message-tray=['<Super>m']
+
+[org/gnome/settings-daemon/plugins/media-keys]
+custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-screenshot/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-files/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-1/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-3/']
+home=@as []
+
+[org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-screenshot]
+name='Orbit Screenshot (area)'
+command='orbit-screenshot --capture'
+binding='<Shift><Super>s'
+
+[org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-files]
+name='Orbit Files'
+command='orbit-files'
+binding='<Super>e'
+
+[org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-1]
+name='Switch to Space 1'
+command='orbit-spaces 1'
+binding='<Super><Alt>1'
+
+[org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-2]
+name='Switch to Space 2'
+command='orbit-spaces 2'
+binding='<Super><Alt>2'
+
+[org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-3]
+name='Switch to Space 3'
+command='orbit-spaces 3'
+binding='<Super><Alt>3'
 
 [org/gnome/desktop/wm/keybindings]
 switch-input-source=['<Super><Alt>space']

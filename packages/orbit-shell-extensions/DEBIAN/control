@@ -1,0 +1,11 @@
+Package: orbit-shell-extensions
+Version: @VERSION@
+Architecture: all
+Maintainer: Orbit OS builder <root@localhost>
+Depends: gnome-shell (>= 46), gnome-shell (<< 47), gir1.2-upowerglib-1.0, gir1.2-soup-3.0
+Section: gnome
+Priority: optional
+Description: Orbit OS GNOME Shell extensions
+ Orbit Control Center (Quick Settings toggles for glass, style, Spaces and
+ Inbox sorting), Orbit Widgets (glass desktop widgets) and Orbit Clipboard
+ (Super+V history that skips password-manager copies).

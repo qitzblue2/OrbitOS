@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Hardware
+GenericName=Hardware Report
+Comment=See what works on this computer
+Exec=orbit-hardware
+Icon=orbit-hardware
+Categories=GTK;System;Monitor;
+StartupNotify=true
+DBusActivatable=false
+Keywords=wifi;fingerprint;battery;drivers;test;

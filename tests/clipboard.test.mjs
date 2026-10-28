@@ -1,0 +1,17 @@
+import {History, looksSecret, preview} from '../packages/orbit-shell-extensions/orbit-clipboard@orbit-os/history.js';
+let bad = 0; const ok = (c, m) => { if (!c) { bad++; console.log('FAIL', m); } };
+const h = new History(3);
+['a', 'b', 'c', 'd'].forEach(t => h.add(t));
+ok(JSON.stringify(h.items.map(i => i.text)) === '["d","c","b"]', 'limit keeps newest');
+h.add('b');
+ok(h.items[0].text === 'b' && h.items.length === 3, 're-copy moves to top, no duplicate');
+h.togglePin('c'); ['e', 'f', 'g', 'h'].forEach(t => h.add(t));
+ok(h.items.some(i => i.text === 'c' && i.pinned), 'pinned survives the limit');
+ok(h.search('')[0].text === 'c', 'pinned first in results');
+ok(!h.add('   ') && !h.add('x'.repeat(200001)), 'blank and huge copies ignored');
+ok(JSON.parse(h.serialize(false)).length === 1, 'only pinned persisted by default');
+const h2 = new History(); h2.load(h.serialize(true)); ok(h2.items.length === h.items.length, 'round trip');
+h2.load('not json'); ok(h2.items.length === h.items.length, 'bad file ignored');
+ok(looksSecret(['text/plain', 'x-kde-passwordManagerHint']) && !looksSecret(['text/plain']), 'password manager copies skipped');
+ok(preview('a\n\n  b', 10) === 'a b' && preview('x'.repeat(200), 10).length === 10, 'preview');
+console.log(bad ? 'clipboard tests failed' : 'clipboard tests passed'); process.exit(bad ? 1 : 0);

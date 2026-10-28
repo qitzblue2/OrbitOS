@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Backup
+GenericName=Backups
+Comment=Snapshot backups of your Home folder
+Exec=orbit-backup
+Icon=orbit-backup
+Categories=GTK;Utility;Archiving;
+StartupNotify=true
+DBusActivatable=false
+Keywords=restore;snapshot;usb;rsync;

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.orbit-clipboard" path="/org/gnome/shell/extensions/orbit-clipboard/">
+    <key name="toggle-history" type="as"><default><![CDATA[['<Super>v']]]></default><summary>Open clipboard history</summary></key>
+    <key name="history-size" type="i"><range min="5" max="200"/><default>50</default><summary>Items to remember</summary></key>
+    <key name="remember-across-sessions" type="b"><default>false</default>
+      <summary>Keep unpinned history after logging out (stored as plain text in ~/.local/share/orbit)</summary></key>
+    <key name="paused" type="b"><default>false</default><summary>Stop recording</summary></key>
+    <key name="paste-on-select" type="b"><default>true</default><summary>Paste into the focused app after choosing</summary></key>
+  </schema>
+</schemalist>

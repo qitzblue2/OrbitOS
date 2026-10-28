@@ -1,0 +1,8 @@
+{
+  "uuid": "orbit-control-center@orbit-os",
+  "name": "Orbit Control Center",
+  "description": "Orbit toggles in Quick Settings: glass on/off, style (Glass/Graphite/Light), Space switcher and Inbox sorting.",
+  "shell-version": ["46"],
+  "url": "https://github.com/qitzblue2/OrbitOS",
+  "version": 1
+}

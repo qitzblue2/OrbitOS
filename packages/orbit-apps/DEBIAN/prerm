@@ -1,0 +1,3 @@
+#!/bin/sh
+set -e
+find /usr/lib/orbit-os/python -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true

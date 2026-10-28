@@ -1,6 +1,7 @@
 // Orbit Launcher — GNOME Shell 46 extension (ESM).
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
@@ -42,9 +43,12 @@ function listFiles(root) {
     return out;
 }
 
-const LauncherDialog = class extends ModalDialog.ModalDialog {
-    constructor(settings) {
-        super({styleClass: 'orbit-launcher', destroyOnClose: true});
+// ModalDialog is a GObject class: subclasses must be registered and use _init (found by
+// tests/shell/run-desktop-shots.sh; a plain ES class throws "construct an object without a GType").
+const LauncherDialog = GObject.registerClass(
+class LauncherDialog extends ModalDialog.ModalDialog {
+    _init(settings) {
+        super._init({styleClass: 'orbit-launcher', destroyOnClose: true});
         this._settings = settings;
         this._appSystem = Shell.AppSystem.get_default();
 
@@ -150,7 +154,7 @@ const LauncherDialog = class extends ModalDialog.ModalDialog {
             first._orbitAction();
         }
     }
-};
+});
 
 export default class OrbitLauncherExtension extends Extension {
     enable() {

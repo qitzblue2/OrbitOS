@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.orbit-widgets" path="/org/gnome/shell/extensions/orbit-widgets/">
+    <key name="show-clock" type="b"><default>true</default><summary>Clock</summary></key>
+    <key name="show-calendar" type="b"><default>true</default><summary>Month calendar</summary></key>
+    <key name="show-system" type="b"><default>true</default><summary>CPU, memory and battery</summary></key>
+    <key name="show-weather" type="b"><default>false</default>
+      <summary>Weather (off by default: it is the only widget that uses the network)</summary></key>
+    <key name="weather-latitude" type="d"><default>52.37</default><summary>Weather latitude</summary></key>
+    <key name="weather-longitude" type="d"><default>4.90</default><summary>Weather longitude</summary></key>
+    <key name="weather-place" type="s"><default>'Amsterdam'</default><summary>Place name shown</summary></key>
+    <key name="clock-24h" type="b"><default>true</default><summary>24-hour clock</summary></key>
+    <key name="positions" type="s"><default>'{}'</default>
+      <summary>Widget positions as JSON {id: [x, y]} relative to the primary monitor</summary></key>
+  </schema>
+</schemalist>

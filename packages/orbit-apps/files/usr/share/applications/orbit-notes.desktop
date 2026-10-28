@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Notes
+GenericName=Markdown Notes
+Comment=Plain Markdown notes in your Home folder
+Exec=orbit-notes
+Icon=orbit-notes
+Categories=GTK;Utility;TextEditor;
+StartupNotify=true
+DBusActivatable=false
+MimeType=text/markdown;
+Keywords=markdown;memo;todo;writing;

@@ -38,6 +38,15 @@ GLYPHS = {
     "launcher": '<rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/>',
     "updates": '<path d="M12 3.5v10M8 9.5l4 4 4-4M4 14.5v3a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-3"/>',
     "network": '<path d="M2.5 9.5a14 14 0 0 1 19 0M5.5 13a9.5 9.5 0 0 1 13 0M8.5 16.4a5 5 0 0 1 7 0"/><path d="M12 19.8h.01"/>',
+    # Orbit's own apps
+    "store": '<path d="M5.5 8.5h13l-1.2 11a1.5 1.5 0 0 1-1.5 1.3H8.2a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/>',
+    "screenshot": '<path d="M4 8.5V5.5a1.5 1.5 0 0 1 1.5-1.5h3M15.5 4h3A1.5 1.5 0 0 1 20 5.5v3M20 15.5v3a1.5 1.5 0 0 1-1.5 1.5h-3M8.5 20h-3A1.5 1.5 0 0 1 4 18.5v-3"/><circle cx="12" cy="12" r="3.2"/>',
+    "backup": '<path d="M4.6 13.2A7.5 7.5 0 1 0 6.8 6.6"/><path d="M4.2 3.8v4h4"/><path d="M12 8v4.2l2.8 1.8"/>',
+    "hardware": '<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3.5V7M14 3.5V7M10 17v3.5M14 17v3.5M3.5 10H7M3.5 14H7M17 10h3.5M17 14h3.5"/>',
+    "clipboard": '<rect x="5.5" y="5" width="13" height="16" rx="2.5"/><path d="M9 3.5h6v3H9zM9 11h6M9 15h4"/>',
+    "spaces": '<circle cx="12" cy="12" r="2.6"/><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(-24 12 12)"/>',
+    "widgets": '<rect x="4" y="4" width="7" height="9" rx="2"/><rect x="13" y="4" width="7" height="5" rx="2"/><rect x="13" y="11" width="7" height="9" rx="2"/><rect x="4" y="15" width="7" height="5" rx="2"/>',
+    "control": '<rect x="3" y="5" width="18" height="6" rx="3"/><circle cx="15.5" cy="8" r="1.4"/><rect x="3" y="13" width="18" height="6" rx="3"/><circle cx="8.5" cy="16" r="1.4"/>',
 }
 
 # Folder symbols (drawn small, centered on the folder front panel at 12,14)
@@ -59,7 +68,7 @@ FOLDER_SYMBOLS = {
 # freedesktop names each glyph/folder maps to (verified against Ubuntu 24.04 .desktop files
 # by tests/check-icon-names.sh at build time; aliases become symlinks).
 APP_MAP = {
-    "files": ["org.gnome.Nautilus", "system-file-manager"],
+    "files": ["orbit-files", "org.gnome.Nautilus", "system-file-manager"],
     "browser": ["firefox", "firefox-esr", "chromium", "web-browser"],
     "terminal": ["org.gnome.Terminal", "utilities-terminal", "org.gnome.Ptyxis"],
     "code": ["org.gnome.TextEditor", "accessories-text-editor", "org.gnome.gedit"],
@@ -75,6 +84,14 @@ APP_MAP = {
     "launcher": ["orbit-launcher", "view-app-grid"],
     "updates": ["org.gnome.Software", "system-software-update", "update-manager"],
     "network": ["preferences-system-network", "network-wireless", "nm-device-wireless"],
+    "store": ["orbit-store"],
+    "screenshot": ["orbit-screenshot", "org.gnome.Screenshot", "applets-screenshooter"],
+    "backup": ["orbit-backup", "org.gnome.DejaDup"],
+    "hardware": ["orbit-hardware", "hardinfo"],
+    "clipboard": ["orbit-clipboard"],
+    "spaces": ["orbit-spaces"],
+    "widgets": ["orbit-widgets"],
+    "control": ["orbit-control-center"],
 }
 FOLDER_MAP = {
     "plain": ["folder"], "music": ["folder-music"], "favorites": ["folder-favorites"],
@@ -94,6 +111,17 @@ MIME = {  # file-type glyph drawn on a page
     "pdf": ("application-pdf", '<path d="M9 16.5c2-1 4-3.5 4.5-5.5.3-1-1.2-1.2-1-0 .4 2 1.5 4 3 5"/>'),
 }
 SIZES = [16, 24, 32, 48, 64, 128, 256, 512]
+# Editor tool icons (Orbit Screenshot), symbolic only: orbit-tool-<name>-symbolic
+TOOL_GLYPHS = {
+    "pen": '<path d="M15.5 4.5l4 4L9 19H5v-4z"/><path d="M13 7l4 4"/>',
+    "highlight": '<path d="M14 4l6 6-7.5 7.5h-3l-3-3v-3z"/><path d="M4 20h7"/>',
+    "arrow": '<path d="M5 19L19 5M10 5h9v9"/>',
+    "rect": '<rect x="4" y="5.5" width="16" height="13" rx="2.5"/>',
+    "ellipse": '<ellipse cx="12" cy="12" rx="8.5" ry="6.5"/>',
+    "text": '<path d="M5 6.5V5h14v1.5M12 5v14M9 19h6"/>',
+    "pixelate": '<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16"/>',
+    "crop": '<path d="M7 3v14h14M3 7h14v14"/>',
+}
 
 
 def load_source(name):
@@ -182,12 +210,14 @@ def symbolic(glyph):
 
 
 def index_theme(name, title, inherits):
-    dirs = ["scalable/apps", "scalable/places", "scalable/mimetypes", "symbolic/apps", "symbolic/places"]
+    dirs = ["scalable/apps", "scalable/places", "scalable/mimetypes", "symbolic/apps", "symbolic/places",
+            "symbolic/actions"]
     dirs += [f"{n}x{n}/apps" for n in SIZES] + [f"{n}x{n}/places" for n in SIZES]
     out = [f"[Icon Theme]\nName={title}\nComment=Orbit OS icons (glyphs redrawn from spec)\n"
            f"Inherits={inherits}\nExample=folder\nDirectories={','.join(dirs)}\n"]
     for d in dirs:
-        ctx = {"apps": "Applications", "places": "Places", "mimetypes": "MimeTypes"}[d.split("/")[1]]
+        ctx = {"apps": "Applications", "places": "Places", "mimetypes": "MimeTypes",
+               "actions": "Actions"}[d.split("/")[1]]
         if d.startswith("scalable"):
             out.append(f"\n[{d}]\nSize=64\nMinSize=8\nMaxSize=512\nType=Scalable\nContext={ctx}\n")
         elif d.startswith("symbolic"):
@@ -212,16 +242,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(HERE / "build"))
     out = pathlib.Path(ap.parse_args().out)
-    missing_sources = [n for n in GLYPHS if not (HERE / "source" / f"{n}.svg").exists()]
+    missing_sources = [n for n in list(GLYPHS)[:16] if not (HERE / "source" / f"{n}.svg").exists()]
     themes = {"glass": ("orbit", "Orbit (Glass)"), "graphite": ("orbit-graphite", "Orbit Graphite"),
               "light": ("orbit-light", "Orbit Light")}
     for style, (tname, title) in themes.items():
         root = out / tname
-        for d in ("scalable/apps", "scalable/places", "scalable/mimetypes", "symbolic/apps", "symbolic/places"):
+        for d in ("scalable/apps", "scalable/places", "scalable/mimetypes", "symbolic/apps", "symbolic/places",
+                  "symbolic/actions"):
             (root / d).mkdir(parents=True, exist_ok=True)
-        inherits = "Yaru,hicolor" if style == "glass" else "orbit,Yaru,hicolor"
-        if style == "light":
-            inherits = "orbit,Yaru,hicolor"
+        # Yaru first (Ubuntu's look for anything we don't draw), Adwaita for symbolic UI icons
+        inherits = "Yaru,Adwaita,hicolor" if style == "glass" else "orbit,Yaru,Adwaita,hicolor"
         (root / "index.theme").write_text(index_theme(tname, title, inherits))
         for gname, names in APP_MAP.items():
             glyph = load_source(gname)
@@ -229,17 +259,20 @@ def main():
             write_alias(root / "symbolic/apps", symbolic(glyph), [n + "-symbolic" for n in names])
         for fname, names in FOLDER_MAP.items():
             write_alias(root / "scalable/places", folder(FOLDER_SYMBOLS[fname], style), names)
+            # symbolic folder: outline plus the folder's own symbol, so Inbox/Notes/... read at 16 px
             write_alias(root / "symbolic/places", symbolic(
-                '<path d="M3 7.5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
-                [n + "-symbolic" for n in names])
+                '<path d="M3 7.5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
+                + FOLDER_SYMBOLS[fname]), [n + "-symbolic" for n in names])
         for space, color in SPACE_COLORS.items():
             (root / "scalable/places" / f"folder-space-{space}.svg").write_text(
                 folder(FOLDER_SYMBOLS["spaces"], style, tint=color))
+        for tname_, glyph in TOOL_GLYPHS.items():
+            (root / "symbolic/actions" / f"orbit-tool-{tname_}-symbolic.svg").write_text(symbolic(glyph))
         for _, (mname, sym) in MIME.items():
             (root / "scalable/mimetypes" / f"{mname}.svg").write_text(page(sym, style))
     print(f"icon themes written to {out}")
     if missing_sources:
-        print(f"NOTE: icons/source/ missing {len(missing_sources)} of 16 exported glyphs; "
+        print(f"NOTE: icons/source/ missing {len(missing_sources)} of the 16 designed glyphs; "
               "redrew them from the spec: " + ", ".join(missing_sources))
 
 

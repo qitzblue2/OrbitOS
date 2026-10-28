@@ -1,0 +1,710 @@
+{
+ "categories": [
+  "Featured",
+  "Internet",
+  "Office",
+  "Graphics",
+  "Media",
+  "Development",
+  "Games",
+  "Windows apps",
+  "Utilities"
+ ],
+ "apps": [
+  {
+   "name": "GIMP",
+   "source": "apt",
+   "packages": [
+    "gimp"
+   ],
+   "category": "Graphics",
+   "summary": "Advanced image editor",
+   "description": "Retouch photos, paint and create graphics with layers, masks and filters.",
+   "icon": "gimp",
+   "desktop": "gimp",
+   "keywords": [
+    "photo",
+    "paint"
+   ],
+   "featured": true
+  },
+  {
+   "name": "Inkscape",
+   "source": "apt",
+   "packages": [
+    "inkscape"
+   ],
+   "category": "Graphics",
+   "summary": "Vector drawing",
+   "description": "Draw logos, icons and illustrations as SVG.",
+   "icon": "org.inkscape.Inkscape",
+   "desktop": "org.inkscape.Inkscape",
+   "keywords": [
+    "svg",
+    "vector"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Krita",
+   "source": "apt",
+   "packages": [
+    "krita"
+   ],
+   "category": "Graphics",
+   "summary": "Digital painting",
+   "description": "A painting program made by artists, with brushes, layers and animation.",
+   "icon": "krita",
+   "desktop": "org.kde.krita",
+   "keywords": [
+    "draw",
+    "art"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Darktable",
+   "source": "apt",
+   "packages": [
+    "darktable"
+   ],
+   "category": "Graphics",
+   "summary": "RAW photo workflow",
+   "description": "Develop and manage RAW photos from your camera.",
+   "icon": "darktable",
+   "desktop": "darktable",
+   "keywords": [
+    "photo",
+    "raw"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Shotwell",
+   "source": "apt",
+   "packages": [
+    "shotwell"
+   ],
+   "category": "Graphics",
+   "summary": "Photo library",
+   "description": "Import, organise and lightly edit your photos.",
+   "icon": "shotwell",
+   "desktop": "org.gnome.Shotwell",
+   "keywords": [
+    "photo",
+    "library"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Blender",
+   "source": "apt",
+   "packages": [
+    "blender"
+   ],
+   "category": "Graphics",
+   "summary": "3D creation suite",
+   "description": "Modelling, sculpting, animation, rendering and video editing.",
+   "icon": "blender",
+   "desktop": "blender",
+   "keywords": [
+    "3d",
+    "render"
+   ],
+   "featured": false
+  },
+  {
+   "name": "VLC",
+   "source": "apt",
+   "packages": [
+    "vlc"
+   ],
+   "category": "Media",
+   "summary": "Plays almost every video and audio format",
+   "description": "The universal media player: files, discs, streams.",
+   "icon": "vlc",
+   "desktop": "vlc",
+   "keywords": [
+    "video",
+    "player",
+    "dvd"
+   ],
+   "featured": true
+  },
+  {
+   "name": "Rhythmbox",
+   "source": "apt",
+   "packages": [
+    "rhythmbox"
+   ],
+   "category": "Media",
+   "summary": "Music library",
+   "description": "Organise and play your music collection and internet radio.",
+   "icon": "org.gnome.Rhythmbox3",
+   "desktop": "org.gnome.Rhythmbox3",
+   "keywords": [
+    "music"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Audacity",
+   "source": "apt",
+   "packages": [
+    "audacity"
+   ],
+   "category": "Media",
+   "summary": "Audio editor",
+   "description": "Record and edit audio: podcasts, voice, music.",
+   "icon": "audacity",
+   "desktop": "audacity",
+   "keywords": [
+    "record",
+    "sound"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Kdenlive",
+   "source": "apt",
+   "packages": [
+    "kdenlive"
+   ],
+   "category": "Media",
+   "summary": "Video editor",
+   "description": "Multi-track video editing with effects and transitions.",
+   "icon": "kdenlive",
+   "desktop": "org.kde.kdenlive",
+   "keywords": [
+    "video",
+    "edit"
+   ],
+   "featured": false
+  },
+  {
+   "name": "OBS Studio",
+   "source": "apt",
+   "packages": [
+    "obs-studio"
+   ],
+   "category": "Media",
+   "summary": "Screen recording and streaming",
+   "description": "Record your screen or stream to the internet.",
+   "icon": "com.obsproject.Studio",
+   "desktop": "com.obsproject.Studio",
+   "keywords": [
+    "record",
+    "stream"
+   ],
+   "featured": false
+  },
+  {
+   "name": "HandBrake",
+   "source": "apt",
+   "packages": [
+    "handbrake"
+   ],
+   "category": "Media",
+   "summary": "Video converter",
+   "description": "Convert videos to modern formats.",
+   "icon": "fr.handbrake.ghb",
+   "desktop": "fr.handbrake.ghb",
+   "keywords": [
+    "convert"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Cheese",
+   "source": "apt",
+   "packages": [
+    "cheese"
+   ],
+   "category": "Media",
+   "summary": "Webcam booth",
+   "description": "Take photos and videos with your webcam. Handy for testing the camera.",
+   "icon": "org.gnome.Cheese",
+   "desktop": "org.gnome.Cheese",
+   "keywords": [
+    "camera",
+    "webcam"
+   ],
+   "featured": false
+  },
+  {
+   "name": "LibreOffice",
+   "source": "apt",
+   "packages": [
+    "libreoffice"
+   ],
+   "category": "Office",
+   "summary": "Full office suite",
+   "description": "Writer, Calc, Impress, Draw and Base: open and save Microsoft Office files.",
+   "icon": "libreoffice-startcenter",
+   "desktop": "libreoffice-startcenter",
+   "keywords": [
+    "word",
+    "excel",
+    "powerpoint"
+   ],
+   "featured": true
+  },
+  {
+   "name": "Thunderbird",
+   "source": "apt",
+   "packages": [
+    "thunderbird"
+   ],
+   "category": "Internet",
+   "summary": "Email and calendar",
+   "description": "Email client with calendar and contacts, no account with us needed.",
+   "icon": "thunderbird",
+   "desktop": "thunderbird",
+   "keywords": [
+    "mail"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Transmission",
+   "source": "apt",
+   "packages": [
+    "transmission-gtk"
+   ],
+   "category": "Internet",
+   "summary": "BitTorrent client",
+   "description": "Simple, fast torrent downloads.",
+   "icon": "transmission",
+   "desktop": "transmission-gtk",
+   "keywords": [
+    "torrent"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Remmina",
+   "source": "apt",
+   "packages": [
+    "remmina"
+   ],
+   "category": "Internet",
+   "summary": "Remote desktop",
+   "description": "Connect to other computers with RDP, VNC or SSH.",
+   "icon": "org.remmina.Remmina",
+   "desktop": "org.remmina.Remmina",
+   "keywords": [
+    "rdp",
+    "vnc"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Chromium",
+   "source": "apt",
+   "packages": [
+    "chromium-browser"
+   ],
+   "category": "Internet",
+   "summary": "Second web browser",
+   "description": "Open-source base of Google Chrome (Ubuntu installs it via snap).",
+   "icon": "chromium-browser",
+   "desktop": "chromium-browser",
+   "keywords": [
+    "browser"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Geany",
+   "source": "apt",
+   "packages": [
+    "geany"
+   ],
+   "category": "Development",
+   "summary": "Lightweight IDE",
+   "description": "Fast code editor with project tree, build and terminal.",
+   "icon": "geany",
+   "desktop": "geany",
+   "keywords": [
+    "code",
+    "ide"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Git",
+   "source": "apt",
+   "packages": [
+    "git"
+   ],
+   "category": "Development",
+   "summary": "Version control",
+   "description": "The command-line tool for tracking code changes.",
+   "icon": "git",
+   "desktop": "git",
+   "keywords": [
+    "code",
+    "vcs"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Meld",
+   "source": "apt",
+   "packages": [
+    "meld"
+   ],
+   "category": "Development",
+   "summary": "Compare files and folders",
+   "description": "Visual diff and merge for files, folders and git.",
+   "icon": "org.gnome.Meld",
+   "desktop": "org.gnome.Meld",
+   "keywords": [
+    "diff",
+    "merge"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Python tools",
+   "source": "apt",
+   "packages": [
+    "python3-pip"
+   ],
+   "category": "Development",
+   "summary": "pip and venv for Python",
+   "description": "Install Python packages in your projects.",
+   "icon": "python",
+   "desktop": "python3",
+   "keywords": [
+    "python"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Docker",
+   "source": "apt",
+   "packages": [
+    "docker.io"
+   ],
+   "category": "Development",
+   "summary": "Containers",
+   "description": "Run apps in containers (needs sudo or the docker group).",
+   "icon": "docker",
+   "desktop": "docker.io",
+   "keywords": [
+    "container"
+   ],
+   "featured": false
+  },
+  {
+   "name": "GNOME Boxes",
+   "source": "apt",
+   "packages": [
+    "gnome-boxes"
+   ],
+   "category": "Utilities",
+   "summary": "Virtual machines",
+   "description": "Try other operating systems in a window.",
+   "icon": "org.gnome.Boxes",
+   "desktop": "org.gnome.Boxes",
+   "keywords": [
+    "vm",
+    "virtual"
+   ],
+   "featured": true
+  },
+  {
+   "name": "GParted",
+   "source": "apt",
+   "packages": [
+    "gparted"
+   ],
+   "category": "Utilities",
+   "summary": "Partition editor",
+   "description": "Resize, create and delete disk partitions. Be careful!",
+   "icon": "gparted",
+   "desktop": "gparted",
+   "keywords": [
+    "disk",
+    "partition"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Timeshift",
+   "source": "apt",
+   "packages": [
+    "timeshift"
+   ],
+   "category": "Utilities",
+   "summary": "System snapshots",
+   "description": "Snapshot the system so you can roll back after a bad update.",
+   "icon": "timeshift",
+   "desktop": "timeshift-gtk",
+   "keywords": [
+    "backup",
+    "restore"
+   ],
+   "featured": false
+  },
+  {
+   "name": "BleachBit",
+   "source": "apt",
+   "packages": [
+    "bleachbit"
+   ],
+   "category": "Utilities",
+   "summary": "Free up space",
+   "description": "Clean caches and temporary files.",
+   "icon": "bleachbit",
+   "desktop": "org.bleachbit.BleachBit",
+   "keywords": [
+    "clean"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Syncthing",
+   "source": "apt",
+   "packages": [
+    "syncthing"
+   ],
+   "category": "Utilities",
+   "summary": "Sync folders between devices",
+   "description": "Private peer-to-peer file sync, no cloud.",
+   "icon": "syncthing",
+   "desktop": "syncthing-start",
+   "keywords": [
+    "sync"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Hardinfo",
+   "source": "apt",
+   "packages": [
+    "hardinfo"
+   ],
+   "category": "Utilities",
+   "summary": "System information",
+   "description": "Detailed hardware information and benchmarks.",
+   "icon": "hardinfo",
+   "desktop": "hardinfo",
+   "keywords": [
+    "hardware"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Powertop",
+   "source": "apt",
+   "packages": [
+    "powertop"
+   ],
+   "category": "Utilities",
+   "summary": "Battery diagnostics",
+   "description": "Measure power draw and find what drains the battery.",
+   "icon": "utilities-system-monitor",
+   "desktop": "powertop",
+   "keywords": [
+    "battery",
+    "power"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Wine",
+   "source": "apt",
+   "packages": [
+    "wine64"
+   ],
+   "category": "Windows apps",
+   "summary": "Run some Windows programs",
+   "description": "Compatibility layer for Windows software. Many programs work; anti-cheat games do not.",
+   "icon": "wine",
+   "desktop": "wine",
+   "keywords": [
+    "windows",
+    "exe"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Steam",
+   "source": "apt",
+   "packages": [
+    "steam-installer"
+   ],
+   "category": "Games",
+   "summary": "PC games store",
+   "description": "Valve's game store and launcher, with Proton for many Windows games.",
+   "icon": "steam",
+   "desktop": "steam",
+   "keywords": [
+    "games"
+   ],
+   "featured": true
+  },
+  {
+   "name": "SuperTuxKart",
+   "source": "apt",
+   "packages": [
+    "supertuxkart"
+   ],
+   "category": "Games",
+   "summary": "Kart racing",
+   "description": "Fun 3D kart racing for all ages.",
+   "icon": "supertuxkart",
+   "desktop": "supertuxkart",
+   "keywords": [
+    "race"
+   ],
+   "featured": false
+  },
+  {
+   "name": "0 A.D.",
+   "source": "apt",
+   "packages": [
+    "0ad"
+   ],
+   "category": "Games",
+   "summary": "Historical strategy",
+   "description": "Real-time strategy game of ancient warfare.",
+   "icon": "0ad",
+   "desktop": "0ad",
+   "keywords": [
+    "strategy"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Mines, Sudoku, Chess",
+   "source": "apt",
+   "packages": [
+    "gnome-games"
+   ],
+   "category": "Games",
+   "summary": "Classic small games",
+   "description": "A collection of quick GNOME games.",
+   "icon": "org.gnome.Mines",
+   "desktop": "org.gnome.Mines",
+   "keywords": [
+    "casual"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Bottles",
+   "source": "flathub",
+   "id": "com.usebottles.bottles",
+   "category": "Windows apps",
+   "summary": "Run Windows software easily",
+   "description": "Manages Wine environments for you, with ready-made setups for common programs.",
+   "icon": "com.usebottles.bottles",
+   "keywords": [
+    "windows",
+    "wine"
+   ],
+   "featured": true
+  },
+  {
+   "name": "Lutris",
+   "source": "flathub",
+   "id": "net.lutris.Lutris",
+   "category": "Games",
+   "summary": "All your games in one place",
+   "description": "Install and launch games from many stores and emulators.",
+   "icon": "net.lutris.Lutris",
+   "keywords": [
+    "games",
+    "emulator"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Spotify",
+   "source": "flathub",
+   "id": "com.spotify.Client",
+   "category": "Media",
+   "summary": "Music streaming (proprietary)",
+   "description": "Official Spotify client. Needs a Spotify account.",
+   "icon": "com.spotify.Client",
+   "keywords": [
+    "music",
+    "stream"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Discord",
+   "source": "flathub",
+   "id": "com.discordapp.Discord",
+   "category": "Internet",
+   "summary": "Chat and voice (proprietary)",
+   "description": "Official Discord client.",
+   "icon": "com.discordapp.Discord",
+   "keywords": [
+    "chat",
+    "voice"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Signal",
+   "source": "flathub",
+   "id": "org.signal.Signal",
+   "category": "Internet",
+   "summary": "Private messenger",
+   "description": "End-to-end encrypted messaging, linked to the Signal phone app.",
+   "icon": "org.signal.Signal",
+   "keywords": [
+    "chat",
+    "private"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Obsidian",
+   "source": "flathub",
+   "id": "md.obsidian.Obsidian",
+   "category": "Office",
+   "summary": "Markdown knowledge base (proprietary)",
+   "description": "Point it at ~/Home/Notes to use the same notes as Orbit Notes.",
+   "icon": "md.obsidian.Obsidian",
+   "keywords": [
+    "notes",
+    "markdown"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Flatseal",
+   "source": "flathub",
+   "id": "com.github.tchx84.Flatseal",
+   "category": "Utilities",
+   "summary": "Flatpak permissions",
+   "description": "See and change what each Flatpak app may access.",
+   "icon": "com.github.tchx84.Flatseal",
+   "keywords": [
+    "privacy",
+    "permissions"
+   ],
+   "featured": false
+  },
+  {
+   "name": "Extension Manager",
+   "source": "flathub",
+   "id": "com.mattjakeman.ExtensionManager",
+   "category": "Utilities",
+   "summary": "GNOME extensions",
+   "description": "Browse and install GNOME Shell extensions.",
+   "icon": "com.mattjakeman.ExtensionManager",
+   "keywords": [
+    "gnome",
+    "extensions"
+   ],
+   "featured": false
+  }
+ ]
+}

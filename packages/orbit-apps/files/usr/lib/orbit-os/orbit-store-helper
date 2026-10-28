@@ -1,0 +1,40 @@
+#!/usr/bin/python3 -I
+"""Privileged half of Orbit Store, run through pkexec.
+
+  orbit-store-helper install|remove PKG...
+
+Refuses any package that is not an apt entry of the shipped catalog, so a
+compromised user session cannot use this to install arbitrary packages.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+CATALOG = "/usr/share/orbit-os/store-catalog.json"
+NAME = re.compile(r"^[a-z0-9][a-z0-9+.-]{1,62}$")
+
+
+def main(argv):
+    if os.geteuid() != 0:
+        sys.exit("must run as root (via pkexec)")
+    if len(argv) < 3 or argv[1] not in ("install", "remove"):
+        sys.exit("usage: orbit-store-helper install|remove PKG...")
+    with open(CATALOG) as f:
+        allowed = {p for a in json.load(f)["apps"] if a["source"] == "apt" for p in a["packages"]}
+    pkgs = argv[2:]
+    bad = [p for p in pkgs if not NAME.match(p) or p not in allowed]
+    if bad:
+        sys.exit(f"refused: not in the Orbit Store catalog: {' '.join(bad)}")
+    env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "DEBIAN_FRONTEND": "noninteractive", "LANG": "C.UTF-8"}
+    if argv[1] == "install":
+        subprocess.run(["apt-get", "update", "-q"], env=env, check=False)
+        cmd = ["apt-get", "install", "-y", "-q", "--", *pkgs]
+    else:
+        cmd = ["apt-get", "remove", "-y", "-q", "--", *pkgs]
+    sys.exit(subprocess.run(cmd, env=env).returncode)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

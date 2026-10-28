@@ -17,6 +17,17 @@ gsettings set org.gnome.shell.extensions.user-theme name "$gtk"
 gsettings set org.gnome.desktop.background picture-uri-dark "file:///usr/share/backgrounds/orbit/$wp.png"
 gsettings set org.gnome.desktop.background picture-uri "file:///usr/share/backgrounds/orbit/$wp.png"
 gsettings set org.orbit-os.desktop style "$style"
+# libadwaita apps read only ~/.config/gtk-4.0/gtk.css; keep it in step unless the user took it over
+css="${XDG_CONFIG_HOME:-$HOME/.config}/gtk-4.0/gtk.css"
+if [ ! -e "$css" ] || grep -q '^/\* orbit-managed' "$css"; then
+  mkdir -p "$(dirname "$css")"
+  cat > "$css" <<EOF
+/* orbit-managed: GNOME's libadwaita apps ignore the GTK theme setting and read
+   only this file. orbit-style rewrites it when you switch Glass/Graphite/Light.
+   Remove this comment line to keep your own edits (orbit-style then leaves it alone). */
+@import url("file:///usr/share/themes/$gtk/gtk-4.0/gtk.css");
+EOF
+fi
 if [ "${2:-}" = "--reduce-transparency" ]; then
   exec /usr/lib/orbit-os/orbit-transparency "${3:-on}"
 fi

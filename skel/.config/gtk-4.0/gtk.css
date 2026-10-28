@@ -1,0 +1,4 @@
+/* orbit-managed: GNOME's libadwaita apps ignore the GTK theme setting and read
+   only this file. orbit-style rewrites it when you switch Glass/Graphite/Light.
+   Remove this comment line to keep your own edits (orbit-style then leaves it alone). */
+@import url("file:///usr/share/themes/Orbit-graphite/gtk-4.0/gtk.css");

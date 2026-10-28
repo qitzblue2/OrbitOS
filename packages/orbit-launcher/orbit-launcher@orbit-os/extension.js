@@ -1,4 +1,5 @@
 // Orbit Launcher — GNOME Shell 46 extension (ESM).
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
@@ -53,7 +54,7 @@ class LauncherDialog extends ModalDialog.ModalDialog {
         this._appSystem = Shell.AppSystem.get_default();
 
         this._entry = new St.Entry({style_class: 'orbit-launcher-entry', hint_text: 'Search apps, files, settings, or type 2+2', can_focus: true});
-        this._results = new St.BoxLayout({vertical: true, style_class: 'orbit-launcher-results'});
+        this._results = new St.BoxLayout({vertical: true, style_class: 'orbit-launcher-results', x_expand: true});
         this._folders = new St.BoxLayout({style_class: 'orbit-launcher-folders'});
         this.contentLayout.add_child(this._entry);
         this.contentLayout.add_child(this._folders);
@@ -87,11 +88,14 @@ class LauncherDialog extends ModalDialog.ModalDialog {
     }
 
     _row(label, sub, icon, action) {
-        const btn = new St.Button({style_class: 'orbit-launcher-row', can_focus: true, x_expand: true});
-        const box = new St.BoxLayout({style_class: 'orbit-launcher-row-box'});
+        // St.Button centres its child by default: fill the row and left-align, like a list
+        const btn = new St.Button({style_class: 'orbit-launcher-row', can_focus: true, x_expand: true,
+            x_align: Clutter.ActorAlign.FILL});
+        const box = new St.BoxLayout({style_class: 'orbit-launcher-row-box', x_expand: true,
+            x_align: Clutter.ActorAlign.START});
         if (icon)
             box.add_child(new St.Icon({gicon: icon, icon_size: 24}));
-        const text = new St.BoxLayout({vertical: true});
+        const text = new St.BoxLayout({vertical: true, y_align: Clutter.ActorAlign.CENTER});
         text.add_child(new St.Label({text: label, style_class: 'orbit-launcher-title'}));
         if (sub)
             text.add_child(new St.Label({text: sub, style_class: 'orbit-launcher-sub'}));

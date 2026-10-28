@@ -61,6 +61,23 @@ class Win(Adw.ApplicationWindow):
         look.add(inbox)
         page.add(look)
 
+        tools = Adw.PreferencesGroup(title="Orbit tools")
+        for title, sub, icon, argv in [
+            ("Spaces", "Personal, Work, Study: folder, wallpaper, dock and notifications", "orbit-spaces",
+             ["orbit-spaces"]),
+            ("Backup", "Snapshot backups of your Home folder to a USB drive", "orbit-backup", ["orbit-backup"]),
+            ("Hardware", "What works on this computer, plus guided tests", "orbit-hardware", ["orbit-hardware"]),
+            ("Store", "Hand-picked apps from Ubuntu and Flathub", "orbit-store", ["orbit-store"]),
+            ("Desktop widgets", "Clock, calendar, system, weather", "orbit-widgets",
+             ["gnome-extensions", "prefs", "orbit-widgets@orbit-os"]),
+        ]:
+            row = Adw.ActionRow(title=title, subtitle=sub, activatable=True)
+            row.add_prefix(Gtk.Image(icon_name=icon, pixel_size=32))
+            row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
+            row.connect("activated", lambda _r, a=argv: subprocess.Popen(a))
+            tools.add(row)
+        page.add(tools)
+
         sys_group = Adw.PreferencesGroup(title="System")
         for title, sub, icon, panel in PANELS:
             row = Adw.ActionRow(title=title, subtitle=sub, activatable=True)

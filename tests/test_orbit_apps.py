@@ -202,7 +202,10 @@ class Backup(unittest.TestCase):
 
 class Annotate(unittest.TestCase):
     def test_render_crop_pixelate_undo(self):
-        import cairo
+        try:
+            import cairo
+        except ImportError:
+            self.skipTest("python3-cairo not installed")
         from orbit import annotate
         base = cairo.ImageSurface(cairo.FORMAT_ARGB32, 200, 100)
         cr = cairo.Context(base)

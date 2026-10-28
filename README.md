@@ -4,6 +4,17 @@ A personal Linux remix **based on Ubuntu 24.04 LTS**. It has a calm GNOME 46 des
 
 > Status: personal project. See **[What was tested](#what-was-tested)** before you trust any of it on real hardware.
 
+![Orbit OS desktop: glass widgets, slim dock, frosted top bar](docs/screenshots/desktop-desktop.png)
+
+The screenshot is real: GNOME Shell 46 running headless with the Orbit packages, captured by `tests/shell/run-desktop-shots.sh`.
+
+## Orbit's own apps
+**Files**, **Notes**, **Spaces**, **Screenshot**, **Store**, **Hardware** and **Backup**, plus the **Launcher**, **Control Center**, **Widgets** and **Clipboard** in the shell. See **[APPS.md](APPS.md)** for what each does, shortcuts and screenshots.
+
+| | | |
+|---|---|---|
+| ![Files](docs/screenshots/app-files-pictures.png) | ![Notes](docs/screenshots/app-notes-preview.png) | ![Store](docs/screenshots/app-store-featured.png) |
+
 ## Quick start
 ```bash
 ./build.sh
@@ -18,6 +29,11 @@ tests/vm-boot-test.sh out/orbit-os-1.0.0-full-amd64.iso
 ```
 This boots the ISO in QEMU and passes only if the desktop appears.
 
+```bash
+tests/shell/run-desktop-shots.sh docs/screenshots-new
+```
+This boots the Orbit desktop in headless GNOME Shell and screenshots it. The run also reports whether each extension loaded.
+
 Then follow **[INSTALL.md](INSTALL.md)**. It is written for beginners and covers USB writing, live testing, dual boot, recovery and troubleshooting.
 
 ## Layout
@@ -28,9 +44,11 @@ branding/tokens.json     every color/size/timing; generate.py turns it into GTK,
                          terminal, Qt themes and 4K wallpapers, and checks contrast
 icons/                   generate_icons.py (16 glyphs + folders + file types, Glass/Graphite/Light),
                          check_and_raster.py (safety, completeness, 16 px legibility, PNG sizes, contact sheet)
-packages/                orbit-os-branding, orbit-os-desktop (meta-package), orbit-launcher (GNOME 46 extension)
+packages/                orbit-os-branding, orbit-os-desktop (meta-package), orbit-launcher (GNOME 46 extension),
+                         orbit-apps (the seven GTK apps), orbit-shell-extensions (Control Center, Widgets, Clipboard)
 skel/                    the ~/Home layout for new users
-tests/                   run-checks.sh, vm-boot-test.sh, screen_check.py, calc/merge/deb tests
+tests/                   run-checks.sh (fast), test_orbit_apps.py, *.test.mjs, gui/ (app screenshots),
+                         shell/ (real GNOME Shell run), vm-boot-test.sh (ISO in QEMU)
 tools/                   hardware-check.sh, merge-overlay-upper.py
 ```
 
@@ -39,7 +57,7 @@ tools/                   hardware-check.sh, merge-overlay-upper.py
 ./build.sh --debs-only
 ```
 ```bash
-sudo apt install ./out/orbit-os-branding_*.deb ./out/orbit-launcher_*.deb ./out/orbit-os-desktop_*.deb
+sudo apt install ./out/orbit-os-branding_*.deb ./out/orbit-launcher_*.deb ./out/orbit-apps_*.deb ./out/orbit-shell-extensions_*.deb ./out/orbit-os-desktop_*.deb
 ```
 Log out and back in. The Firefox ESR deb and the snap seed changes are only applied by the ISO build.
 
@@ -58,4 +76,4 @@ See [HARDWARE-TEST.md](HARDWARE-TEST.md) and [PERFORMANCE.md](PERFORMANCE.md). I
 - The installer is Ubuntu's own, unmodified, and still shows Ubuntu branding (see LICENSES.md).
 - Choose **Extended selection** in the installer, or the Orbit customizations are not installed (DECISIONS D-03).
 
-Docs: [DECISIONS](DECISIONS.md) · [INSTALL](INSTALL.md) · [HARDWARE-TEST](HARDWARE-TEST.md) · [PERFORMANCE](PERFORMANCE.md) · [SECURITY](SECURITY.md) · [LICENSES](LICENSES.md)
+Docs: [APPS](APPS.md) · [DECISIONS](DECISIONS.md) · [INSTALL](INSTALL.md) · [HARDWARE-TEST](HARDWARE-TEST.md) · [PERFORMANCE](PERFORMANCE.md) · [SECURITY](SECURITY.md) · [LICENSES](LICENSES.md)

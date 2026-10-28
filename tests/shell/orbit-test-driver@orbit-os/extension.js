@@ -115,7 +115,7 @@ export default class Driver extends Extension {
             launcher._dialog?._entry.set_text('12*7');
             await sleep(800);
             await shot('launcher-calc');
-            launcher._dialog?._entry.set_text('term');
+            launcher._dialog?._entry.set_text('spa');
             await sleep(800);
             await shot('launcher-search');
             launcher._toggle();

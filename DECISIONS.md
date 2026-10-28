@@ -115,3 +115,42 @@ Every other unit is Ubuntu's default. The full list on a booted system comes fro
 **D-15 power-profiles-daemon, not TLP.** PPD is Ubuntu's default, is wired into GNOME's power menu, and conflicts with TLP. An EliteBook-tuned TLP profile, with charge thresholds of 75/90, ships in `/usr/share/orbit-os/tlp/orbit.conf` with one-line switch instructions. It is not active.
 
 **D-16 os-release.** `/usr/lib/os-release` is moved aside with `dpkg-divert`, not overwritten. The new file uses `ID=orbit`, `ID_LIKE="ubuntu debian"` and `UBUNTU_CODENAME=noble`, so tools that look for Ubuntu still work through `ID_LIKE`. Removing the package restores Ubuntu's file.
+
+## Orbit apps and shell extensions
+
+**D-17 The apps are Python + GTK 4 + libadwaita 1.5,** exactly the versions Ubuntu 24.04 ships (`python3-gi`, `gir1.2-adw-1`), so nothing extra comes in from outside the archive. They follow GNOME's patterns, so keyboard access, Orca and large text work the same way as in GNOME's own apps. Each app keeps its logic separate from its window code (`orbit/fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`), so the logic is unit-tested without a display.
+
+**D-18 Orbit Files becomes the default file manager, and GNOME Files stays installed.** Orbit Files is set as the default for folders (`/etc/xdg/mimeapps.list`) and is in the dock. Nautilus remains because the desktop-icons extension and some portals use it. Nautilus also gets the same *Move to Space* and *Sort Inbox Now* items through `nautilus-python`, so whichever file manager you use behaves the same.
+
+**D-19 The Store is catalog-locked.**
+- Ubuntu packages are installed by `/usr/lib/orbit-os/orbit-store-helper` through `pkexec`, under the polkit action `org.orbit-os.store.helper` (admin password, kept briefly).
+- The helper re-reads `/usr/share/orbit-os/store-catalog.json` and refuses any package that is not listed in it. A compromised user session therefore cannot use the Store to install arbitrary packages.
+- Flathub installs are per-user (`--user`) and need no password.
+- Every apt name in the catalog was checked against the Ubuntu 24.04 archive.
+
+**D-20 Clipboard privacy.**
+- Copies marked with `x-kde-passwordManagerHint` (set by KeePassXC and others) are never recorded.
+- Nothing is recorded while the screen is locked.
+- Only pinned items are written to disk, in a `0600` file. Unpinned history lives in memory unless *remember across sessions* is turned on.
+
+**D-21 Widgets live in the background layer, and weather is opt-in.** The widgets sit in `Main.layoutManager._backgroundGroup`: above the wallpaper, below every window, never in the way. Weather is the only Orbit feature that contacts a server after boot (Open-Meteo, every 30 min, location rounded to 2 decimals), so it is off by default.
+
+**D-22 How the shell theme is applied (bugs found by running real GNOME Shell).** Three bugs were found by `tests/shell/run-desktop-shots.sh` and fixed:
+- GNOME 46 no longer has `gnome-shell.css`; it ships `-dark` and `-light` variants.
+- The `user-theme` extension already loads the stock theme underneath ours, so `@import`-ing it again re-added every stock rule after Orbit's, and the stock copies won.
+- A `stage …` descendant prefix matches nothing in St, so it silently disabled every rule it was added to.
+
+The generated shell CSS is therefore plain override rules with no `@import`. Blur my Shell is set to `popup/preserve-shell-theme=true`, because its popup style otherwise forces GNOME-blue toggles with `!important`.
+
+**D-23 libadwaita apps get Orbit colors through `~/.config/gtk-4.0/gtk.css`.** libadwaita ignores the `gtk-theme` setting, so the theme name alone only reached GTK 3 apps. The skel file imports the generated Orbit GTK 4 sheet.
+- `orbit-style` rewrites that file, but only while it still carries the `orbit-managed` marker, so your own edits are never overwritten.
+- Converted Ubuntu installs get the file at first login.
+
+**D-24 Keyboard shortcuts.**
+- Super+V opens Orbit Clipboard. GNOME's notification list keeps its other default key, Super+M.
+- New bindings, all standard GNOME custom keybindings that you can change in Settings → Keyboard:
+  - Shift+Super+S: screenshot an area
+  - Super+E: Files
+  - Super+Alt+1/2/3: switch Space
+
+**D-25 Blur my Shell is vendored.** Ubuntu 24.04 has no package for it, so `config/vendor/` holds the extensions.gnome.org build for GNOME 46 (v76, GPL-3.0) with its SHA-256. The build verifies the hash before installing it.

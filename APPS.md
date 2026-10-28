@@ -1,0 +1,163 @@
+# Orbit apps
+
+Orbit OS ships with its own apps. Each one is a GTK 4 / libadwaita app written in Python or a GNOME Shell extension, built from this repository and themed from `branding/tokens.json`.
+
+Every screenshot here is real:
+- **Desktop shots** come from GNOME Shell 46 running headless with the Orbit packages installed (`tests/shell/run-desktop-shots.sh`).
+- **App shots** come from the apps running under a virtual display with demo files (`tests/gui/screenshots.py`).
+- **What's not from Orbit:** the build machine had a few extra apps (XTerm, Vim, ImageMagick) that appear in the app grid; they are not part of Orbit. The "Logged in as a privileged user" notice is there because the test session runs as root.
+
+| | |
+|---|---|
+| ![Desktop](docs/screenshots/desktop-desktop.png) | ![Quick Settings](docs/screenshots/desktop-quick-settings.png) |
+| The Glass desktop: dock, glass widgets, frosted top bar | Orbit toggles in Quick Settings |
+
+## Keyboard shortcuts
+
+| Keys | What it does |
+|---|---|
+| Super (tap) or Super+Space | Orbit Launcher: apps, files, settings, sums |
+| Super+V | Clipboard history |
+| Super+E | Orbit Files |
+| Shift+Super+S | Screenshot an area and annotate it |
+| Super+Alt+1 / 2 / 3 | Switch to Space 1 / 2 / 3 |
+| Super+A | App grid |
+| Super+M | Notification list (GNOME's own key; Super+V now opens the clipboard) |
+
+---
+
+## Orbit Launcher (Super / Super+Space)
+| | |
+|---|---|
+| ![Launcher sum](docs/screenshots/desktop-launcher-calc.png) | ![Launcher search](docs/screenshots/desktop-launcher-search.png) |
+
+- Type to search apps, settings panels and files under `~/Home`.
+- Type a sum (`12*7`, `2^10`, `(3+4)/2`) and press Enter to copy the answer.
+- The chips above the results are your app folders (name, color, apps), stored in the extension settings.
+- Searching files never uses an index or the network. It does a bounded walk: 3 levels deep, up to 400 entries.
+
+## Orbit Files (file manager, Super+E)
+| | |
+|---|---|
+| ![Pictures](docs/screenshots/app-files-pictures.png) | ![List and preview](docs/screenshots/app-files-list-preview.png) |
+
+- **Layout:** a sidebar with Places, your colored Spaces, plugged-in drives (with eject) and the Trash. Above the files, a clickable path bar; Ctrl+L lets you type a path instead.
+- **Views:** tabs (Ctrl+T), a grid with picture thumbnails, or a list with Size / Modified / Kind columns.
+- **Preview pane** (Space): pictures, the start of text files, file details.
+- **Search:** filter this folder as you type, or press Enter for *Search Everywhere* to search all subfolders.
+- **Moving files:** drag and drop, or cut / copy / paste. These work with other apps too: copy in Orbit Files, paste in Firefox.
+- **Trash with Undo:** a toast offers Undo after you delete. In the Trash you can restore to the original place or delete for good.
+- **Compress / extract:** compress to ZIP, and extract ZIP or tar archives. Extraction blocks archives that try to write outside their folder.
+- **Spaces and Inbox:** *Move to Space* in the right-click menu, and *Sort Inbox Now* when you are in `~/Home/Inbox`.
+- **Properties:** with the full folder size, permissions and the app that opens the file.
+- GNOME's own Files (Nautilus) stays installed. It gets the same *Move to Space* and *Sort Inbox Now* menu items through the Orbit add-on.
+
+## Orbit Notes
+| | |
+|---|---|
+| ![Preview](docs/screenshots/app-notes-preview.png) | ![Editor](docs/screenshots/app-notes-editor.png) |
+
+- **Plain files:** each note is a Markdown file in `~/Home/Notes`. Sub-folders become groups, and any editor or sync tool works with them.
+- **Pinned notes** stay at the top of the list. Pins are stored in `~/Home/Notes/.orbit-notes.json`, so the notes themselves stay clean.
+- **Editing:** Markdown highlighting, autosave 0.6 s after you stop typing (written safely, so a crash never leaves half a note), and a word count with reading time.
+- **Preview** (Ctrl+P): headings, bold and italic, code, check lists, quotes and links. All text is escaped first, so a note can never inject markup.
+- **Moving and trashing:** move notes between folders. Trashing a note offers Undo.
+- **Outside edits:** if another program or a sync tool changes a note while it is open, Orbit Notes reloads it.
+
+## Orbit Spaces
+| | |
+|---|---|
+| ![Spaces](docs/screenshots/app-spaces-switched.png) | ![Edit a Space](docs/screenshots/app-spaces-edit.png) |
+
+- **What a Space is:** a folder in `~/Home/Spaces`, a color, a wallpaper, the apps pinned in the dock, and *Do not disturb*. Switching applies all of them at once.
+- **Ways to switch:** from the app, from Quick Settings → **Space**, with Super+Alt+1/2/3, or from a terminal:
+
+  ```bash
+  orbit-spaces list
+  ```
+  ```bash
+  orbit-spaces switch Work
+  ```
+  ```bash
+  orbit-spaces next
+  ```
+- **Renaming:** when you rename a Space, its folder is renamed with it. Deleting a Space never deletes its files.
+- Settings are stored in `~/.config/orbit/spaces.json`.
+
+## Orbit Screenshot (Shift+Super+S)
+![Annotate](docs/screenshots/app-screenshot-annotated.png)
+
+- **Capture** through the desktop portal, so on Wayland you get GNOME's normal area, window or screen picker. A delayed capture is also available.
+- **Tools:** pen, highlighter, arrow, box, ellipse, text (with a halo so it stays readable on any background), pixelate and crop.
+  - Pixelate is permanent in the saved image: use it for passwords or faces.
+  - Undo and redo work for every tool, crop included.
+  - The single-letter tool keys (P, H, A, R, E, T, X, C) only work while the image has focus, so typing in the text box can't switch tools.
+- **Output:** save to `~/Home/Pictures/Screenshots`, use *Save As*, copy the image (Ctrl+C), or open an existing image to annotate it.
+
+## Orbit Store
+| | |
+|---|---|
+| ![Featured](docs/screenshots/app-store-featured.png) | ![Details](docs/screenshots/app-store-details.png) |
+
+- **Catalog:** 43 hand-picked apps, from Ubuntu's archive (signed by Ubuntu) and Flathub (sandboxed). All 35 apt package names were checked against Ubuntu 24.04's archive.
+- **Ubuntu apps** install through `pkexec orbit-store-helper`, which asks for your password once.
+  - The helper re-reads the catalog itself and refuses any package that isn't in it.
+  - Package names are passed after `--`, so they can never be read as apt options.
+- **Flathub apps** install for your user only, with no password. If Flathub is off, the Store offers to turn it on.
+- **Labels:** proprietary apps (Spotify, Discord, Obsidian) are labelled as such.
+
+## Orbit Hardware
+| | |
+|---|---|
+| ![Automatic](docs/screenshots/app-hardware-auto.png) | ![Guided tests](docs/screenshots/app-hardware-guided.png) |
+
+- **Automatic:** runs `orbit-hardware-check` (the same script as `tools/hardware-check.sh`). It changes nothing and sends nothing, and it marks each check green, amber or red.
+- **Guided tests:** 13 checks a script can't judge, such as brightness keys, lid sleep, headphones, webcam, external monitor and fingerprint. You mark each one, and can come back later.
+- **Report:** *Copy Report* or *Save Report* writes a Markdown table you can paste into `HARDWARE-TEST.md`.
+- The screenshots show this cloud build machine, which is why it reports legacy BIOS and no GPU.
+
+## Orbit Backup
+![Backup](docs/screenshots/app-backup.png)
+
+- **Snapshots:** backups go to a USB drive or folder, stored as `orbit-backup/<computer>/<date>/`.
+  - Each snapshot is a complete copy you can browse in Files.
+  - Unchanged files are hard-linked to the previous snapshot, so they take no extra space.
+- **What to back up:** choose which `~/Home` folders, plus patterns to skip. Caches, `node_modules` and partial downloads are skipped by default.
+- **Schedule:** manual, daily or weekly, through a user-level systemd timer. If the drive isn't plugged in, that run is quietly skipped.
+- **Keeping snapshots:** set how many to keep; the oldest are removed after each new backup.
+- **Restore** a whole snapshot or one folder. Restoring never deletes anything: files it would replace are kept as `name.before-restore`.
+- **Limitation:** change detection uses rsync's normal check (size and modification time). A same-size edit made in the same second as a backup is only picked up at the next change.
+
+## GNOME Shell extensions
+
+| | |
+|---|---|
+| ![Clipboard](docs/screenshots/desktop-clipboard.png) | ![App grid](docs/screenshots/desktop-app-grid.png) |
+
+**Orbit Control Center** adds these toggles to Quick Settings:
+- **Glass:** turns *Reduce transparency* on or off.
+- **Style:** Glass, Graphite or Light.
+- **Space:** lists your Spaces, marks the current one, and links to *Edit Spaces…*.
+- **Sort Inbox:** turns automatic Inbox sorting on or off.
+
+**Orbit Widgets** are glass cards on the desktop, above the wallpaper and below windows:
+- **Cards:** clock, month calendar, and system (CPU, memory and battery).
+- **Moving them:** drag a card to move it. Positions are remembered.
+- **Reduce transparency:** with it on, the cards turn solid.
+- **Weather** is **off by default**, because it is the only widget that uses the network. When on, it asks the free Open-Meteo service every 30 minutes, with your location rounded to about 1 km. Turn it on in Orbit Settings → Desktop widgets.
+
+**Orbit Clipboard** (Super+V) keeps a clipboard history:
+- **Using it:** search the history, pin items, forget single items, or clear everything unpinned. Choosing an item pastes it into the app you were using.
+- **Privacy:**
+  - Copies that a password manager marks (KeePassXC and others) are **never recorded**.
+  - Nothing is recorded while the screen is locked or recording is paused.
+  - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
+
+## Where the code is
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`), so it can be unit-tested.
+- `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
+- `packages/orbit-launcher/`: the launcher extension.
+- Tests:
+  - Unit tests: `tests/test_orbit_apps.py`, plus `tests/*.test.mjs` for the extensions.
+  - App scenarios: `tests/gui/scenarios/`.
+  - Real-shell run: `tests/shell/`.

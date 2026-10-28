@@ -34,3 +34,17 @@ The build is not yet bit-for-bit reproducible: squashfs and ISO timestamps vary 
 
 ## Reporting
 This is a personal project: there is no security team. Security fixes for the base system come from Ubuntu. Report Orbit-specific problems as issues on the repository.
+
+## Orbit apps
+- **Orbit Store:** apt installs go through `pkexec /usr/lib/orbit-os/orbit-store-helper`, which:
+  - only accepts packages listed in the shipped catalog;
+  - validates package names;
+  - passes them after `--`;
+  - runs apt with a fixed environment.
+
+  The polkit action is `org.orbit-os.store.helper` and asks for the admin password. Flathub installs are per-user.
+- **Orbit Clipboard:** password-manager copies are skipped, nothing is recorded while the screen is locked, and only pinned items are stored on disk (mode 0600).
+- **Orbit Widgets:** weather is off by default. When on, it sends a rounded location to `api.open-meteo.com` every 30 minutes, with no key and no account.
+- **Orbit Files:** extracting an archive refuses entries that would write outside the target folder (zip-slip). tar archives use Python's `filter="data"`, which blocks links, devices and absolute paths.
+- **Orbit Backup:** restores never delete anything; files that would be replaced are kept as `*.before-restore`. A backup destination inside the folders being backed up is refused.
+- **GNOME extension updates:** GNOME Shell checks extensions.gnome.org for updates only for extensions *you* install in `~/.local/share/gnome-shell/extensions`. Orbit's are system-wide and are updated through its packages.

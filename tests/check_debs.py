@@ -6,10 +6,21 @@ out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "out")
 need = {
     "orbit-os-branding": ["./usr/share/icons/orbit/index.theme", "./usr/share/backgrounds/orbit/orbit-glass.png",
                           "./usr/share/plymouth/themes/orbit/orbit.plymouth", "./usr/share/grub/themes/orbit/theme.txt",
-                          "./usr/lib/orbit-os/os-release", "./usr/share/themes/Orbit-graphite/gtk-4.0/gtk.css"],
+                          "./usr/lib/orbit-os/os-release", "./usr/share/themes/Orbit-graphite/gtk-4.0/gtk.css",
+                          "./usr/share/orbit-os/tokens.json", "./usr/share/icons/orbit/scalable/apps/orbit-files.svg",
+                          "./usr/share/icons/orbit/symbolic/actions/orbit-tool-crop-symbolic.svg"],
     "orbit-launcher": ["./usr/share/gnome-shell/extensions/orbit-launcher@orbit-os/extension.js"],
+    "orbit-apps": ["./usr/bin/orbit-files", "./usr/bin/orbit-notes", "./usr/bin/orbit-spaces", "./usr/bin/orbit-screenshot",
+                   "./usr/bin/orbit-store", "./usr/bin/orbit-hardware", "./usr/bin/orbit-backup",
+                   "./usr/lib/orbit-os/python/orbit/files.py", "./usr/lib/orbit-os/orbit-store-helper",
+                   "./usr/share/orbit-os/store-catalog.json", "./usr/share/polkit-1/actions/org.orbit-os.store.policy",
+                   "./usr/share/applications/orbit-files.desktop", "./etc/xdg/mimeapps.list"],
+    "orbit-shell-extensions": ["./usr/share/gnome-shell/extensions/orbit-control-center@orbit-os/extension.js",
+                               "./usr/share/gnome-shell/extensions/orbit-widgets@orbit-os/schemas/gschemas.compiled",
+                               "./usr/share/gnome-shell/extensions/orbit-clipboard@orbit-os/extension.js"],
     "orbit-os-desktop": ["./etc/dconf/db/local.d/00-orbit", "./etc/skel/Home/Inbox/.keep",
                          "./etc/skel/.config/user-dirs.dirs", "./etc/firefox/policies/policies.json",
+                         "./etc/skel/.config/gtk-4.0/gtk.css", "./usr/bin/orbit-hardware-check",
                          "./usr/share/glib-2.0/schemas/org.orbit-os.desktop.gschema.xml"],
 }
 bad = 0
@@ -24,7 +35,9 @@ for pkg, files in need.items():
             print(f"FAIL {pkg}: {f} not packaged"); bad = 1
     for l in listing.splitlines():
         perms, name = l.split()[0], l.split()[5]
-        if "s" in perms[1:10].replace("-", ""):
+        if "__pycache__" in name or name.endswith(".pyc"):
+            print(f"FAIL {pkg}: compiled bytecode shipped: {name}"); bad = 1
+        if perms[3] in "sS" or perms[6] in "sS":
             print(f"FAIL {pkg}: setuid/setgid file {name}"); bad = 1
         if any(k in name for k in ("id_rsa", ".pem", "shadow", "authorized_keys", ".netrc")):
             print(f"FAIL {pkg}: secret-looking file {name}"); bad = 1

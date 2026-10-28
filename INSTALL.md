@@ -131,6 +131,19 @@ The last screen lists every change to your disks. Read it, then click **Install*
 3. Your folders live in **~/Home**: Desktop, Documents, Downloads, Pictures, Music, Videos, Projects, Spaces (Personal, Work, Study), Notes and Inbox.
 4. Optional: in **Orbit Settings**, turn on **Sort Inbox automatically**. Files dropped in Inbox are moved by type every two minutes. To undo all moves, run `/usr/lib/orbit-os/orbit-inbox-sorter --undo`.
 5. Press **Super** or **Super+Space** for the launcher: type an app name, a file name, a setting, or a sum like `12*7`.
+6. Other shortcuts:
+
+   | Keys | What it does |
+   |---|---|
+   | Super+V | Clipboard history |
+   | Super+E | Files |
+   | Shift+Super+S | Screenshot an area |
+   | Super+Alt+1/2/3 | Switch Space |
+   | Super+M | Notifications |
+
+   The apps are described in [APPS.md](APPS.md).
+7. Open **Hardware** and run the *Guided tests*. *Copy Report* gives you the table for `HARDWARE-TEST.md`.
+8. Open **Backup**, plug in a USB drive and press *Back Up Now*. Do this before you rely on the laptop.
 
 ## 9. Update, rebuild and customize
 - **Updates:** security updates install automatically. For everything else, use Software → Updates, or `sudo apt update && sudo apt upgrade`.
@@ -139,7 +152,7 @@ The last screen lists every change to your disks. Read it, then click **Install*
   ./build.sh --debs-only
   ```
   ```bash
-  sudo apt install ./out/orbit-os-*.deb ./out/orbit-launcher_*.deb
+  sudo apt install ./out/orbit-*.deb
   ```
 - **Your own startup logo:** save it as `branding/boot-logo/logo.png` (transparent, about 192 px) or `logo.svg`, then run `./build.sh`. On an installed system, no rebuild is needed:
   ```bash

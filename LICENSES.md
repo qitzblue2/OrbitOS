@@ -12,7 +12,10 @@ Everything in the image is an unmodified binary package with its upstream licens
 |---|---|---|
 | Ubuntu 24.04 LTS base system | various free licenses (per package) | Ubuntu archive |
 | GNOME 46 (shell, apps), Ubuntu Dock | GPL/LGPL | Ubuntu archive |
-| Blur my Shell | GPL-3.0 | Ubuntu archive or vendored release |
+| Blur my Shell v76 | GPL-3.0 | vendored from extensions.gnome.org (`config/vendor/`, SHA-256 pinned); Ubuntu 24.04 has no package |
+| GtkSourceView 5, libadwaita 1.5, PyGObject | LGPL-2.1+ | Ubuntu archive (used by the Orbit apps) |
+| rsync | GPL-3.0 | Ubuntu archive (Orbit Backup) |
+| Open-Meteo API (only if weather is turned on) | data CC BY 4.0 | api.open-meteo.com, attribution: "Weather data by Open-Meteo.com" |
 | Inter font | SIL OFL 1.1 | `fonts-inter` |
 | JetBrains Mono | SIL OFL 1.1 | `fonts-jetbrains-mono` |
 | Firefox ESR | MPL-2.0 (Firefox trademark: Mozilla) | Mozilla APT repo, unmodified binary |

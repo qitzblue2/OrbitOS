@@ -96,7 +96,13 @@ app.process().stderr.on('data', (d) => {
     if (/Uncaught|TypeError|ReferenceError/.test(s)) failures.push(`main process: ${s.trim().slice(0, 200)}`);
   }
 });
-const ui = await app.firstWindow();
+await app.firstWindow();
+let ui;
+for (let i = 0; i < 60 && !ui; i++) {
+  ui = app.windows().find((w) => w.url().startsWith('aphelion://ui'));
+  if (!ui) await sleep(500);
+}
+if (!ui) throw new Error(`toolbar page not found: ${app.windows().map((w) => w.url()).join(', ')}`);
 const pageErrors = [];
 ui.on('pageerror', (e) => pageErrors.push(`ui: ${e.message}`));
 app.on('window', (w) => w.on('pageerror', (e) => pageErrors.push(`${w.url()}: ${e.message}`)));
@@ -116,7 +122,7 @@ async function shot(name) {
   execFileSync('import', ['-window', 'root', '-crop', `${b.width}x${b.height}+${b.x}+${b.y}`, '+repage', file]);
   console.log(`shot ${name}`);
 }
-const setSetting = (k, v) => A(({ k, v }) => global.__aphelion.setSetting(k, v), { k, v });
+const setSetting = (k, v) => A((_e, { k, v }) => global.__aphelion.setSetting(k, v), { k, v });
 const openPop = async (name) => {
   await ui.evaluate((n) => document.querySelector(`.widget[title="${n}"]`)?.click(), name);
   await sleep(900);
@@ -126,7 +132,7 @@ const closePop = async () => {
   await sleep(400);
 };
 const go = async (url, wait = 6000) => {
-  await A((u) => global.__aphelion.current().navigate(u), url);
+  await A((_e, u) => global.__aphelion.current().navigate(u), url);
   await sleep(wait);
 };
 const state = () => A(() => global.__aphelion.current().state());
@@ -160,14 +166,14 @@ st = await state();
 check(st.nav.url.startsWith('https://example.com'), `http://example.com upgraded to ${st.nav.url}`);
 
 // 5. KeePass: unlock the test database, entries match the site
-await A((p) => global.__aphelion.setSetting('vaultPath', p), vaultPath);
+await A((_e, p) => global.__aphelion.setSetting('vaultPath', p), vaultPath);
 await openPop('KeePass');
-await ui.fill('.pop input[type=password]', 'orbit-demo');
+await ui.fill('#pop input[type=password]', 'orbit-demo');
 await ui.keyboard.press('Enter');
 await sleep(4000);
 await shot('06-keepass-unlocked');
-const kpText = await ui.evaluate(() => document.querySelector('.pop')?.innerText || '');
-check(/Matches for example\.com/.test(kpText) && /demo-user/.test(kpText), 'KeePass shows the matching entry for example.com');
+const kpText = await ui.evaluate(() => document.querySelector('#pop')?.innerText || '');
+check(/Matches for example\.com/i.test(kpText) && /demo-user/.test(kpText), 'KeePass shows the matching entry for example.com');
 await closePop();
 
 // 6. Authenticator with a real TOTP secret
@@ -181,7 +187,7 @@ await closePop();
 
 // 7. quick notes saved to ~/Home/Notes
 await openPop('Quick notes');
-await ui.fill('.pop textarea', 'Read later: Orbit OS build guide\nAsk about the EliteBook fingerprint reader');
+await ui.fill('#pop textarea', 'Read later: Orbit OS build guide\nAsk about the EliteBook fingerprint reader');
 await sleep(1200);
 await shot('08-quick-notes');
 await closePop();

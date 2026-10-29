@@ -67,6 +67,9 @@ function render() {
   renderTabs();
   renderToolbar();
   renderBars();
+  // the wallpaper stays behind the toolbar only: while a popover makes this view
+  // cover the window, the page must stay visible underneath
+  $('#bg').style.height = `${$('#bars').getBoundingClientRect().bottom}px`;
   const show = Boolean(S.overlay);
   $('#overlay').hidden = !show;
   if (show && popName !== S.overlay) openPop(S.overlay, false);
@@ -178,7 +181,7 @@ function renderToolbar() {
   z.hidden = n.zoom === 100;
   z.textContent = `${n.zoom}%`;
   const wrap = $('#widgets');
-  wrap.replaceChildren(...S.widgets.map((w) => h('button', { class: `widget${S.overlay === w.key ? ' open' : ''}`, title: w.title,
+  wrap.replaceChildren(...S.widgets.map((w) => h('button', { type: 'button', class: `widget${S.overlay === w.key ? ' open' : ''}`, title: w.title,
                                                              'aria-label': w.title, onclick: () => togglePop(w.key) },
                                                  w.icon, w.badge ? h('span', { class: 'badge', text: w.badge }) : null)));
   const shield = $('#shield');

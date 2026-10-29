@@ -121,6 +121,7 @@ fi
 for t in xorriso unsquashfs mksquashfs gpgv sha256sum python3 dpkg-deb; do
   command -v "$t" >/dev/null || die "missing tool: $t (apt install $HOST_DEPS)"
 done
+python3 -c "import yaml" 2>/dev/null || die "missing python3-yaml (sudo apt install python3-yaml)"
 
 # ---------- stage B: fetch + verify the official ISO ----------
 mkdir -p "$WORK/iso-src" "$OUT"
@@ -242,6 +243,10 @@ for sq in minimal.standard minimal.standard.live; do
   # manifests tell the installer which packages each layer stack contains
   cp "$WORK/$sq.manifest" "$X/casper/$sq.manifest"
 done
+# The installer must install the Orbit layer stack (minimal + minimal.standard),
+# not Ubuntu's untouched "minimal" choice, and check free space against its real size.
+installed=$(( $(du -sx --block-size=1 "$L/minimal" | cut -f1) + $(du -sx --block-size=1 "$L/minimal.standard" | cut -f1) ))
+python3 "$HERE/tools/orbit-install-sources.py" "$X/casper/install-sources.yaml" "$installed" "$ORBIT_VERSION"
 
 # Live-boot menu: names plus a verbose entry (no splash, boot messages on
 # screen) so a stuck boot shows where it stops. Signed shim/GRUB/kernel untouched.

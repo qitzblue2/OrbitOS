@@ -201,7 +201,8 @@ customize_layer() {
     echo "Acquire::https::Proxy \"${https_proxy:-$HTTPS_PROXY}\"; Acquire::http::Proxy \"${http_proxy:-${HTTP_PROXY:-${https_proxy:-$HTTPS_PROXY}}}\";" >> "$WORK/root/tmp/orbit/apt.conf"
   log "chroot: $hook on layer $name"
   chroot "$WORK/root" env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root LANG=C.UTF-8 \
-    ORBIT_VARIANT="$VARIANT" ORBIT_SNAPSHOT="$ORBIT_SNAPSHOT" DEBIAN_FRONTEND=noninteractive \
+    ORBIT_VARIANT="$VARIANT" ORBIT_SNAPSHOT="$ORBIT_SNAPSHOT" \
+    ORBIT_LIVE_INITRD="${ORBIT_LIVE_INITRD:-0}" ORBIT_GDM_THEME="${ORBIT_GDM_THEME:-0}" DEBIAN_FRONTEND=noninteractive \
     APT_CONFIG=/tmp/orbit/apt.conf "${proxyenv[@]}" \
     /bin/bash "/tmp/orbit/config/hooks/$hook"
   chroot "$WORK/root" dpkg-query -W --showformat='${Package}\t${Version}\n' > "$WORK/$name.manifest"
@@ -214,11 +215,22 @@ customize_layer() {
 customize_layer minimal.standard 10-desktop.chroot.sh minimal
 customize_layer minimal.standard.live 20-live.chroot.sh minimal.standard minimal
 
-# The live boot splash comes from casper/initrd, not the squashfs: use the one
-# regenerated in the live chroot (it contains casper + the Orbit Plymouth theme).
-newinitrd=$(ls -t "$L/minimal.standard.live"/boot/initrd.img-* 2>/dev/null | head -1)
-[ -n "$newinitrd" ] || die "live chroot did not produce an initrd"
-cp "$newinitrd" "$X/casper/initrd"
+# casper/initrd: keep Ubuntu's own, known-good live initrd by default (a
+# regenerated one is the easiest way to end up with a black screen).
+# ORBIT_LIVE_INITRD=1 opts in to the initrd rebuilt in the live chroot (Orbit
+# splash during live boot); it is used only if built for casper/vmlinuz's kernel.
+newinitrd=$(ls -t "$L/minimal.standard.live"/boot/initrd.img-* 2>/dev/null | head -1 || true)
+if [ "${ORBIT_LIVE_INITRD:-0}" = 1 ] && [ -n "$newinitrd" ]; then
+  kv=$(file -bL "$X/casper/vmlinuz" | grep -o 'version [^ ]*' | cut -d' ' -f2)
+  if [ "${newinitrd##*/initrd.img-}" = "$kv" ]; then
+    log "using the Orbit live initrd for kernel $kv"
+    cp "$newinitrd" "$X/casper/initrd"
+  else
+    log "WARNING: live initrd is for ${newinitrd##*/initrd.img-}, casper kernel is $kv: keeping Ubuntu's"
+  fi
+else
+  log "keeping Ubuntu's live initrd"
+fi
 rm -f "$L/minimal.standard.live"/boot/initrd.img-*
 
 # ---------- stage E: repack ----------
@@ -231,9 +243,13 @@ for sq in minimal.standard minimal.standard.live; do
   cp "$WORK/$sq.manifest" "$X/casper/$sq.manifest"
 done
 
-# Live-boot menu text only: signed shim/GRUB/kernel binaries are untouched.
-sed -i "s/Try or Install Ubuntu/Try or Install Orbit OS/g; s/Ubuntu (safe graphics)/Orbit OS (safe graphics)/g" \
-  "$X/boot/grub/grub.cfg" "$X/boot/grub/loopback.cfg" 2>/dev/null || true
+# Live-boot menu: names plus a verbose entry (no splash, boot messages on
+# screen) so a stuck boot shows where it stops. Signed shim/GRUB/kernel untouched.
+for cfg in "$X/boot/grub/grub.cfg" "$X/boot/grub/loopback.cfg"; do
+  [ -f "$cfg" ] || continue
+  sed -i "s/Try or Install Ubuntu/Try or Install Orbit OS/g; s/Ubuntu (safe graphics)/Orbit OS (safe graphics)/g" "$cfg"
+  grep -q 'Orbit OS (verbose' "$cfg" || python3 "$HERE/tools/add-verbose-entry.py" "$cfg"
+done
 install -D -m 755 "$HERE/tools/hardware-check.sh" "$X/tools/hardware-check.sh"
 printf 'Orbit OS %s (based on Ubuntu 24.04 LTS) - %s amd64\n' "$ORBIT_VERSION" "$VARIANT" > "$X/.disk/info"
 

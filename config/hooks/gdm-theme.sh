@@ -2,6 +2,9 @@
 # Build an Orbit GDM theme: stock Ubuntu shell gresource + Orbit color overrides
 # appended to its stylesheets, registered as the gdm-theme.gresource alternative.
 set -euo pipefail
+# The recompiled login-screen gresource is opt-in (ORBIT_GDM_THEME=1): a broken
+# one leaves GDM on a black screen. By default only the dconf settings below apply.
+if [ "${ORBIT_GDM_THEME:-0}" = 1 ]; then
 src=$(readlink -f /usr/share/gnome-shell/gdm-theme.gresource 2>/dev/null || echo /usr/share/gnome-shell/gnome-shell-theme.gresource)
 [ -f "$src" ] || { echo "no stock gresource found; GDM keeps the default theme"; exit 0; }
 css=/usr/share/themes/Orbit-graphite/gnome-shell/gnome-shell.css
@@ -32,6 +35,7 @@ glib-compile-resources --sourcedir="$T" --target=/usr/share/gnome-shell/theme/or
 update-alternatives --install /usr/share/gnome-shell/gdm-theme.gresource gdm-theme.gresource \
   /usr/share/gnome-shell/theme/orbit-gdm.gresource 150
 update-alternatives --set gdm-theme.gresource /usr/share/gnome-shell/theme/orbit-gdm.gresource
+fi
 
 install -d /etc/dconf/db/gdm.d /etc/dconf/profile
 [ -f /etc/dconf/profile/gdm ] || printf 'user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n' > /etc/dconf/profile/gdm

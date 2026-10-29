@@ -56,12 +56,16 @@ tests/vm-boot-test.sh out/orbit-os-1.0.0-full-amd64.iso
 **Expected:** `[vm-test] PASS: desktop after …s`. Screenshots are saved in `tests/screenshots/<date>/`.
 
 By hand, with VirtualBox:
-1. Create a new VM: type Linux, Ubuntu 64-bit, 4 GB RAM, 25 GB disk, and tick **Enable EFI**.
+1. Create a new VM: type Linux, Ubuntu 64-bit, **at least 4 GB RAM (6–8 GB is better)**, 2+ CPUs, 25 GB disk, and tick **Enable EFI**. Under Display: Graphics Controller **VMSVGA**, Video Memory **128 MB**, **Enable 3D Acceleration off**. In the new-VM wizard, tick **Skip Unattended Installation** (or leave the ISO empty there and attach it later under Storage).
 2. Attach the ISO and start the VM.
-3. You should see the boot menu ("Try or Install Orbit OS"), then a dark screen with a pulsing Orbit logo, then the desktop. The desktop has a pink, purple and blue wallpaper, a slim dock on the left, and the installer window.
+3. You should see the boot menu ("Try or Install Orbit OS"), then the boot splash, then the desktop. The first boot in a VM can sit on a black or dark screen for **2–5 minutes** while the live system unpacks; wait before resetting. The desktop has a pink, purple and blue wallpaper, a slim dock on the left, and the installer window.
 4. Close the installer window to keep exploring in live mode.
 
-**If it fails:** if you get a black screen in VirtualBox, set Graphics Controller to **VMSVGA** with 128 MB of video memory, or choose "Orbit OS (safe graphics)" in the boot menu.
+**If it fails (black screen):** go through these in order.
+1. Power off the VM and check the settings above: EFI on, VMSVGA, 128 MB, 3D **off**, 4+ GB RAM. VirtualBox's default *unattended install* also breaks live ISOs: if the wizard used it, make a new VM without it.
+2. In the boot menu, choose **Orbit OS (safe graphics)**.
+3. Still black? Choose **Orbit OS (verbose, safe graphics)**: it prints boot messages instead of the splash. Take a photo of the last lines and send it, so the cause can be fixed.
+4. On Windows hosts, turn off Hyper-V/"Virtual Machine Platform" if VirtualBox shows a green turtle icon in the status bar: VirtualBox then runs very slowly and can look frozen.
 
 ## 4. Write the USB stick safely
 > ⚠️ **Writing to the wrong device erases it.** Unplug every other USB drive first.

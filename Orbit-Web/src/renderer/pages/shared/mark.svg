@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Aphelion mark: an orbit ellipse with the planet at its far point -->
+  <ellipse cx="32" cy="32" rx="26" ry="12.5" transform="rotate(-28 32 32)" stroke="currentColor" stroke-width="3.2" opacity=".55" style="color:#f4f4f6"/>
+  <circle cx="32" cy="32" r="7.5" fill="#f4f4f6"/>
+  <circle cx="54.5" cy="19.6" r="4.4" fill="#4fd1c0"/>
+</svg>

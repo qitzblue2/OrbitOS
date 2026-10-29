@@ -1,0 +1,61 @@
+/* Aphelion design tokens: the Orbit OS tokens (branding/tokens.json) as CSS.
+   Glass (default) and Graphite are dark; Light flips the ground and ink.
+   One source for the toolbar UI and every aphelion:// page. */
+@font-face { font-family: "Inter"; src: url("inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215; }
+@font-face { font-family: "Inter"; src: url("inter-ext.woff2") format("woff2"); font-weight: 100 900; font-display: swap;
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+20A0-20AB, U+20AD-20CF, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "JetBrains Mono"; src: url("mono.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("mono-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+
+:root {
+  --canvas: #1a1a1d; --panel: #1f1f22; --surface: #26262a; --raised: #2c2c30; --menu: rgba(61, 61, 68, .92);
+  --ink: #f4f4f6; --ink-2: #d8d8db; --muted: rgba(244, 244, 246, .68); --faint: rgba(244, 244, 246, .44);
+  --border: rgba(255, 255, 255, .07); --border-strong: rgba(255, 255, 255, .13);
+  --fill: rgba(255, 255, 255, .05); --fill-hover: rgba(255, 255, 255, .08); --fill-active: rgba(255, 255, 255, .12);
+  --row-hover: rgba(255, 255, 255, .04); --row-active: rgba(255, 255, 255, .075);
+  --lit: #ededf0; --lit-ink: #161619; --ok: #5fd38d; --warn: #f5c451; --bad: #f2748a; --pink: #f28dc4;
+  --strip: rgba(20, 20, 23, .55); --toolbar: rgba(38, 38, 42, .6); --content: rgba(26, 26, 29, .45);
+  --tile: linear-gradient(#303034, #232327);
+  --blur: blur(14px); --blur-pop: blur(24px);
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+  --fast: 120ms; --base: 180ms; --slow: 260ms;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
+  --text: 13px;
+  color-scheme: dark;
+}
+.style-light {
+  --canvas: #f1f1f3; --panel: #e6e6e9; --surface: #ffffff; --raised: #ffffff; --menu: rgba(255, 255, 255, .94);
+  --ink: #1c1c1f; --ink-2: #3a3a3f; --muted: rgba(28, 28, 31, .68); --faint: rgba(28, 28, 31, .48);
+  --border: rgba(0, 0, 0, .09); --border-strong: rgba(0, 0, 0, .16);
+  --fill: rgba(0, 0, 0, .04); --fill-hover: rgba(0, 0, 0, .07); --fill-active: rgba(0, 0, 0, .10);
+  --row-hover: rgba(0, 0, 0, .04); --row-active: rgba(0, 0, 0, .07);
+  --lit: #222226; --lit-ink: #f4f4f6;
+  --strip: rgba(236, 234, 243, .6); --toolbar: rgba(255, 255, 255, .62); --content: rgba(241, 241, 243, .5);
+  --tile: linear-gradient(#ffffff, #ececef);
+  color-scheme: light;
+}
+.style-graphite { --strip: rgba(26, 26, 29, .82); --toolbar: rgba(38, 38, 42, .86); --content: rgba(26, 26, 29, .8); }
+/* Reduce transparency: every glass surface becomes its solid token color */
+.reduce { --strip: var(--panel); --toolbar: var(--surface); --content: var(--canvas); --blur: none; --blur-pop: none; }
+.reduce { --menu: #3d3d44; }
+.reduce.style-light { --menu: #ffffff; }
+/* High contrast: solid surfaces, strong borders, no glass */
+.contrast { --strip: var(--panel); --toolbar: var(--surface); --content: var(--canvas); --blur: none; --blur-pop: none;
+  --border: rgba(255, 255, 255, .45); --border-strong: rgba(255, 255, 255, .7); --muted: #f4f4f6; --faint: #d8d8db; }
+.contrast.style-light { --border: rgba(0, 0, 0, .6); --border-strong: rgba(0, 0, 0, .85); --muted: #1c1c1f; --faint: #3a3a3f; }
+.bigtext { --text: 15px; }
+.motion *, .motion *::before, .motion *::after { animation-duration: 0s !important; transition-duration: 0s !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0s !important; transition-duration: 0s !important; }
+}
+
+/* switches as in the design: 34x20, lit when on */
+.switch { width: 34px; height: 20px; border-radius: 999px; padding: 2px; background: var(--fill-active); flex: none;
+  transition: background var(--fast); border: none; cursor: pointer; position: relative; }
+.switch::after { content: ""; display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--ink);
+  transition: transform var(--fast); }
+.switch[aria-checked="true"] { background: var(--lit); }
+.switch[aria-checked="true"]::after { background: var(--lit-ink); transform: translateX(14px); }
+.switch:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Aphelion</title>
+<link rel="stylesheet" href="shared/tokens.css">
+<link rel="stylesheet" href="ui.css">
+<script type="module" src="ui.js"></script>
+</head>
+<body>
+<div id="bg" aria-hidden="true"></div>
+
+<header id="strip" role="tablist" aria-label="Tabs">
+  <div id="tabs"></div>
+  <button id="newtab" class="icon-btn" title="New tab (Ctrl+T)" aria-label="New tab">+</button>
+  <div class="drag"></div>
+  <div id="private-badge" hidden>Private</div>
+  <div id="winbtns">
+    <button data-win="min" class="light yellow" title="Minimize" aria-label="Minimize"><svg viewBox="0 0 8 8"><path d="M2 4h4"/></svg></button>
+    <button data-win="full" class="light green" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 8 8"><path d="M2 2h4v4"/></svg></button>
+    <button data-win="close" class="light red" title="Close" aria-label="Close window"><svg viewBox="0 0 8 8"><path d="M2 2l4 4M6 2 2 6"/></svg></button>
+  </div>
+</header>
+
+<div id="toolbar">
+  <button class="nav" data-nav="back" title="Back (Alt+←)" aria-label="Back"><svg viewBox="0 0 16 16"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
+  <button class="nav" data-nav="forward" title="Forward (Alt+→)" aria-label="Forward"><svg viewBox="0 0 16 16"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>
+  <button class="nav" data-nav="reload" title="Reload (Ctrl+R)" aria-label="Reload"><svg viewBox="0 0 16 16"><path id="reload-path" d="M13 8a5 5 0 1 1-1.6-3.7M13.2 2.5v2.4h-2.4"/></svg></button>
+  <form id="addr-form" autocomplete="off">
+    <span id="lock" title="Connection">◎</span>
+    <input id="addr" spellcheck="false" placeholder="Search or enter address" aria-label="Address and search bar">
+    <button type="button" id="reader" class="mini" title="Reader view (Ctrl+Alt+R)" hidden>¶</button>
+    <span id="zoom" class="mini" hidden></span>
+    <button type="button" id="star" class="mini" title="Bookmark this page (Ctrl+D)" aria-label="Bookmark">☆</button>
+    <div id="widgets" aria-label="Widgets"></div>
+  </form>
+  <button id="shield" title="Tracker shield" aria-label="Tracker shield">◈ <span id="blocked">0</span></button>
+  <button id="menu-btn" class="nav" title="Menu" aria-label="Menu">⋯</button>
+</div>
+
+<div id="bars"></div>
+
+<div id="overlay" hidden>
+  <div id="catcher"></div>
+  <div id="pop" role="dialog"></div>
+</div>
+</body>
+</html>

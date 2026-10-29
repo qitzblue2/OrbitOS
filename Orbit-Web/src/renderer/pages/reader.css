@@ -1,0 +1,11 @@
+#art { max-width: 700px; margin: 0 auto; padding: 32px 24px 80px; --size: 18px; }
+.tools { display: flex; gap: 8px; margin-bottom: 28px; } .sp { flex: 1; }
+#title { font-size: 32px; line-height: 1.2; letter-spacing: -0.01em; margin: 6px 0 10px; }
+#body { font-size: var(--size); line-height: 1.7; color: var(--ink-2); }
+#art.serif #body { font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; }
+#body img, #body video, #body figure { max-width: 100%; height: auto; border-radius: var(--r-md); }
+#body a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+#body pre, #body code { font-family: var(--mono); font-size: .85em; background: var(--fill); border-radius: 6px; padding: 2px 5px; }
+#body pre { padding: 14px; overflow: auto; }
+#body blockquote { margin: 0; padding-left: 16px; border-left: 3px solid var(--border-strong); color: var(--muted); }
+#body h2, #body h3 { color: var(--ink); line-height: 1.3; }

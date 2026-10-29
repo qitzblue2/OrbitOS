@@ -1,0 +1,29 @@
+.layout { display: flex; min-height: 100vh; }
+#side { width: 220px; flex: none; padding: 20px 10px; background: var(--strip); backdrop-filter: var(--blur); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; height: 100vh; overflow: auto; }
+#side .head { padding: 0 12px 14px; font-size: 18px; font-weight: 600; }
+#side button { text-align: left; padding: 8px 12px; border-radius: var(--r-sm); color: var(--muted); }
+#side button:hover { background: var(--row-hover); }
+#side button[aria-current="page"] { background: var(--row-active); color: var(--ink); }
+#main { flex: 1; padding: 28px 40px 60px; max-width: 800px; display: flex; flex-direction: column; gap: 24px; }
+.sec-head { display: flex; flex-direction: column; gap: 4px; }
+.sec-head p { margin: 0; color: var(--muted); }
+.group { display: flex; flex-direction: column; gap: 10px; }
+.group-title { display: flex; justify-content: space-between; align-items: baseline; font-weight: 500; }
+.group-title span { font-size: 11px; color: var(--faint); font-weight: 400; }
+.styles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.style-card, .bg-card { display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: var(--r-md); cursor: pointer;
+  border: 2px solid var(--border); transition: transform 160ms, border-color 160ms; background: none; text-align: left; }
+.style-card:hover, .bg-card:hover { transform: translateY(-2px); }
+.style-card[aria-pressed="true"], .bg-card[aria-pressed="true"] { border-color: var(--lit); }
+.style-card .sw { height: 64px; border-radius: var(--r-sm); }
+.bgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.bg-card { gap: 6px; padding: 6px; }
+.bg-card .sw { height: 56px; border-radius: var(--r-sm); background-size: cover !important; background-position: center !important; }
+.bg-card span { font-size: 11px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 12px; }
+.list-item:first-child { border-top: none; }
+.list-item .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.about-mark { display: flex; align-items: center; gap: 14px; }
+.about-mark b { font-size: 22px; }

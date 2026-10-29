@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-bundle/
+*.log
+assets/lists/*.txt
+assets/lists/*.bin
+assets/lists/manifest.json

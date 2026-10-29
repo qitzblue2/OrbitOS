@@ -1,0 +1,133 @@
+{
+  "name": "aphelion",
+  "productName": "Aphelion",
+  "version": "1.0.0",
+  "description": "Aphelion: a calm, private web browser from Orbit OS. Tracker shield, ad blocker, authenticator, KeePass, notes and media in the address bar.",
+  "homepage": "https://github.com/qitzblue2/OrbitOS/tree/Orbit-Apps/Orbit-Web",
+  "license": "GPL-3.0-or-later",
+  "author": {
+    "name": "Orbit OS",
+    "email": "noreply@orbit-os.invalid"
+  },
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "bundle": "node tools/bundle.mjs",
+    "lists": "node tools/fetch-lists.mjs",
+    "icons": "python3 tools/make-icons.py",
+    "test": "node --test test/unit/",
+    "test:e2e": "node test/e2e/run.mjs",
+    "prepack": "npm run bundle",
+    "dist:linux": "npm run lists && npm run bundle && electron-builder --linux deb AppImage",
+    "dist:win": "npm run lists && npm run bundle && electron-builder --win nsis",
+    "dist:mac": "npm run lists && npm run bundle && electron-builder --mac dmg zip"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@ghostery/adblocker": "2.20.1",
+    "@mozilla/readability": "0.6.0",
+    "hash-wasm": "4.12.0",
+    "jsqr": "1.4.0",
+    "kdbxweb": "2.1.1",
+    "tldts": "7.4.18"
+  },
+  "devDependencies": {
+    "electron": "44.7.1",
+    "electron-builder": "26.17.0",
+    "esbuild": "0.28.2",
+    "playwright-core": "1.64.0"
+  },
+  "build": {
+    "appId": "os.orbit.aphelion",
+    "productName": "Aphelion",
+    "copyright": "Orbit OS \u00b7 GPL-3.0-or-later",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets/build"
+    },
+    "files": [
+      "src/**",
+      "dist-bundle/**",
+      "assets/icons/**",
+      "assets/lists/*.bin",
+      "assets/lists/manifest.json",
+      "package.json",
+      "!**/*.map"
+    ],
+    "protocols": [
+      {
+        "name": "Web",
+        "schemes": [
+          "http",
+          "https"
+        ]
+      }
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "html",
+          "htm",
+          "pdf"
+        ],
+        "name": "Web page",
+        "role": "Viewer"
+      }
+    ],
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "icon": "assets/icons/png",
+      "category": "Network;WebBrowser",
+      "executableName": "aphelion",
+      "synopsis": "Calm, private web browser",
+      "desktop": {
+        "entry": {
+          "Name": "Aphelion",
+          "GenericName": "Web Browser",
+          "Comment": "Browse the web privately",
+          "Keywords": "web;browser;internet;",
+          "MimeType": "text/html;x-scheme-handler/http;x-scheme-handler/https;",
+          "StartupWMClass": "Aphelion"
+        }
+      }
+    },
+    "deb": {
+      "depends": [
+        "libnss3",
+        "libgtk-3-0t64 | libgtk-3-0",
+        "libnotify4",
+        "libsecret-1-0"
+      ],
+      "packageName": "aphelion"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icons/aphelion.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "shortcutName": "Aphelion"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "assets/icons/aphelion.icns",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "extendInfo": {
+        "NSCameraUsageDescription": "Websites can ask to use your camera.",
+        "NSMicrophoneUsageDescription": "Websites can ask to use your microphone."
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@
 // One browser tab: a sandboxed WebContentsView plus the state the toolbar shows.
 const { WebContentsView } = require('electron');
 const path = require('node:path');
+const { signInUserAgent } = require('./network');
 
 let nextId = 1;
 const PRELOAD = path.join(__dirname, '..', '..', 'dist-bundle', 'tab-preload.js');
@@ -95,9 +96,18 @@ class Tab {
     const app = this.win.app;
     wc.setWindowOpenHandler(({ url, disposition }) => {
       if (/^aphelion:/.test(url) && !/^aphelion:/.test(wc.getURL())) return { action: 'deny' };
+      // real popups (window.open with a size) stay popups: "Sign in with Google/Microsoft/Apple"
+      // and payment windows talk back to their opener, which a plain new tab would break
+      if (disposition === 'new-window' && /^https:/.test(url)) {
+        return { action: 'allow', outlivesOpener: false,
+                 overrideBrowserWindowOptions: { width: 520, height: 680, autoHideMenuBar: true, title: 'Aphelion',
+                                                 webPreferences: { sandbox: true, contextIsolation: true, session: this.session } } };
+      }
       this.win.newTab(url, { background: disposition === 'background-tab', opener: this });
       return { action: 'deny' };
     });
+    signInUserAgent(wc);
+    wc.on('did-create-window', (child) => signInUserAgent(child.webContents));
     const guard = (e, url) => {
       // web pages may never open Aphelion's own pages (settings, history, ...)
       if (/^aphelion:/.test(url) && !/^aphelion:/.test(wc.getURL()) && wc.getURL()) e.preventDefault();

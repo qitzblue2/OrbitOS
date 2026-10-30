@@ -115,8 +115,9 @@ class Pipeline {
     const s = this.ctx.settings();
     const filter = { urls: ['<all_urls>'] };
     const wr = this.ses.webRequest;
-    if (s.dnt || s.cookies) wr.onBeforeSendHeaders(filter, (d, cb) => cb(this.sendHeaders(d)));
-    else wr.onBeforeSendHeaders(null);
+    // the sign-in hosts always need the header rewrite; everything else only for DNT/cookies
+    const headerFilter = s.dnt || s.cookies ? filter : { urls: [...SIGN_IN_HOSTS].map((h) => `https://${h}/*`) };
+    wr.onBeforeSendHeaders(headerFilter, (d, cb) => cb(this.sendHeaders(d)));
     if (s.cookies) wr.onHeadersReceived(filter, (d, cb) => cb(this.received(d)));
     else wr.onHeadersReceived(null);
     this.ses.setUserAgent(this.ses.getUserAgent(), languageList(s.lang));
@@ -180,6 +181,10 @@ class Pipeline {
   sendHeaders(details) {
     const s = this.ctx.settings();
     const h = details.requestHeaders;
+    if (isGoogleSignIn(details.url)) {
+      h['User-Agent'] = SIGN_IN_UA;
+      for (const k of Object.keys(h)) if (/^sec-ch-ua/i.test(k)) delete h[k];
+    }
     if (s.dnt) {
       h.DNT = '1';
       h['Sec-GPC'] = '1';
@@ -238,4 +243,37 @@ function acceptLanguage(lang) {
   return [...new Set([lang, base, 'en-US', 'en'])].map((l, i) => (i ? `${l};q=${(1 - i * 0.1).toFixed(1)}` : l)).join(',');
 }
 
-module.exports = { Engines, Pipeline, siteOf, acceptLanguage, LIST_KEYS };
+// ---- Google sign-in ----
+// Google refuses sign-in from browsers it identifies as Electron ("This browser or app may
+// not be secure"). On its sign-in host only, Aphelion presents itself as Firefox (whose
+// requests carry no Sec-CH-UA client hints), in navigator.userAgent and in the headers.
+const SIGN_IN_HOSTS = new Set(['accounts.google.com', 'accounts.youtube.com']);
+const SIGN_IN_UA = {
+  win32: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0',
+  darwin: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:140.0) Gecko/20100101 Firefox/140.0',
+  linux: 'Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0',
+}[process.platform] || 'Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0';
+
+function isGoogleSignIn(url) {
+  try {
+    return SIGN_IN_HOSTS.has(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** switch a webContents' user agent while its main frame is on a sign-in host */
+function signInUserAgent(wc) {
+  let on = false;
+  const check = (d) => {
+    if (!d.isMainFrame) return;
+    const want = isGoogleSignIn(d.url);
+    if (want === on) return;
+    on = want;
+    wc.setUserAgent(want ? SIGN_IN_UA : wc.session.getUserAgent());
+  };
+  wc.on('did-start-navigation', check);
+  wc.on('did-redirect-navigation', check);
+}
+
+module.exports = { Engines, Pipeline, siteOf, acceptLanguage, LIST_KEYS, SIGN_IN_UA, isGoogleSignIn, signInUserAgent };

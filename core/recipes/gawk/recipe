@@ -1,0 +1,20 @@
+# GNU awk: the final Orbit build (replaces the temporary one).
+# 5.3.2, not 5.4.1: 5.4.1 stores 0 in an array element that a comparison merely looks at
+# (A[0] > A[1] leaves A[0] == "0"), which scrambles the sort in GCC's opt-gather.awk and
+# breaks GCC's generated options.cc ("#error ... does not have a Var() flag").
+name=gawk
+version=5.3.2
+stage=base
+sources=(https://ftp.gnu.org/gnu/gawk/gawk-5.3.2.tar.xz)
+sha256=(f8c3486509de705192138b00ef2c00bbbdd0e84c30d5c07d23fc73a9dc4cc9cc)
+depends=(base-files readline)
+replaces=(gawk-temp)
+description="GNU awk pattern scanning language"
+
+build() {
+  sed -i 's/extras//' Makefile.in    # no extra example programs
+  ./configure --prefix=/usr
+  make
+  make DESTDIR="$DESTDIR" install
+  ln -sf gawk.1 "$DESTDIR/usr/share/man/man1/awk.1"
+}

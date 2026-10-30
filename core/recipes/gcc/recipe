@@ -4,7 +4,7 @@ version=15.3.0
 stage=base
 sources=(https://ftp.gnu.org/gnu/gcc/gcc-15.3.0/gcc-15.3.0.tar.xz)
 sha256=(fa59c1beef8995f27c4d71c1df227587189315d3e6faff1bb4306e61b0c530eb)
-depends=(base-files binutils gmp mpfr mpc zlib zstd)
+depends=(base-files binutils gmp mpfr mpc zlib zstd gawk)
 replaces=(gcc-pass2 libstdcxx)
 description="GNU C and C++ compilers and runtime libraries"
 

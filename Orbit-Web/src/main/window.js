@@ -303,7 +303,7 @@ class BrowserWindowController {
     this._pending = setTimeout(() => {
       this._pending = null;
       if (!this.win.isDestroyed()) this.ui.webContents.send('state', this.state());
-    }, 16);
+    }, 50);  // a loading page changes title, icon and counters many times a second; 20 updates/s is plenty
   }
 
   state() {

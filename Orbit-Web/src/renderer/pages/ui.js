@@ -181,9 +181,14 @@ function renderToolbar() {
   z.hidden = n.zoom === 100;
   z.textContent = `${n.zoom}%`;
   const wrap = $('#widgets');
+  // rebuild the widget buttons only when something on them changed
+  const wkey = JSON.stringify([S.widgets, S.overlay]);
+  if (wrap._key !== wkey) {
+  wrap._key = wkey;
   wrap.replaceChildren(...S.widgets.map((w) => h('button', { type: 'button', class: `widget${S.overlay === w.key ? ' open' : ''}`, title: w.title,
                                                              'aria-label': w.title, onclick: () => togglePop(w.key) },
                                                  w.icon, w.badge ? h('span', { class: 'badge', text: w.badge }) : null)));
+  }
   const shield = $('#shield');
   shield.classList.toggle('off', !S.shieldOnForSite);
   $('#blocked').textContent = String(n.internal ? 0 : S.counts.trackers);

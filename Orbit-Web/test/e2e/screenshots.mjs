@@ -165,6 +165,18 @@ await go('http://example.com/', 5000);
 st = await state();
 check(st.nav.url.startsWith('https://example.com'), `http://example.com upgraded to ${st.nav.url}`);
 
+// passkeys: no background (conditional) requests, so no random Windows Security dialogs
+const site = app.windows().find((w) => w.url().startsWith('https://example.com'));
+const pk = await site.evaluate(async () => {
+  const avail = await PublicKeyCredential.isConditionalMediationAvailable();
+  let err = '';
+  try {
+    await navigator.credentials.get({ mediation: 'conditional', publicKey: { challenge: new Uint8Array(16) } });
+  } catch (e) { err = e.name; }
+  return { avail, err };
+});
+check(pk.avail === false && pk.err === 'NotSupportedError', `background passkey requests are refused quietly (${JSON.stringify(pk)})`);
+
 // 5. KeePass: unlock the test database, entries match the site
 await A((_e, p) => global.__aphelion.setSetting('vaultPath', p), vaultPath);
 await openPop('KeePass');

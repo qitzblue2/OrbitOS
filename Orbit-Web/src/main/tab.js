@@ -56,7 +56,9 @@ class Tab {
         autoplayPolicy: 'document-user-activation-required',
       },
     });
-    this.view.setBackgroundColor('#00000000');
+    // opaque, like a normal browser tab: a see-through page view makes the compositor
+    // blend every frame with what is behind it (Aphelion's own pages paint their background)
+    this.view.setBackgroundColor('#ffffff');
     const wc = this.view.webContents;
     if (s.webrtc) wc.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
     this.bind(wc);

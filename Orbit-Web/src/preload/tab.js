@@ -11,7 +11,35 @@ if (location.protocol === 'aphelion:') {
     on: (name, cb) => ipcRenderer.on('aph:event', (_e, n, payload) => n === name && cb(payload)),
   });
 } else {
+  quietPasskeys();
   content();
+}
+
+// Sites such as Google and GitHub ask for passkeys in the background ("conditional
+// mediation", meant to feed the password-field autofill). Chrome answers that silently;
+// in Aphelion it would open the Windows Security key dialog at random moments. Report
+// that background passkey autofill is not available; passkeys still work when a site
+// asks for one because you clicked "Use a passkey" or "Use security key".
+function quietPasskeys() {
+  try {
+    contextBridge.executeInMainWorld({
+      func: () => {
+        const PKC = window.PublicKeyCredential;
+        if (PKC) PKC.isConditionalMediationAvailable = () => Promise.resolve(false);
+        const creds = navigator.credentials;
+        if (!creds?.get) return;
+        const get = creds.get.bind(creds);
+        creds.get = function (options) {
+          if (options && options.mediation === 'conditional') {
+            return Promise.reject(new DOMException('Passkey autofill is not available', 'NotSupportedError'));
+          }
+          return get(options);
+        };
+      },
+    });
+  } catch {
+    /* older Electron without executeInMainWorld: nothing to patch */
+  }
 }
 
 function content() {

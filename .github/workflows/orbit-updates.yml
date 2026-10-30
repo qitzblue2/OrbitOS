@@ -55,7 +55,9 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.v.outputs.built == 'true'
         with:
-          node-version: 22
+          # Node 22.23's built-in fetch crashed on Windows while downloading the filter lists
+          # (undici "assert(!this.paused)"); 24 has the fixed undici
+          node-version: 24
       - name: Build the Windows installer
         if: steps.v.outputs.built == 'true'
         working-directory: Orbit-Web

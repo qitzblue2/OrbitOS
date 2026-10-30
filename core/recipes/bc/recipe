@@ -8,7 +8,8 @@ depends=(base-files readline)
 description="arbitrary-precision calculator"
 
 build() {
-  CC=gcc ./configure --prefix=/usr -G -O3 -r
+  # bc 7.0.3 pastes true/false into identifiers, which C23 (GCC 15's default) makes keywords
+  CC=gcc CFLAGS="-O3 -std=gnu17" ./configure --prefix=/usr -G -O3 -r
   make
   make DESTDIR="$DESTDIR" install
 }

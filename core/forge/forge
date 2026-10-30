@@ -292,6 +292,10 @@ def pack_and_install(rec, root, orbit, pkgs_dir):
     """Pack what a build installed (root = its DESTDIR tree) and install it into Orbit with opm."""
     os.makedirs(pkgs_dir, exist_ok=True)
     opk = os.path.join(pkgs_dir, f"{rec['name']}-{rec['version']}.opk")
+    # the Info index is shared by every package with a manual: it is rebuilt, never owned by one package
+    info_dir = os.path.join(root, "usr/share/info/dir")
+    if os.path.lexists(info_dir):
+        os.remove(info_dir)
     # a package that replaces another also stands in for it, so whatever depended on the old one still installs
     if subprocess.run([sys.executable, OPM, "pack", root, opk, "--name", rec["name"], "--version", rec["version"],
                        "--depends", ",".join(rec["depends"]), "--provides", ",".join(rec["replaces"]),

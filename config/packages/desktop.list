@@ -42,6 +42,9 @@ fonts-wine
 wsdd
 smbclient
 
+# Orbit Sync: direct, encrypted folder sync between your PCs
+syncthing
+
 # gaming: GameMode, and udev rules so controllers and VR headsets work without root
 gamemode
 steam-devices

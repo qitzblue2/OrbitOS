@@ -154,6 +154,15 @@ Every screenshot here is real:
 - The firewall lets replies from PCs on the local network in (`3702`, `5353`, `137` udp, from private addresses only), so they can be found. Until you turn on **Sharing**, this PC shares nothing and doesn't announce itself.
 - OneDrive: Settings → Online Accounts → Microsoft 365 puts your OneDrive in Files.
 
+## Orbit Sync
+![Orbit Sync](docs/screenshots/app-sync.png)
+
+- Keeps Notes, Documents, Desktop, Pictures, Projects and Music the same on all your PCs. Turn on the same folders on each PC.
+- **Pairing:** copy this PC's sync ID, then on the other PC choose **Add PC…** and paste it. This PC then shows the other one under **Wants to pair** with an **Accept** button.
+- Built on Syncthing, running as your user (`systemctl --user`) with its control page on 127.0.0.1 only. PCs connect directly and everything is encrypted; when they aren't on the same network, Syncthing's relays carry the encrypted data along. There is no account, and no server that can read your files.
+- Files that another PC deleted or replaced are kept for 30 days in the folder's `.stversions`.
+- Tested end to end with two real Syncthing instances: pairing request, accept, a note written on one PC arriving on the other, and bad or own IDs refused.
+
 ## Orbit Sharing
 ![Sharing](docs/screenshots/app-sharing.png)
 
@@ -219,7 +228,7 @@ Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
   - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
 
 ## Where the code is
-- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`), so it can be unit-tested.
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`, `sync.py`), so it can be unit-tested.
 - `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
 - `packages/orbit-launcher/`: the launcher extension.
 - Tests:

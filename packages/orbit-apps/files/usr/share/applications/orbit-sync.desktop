@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Orbit Sync
+GenericName=File Sync
+Comment=Keep Notes, Documents and other folders the same on all your PCs
+Exec=orbit-sync
+Icon=orbit-sync
+Categories=GTK;Network;FileTransfer;
+StartupNotify=true
+DBusActivatable=false
+Keywords=sync;syncthing;backup;devices;laptop;cloud;

@@ -13,6 +13,7 @@ Description: Orbit OS apps
  Debian and Flathub), Orbit Hardware (hardware report and guided tests),
  Orbit Backup (rsync snapshot backups), Orbit Updater (updates with
  notifications), Orbit Windows Apps (run .exe and .msi with Wine),
- Orbit Sharing (share folders with Windows PCs), Orbit Optimizer (cleanup and
+ Orbit Sharing (share folders with Windows PCs), Orbit Sync (folders
+ kept the same on all your PCs), Orbit Optimizer (cleanup and
  login apps), Orbit Performance (live load, power mode) and Orbit Games
  (Steam setup, Game Mode, game library), plus a Spaces add-on for GNOME Files.

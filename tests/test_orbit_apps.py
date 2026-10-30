@@ -18,7 +18,7 @@ os.environ["XDG_CONFIG_HOME"] = str(TMP / "home/.config")
 os.environ["XDG_STATE_HOME"] = str(TMP / "home/.local/state")
 (TMP / "home/Home").mkdir(parents=True)
 
-from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, sharing, updater, winapps  # noqa: E402
+from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, sharing, sync, updater, winapps  # noqa: E402
 
 
 class FileOps(unittest.TestCase):
@@ -549,6 +549,30 @@ class Sharing(unittest.TestCase):
         self.assertFalse(sharing.password_ok("short"))
         self.assertFalse(sharing.password_ok("long enough\nx"))
         self.assertTrue(sharing.password_ok("long enough"))
+
+
+class Sync(unittest.TestCase):
+    ID = "FIDKJCU-RDTAAK4-ABCDEFG-HIJKLMN-OPQRSTU-VWXYZ23-4567ABC-DEFGHIJ"
+
+    def test_ids(self):
+        self.assertEqual(sync.normalize_id(self.ID.lower().replace("-", " ")), self.ID)
+        self.assertEqual(sync.normalize_id(self.ID.replace("-", "")), self.ID)
+        self.assertIsNone(sync.normalize_id("hello"))
+        self.assertIsNone(sync.normalize_id(self.ID[:-1] + "1"))  # 1 is not base32
+
+    def test_api_key_and_configs(self):
+        d = pathlib.Path(tempfile.mkdtemp(dir=TMP))
+        (d / "config.xml").write_text("<configuration><gui><apikey>k3y</apikey></gui></configuration>")
+        self.assertEqual(sync.api_key([d / "none", d]), "k3y")
+        self.assertIsNone(sync.api_key([d / "none"]))
+        f = sync.folder_config("orbit-notes", "/h/Notes", [self.ID], "Notes")
+        self.assertEqual(f["devices"], [{"deviceID": self.ID}])
+        self.assertEqual(f["versioning"]["type"], "trashcan")
+        self.assertFalse(sync.device_config(self.ID, "Laptop")["autoAcceptFolders"])
+
+    def test_client_without_key(self):
+        with self.assertRaises(sync.SyncError):
+            sync.Client(key=None, base="http://127.0.0.1:9").my_id()  # no Syncthing config in this HOME
 
 
 if __name__ == "__main__":

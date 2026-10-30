@@ -52,6 +52,7 @@ GLYPHS = {
     "updater": '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 4v4h-4"/><path d="M12 8.5v5M9.8 11.5l2.2 2.2 2.2-2.2"/>',
     "windows": '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 8.5h17M8 13l2 2-2 2M12.5 17h3.5"/>',
     "sharing": '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><circle cx="9" cy="13.5" r="1.4"/><circle cx="15.5" cy="11" r="1.4"/><circle cx="15.5" cy="16" r="1.4"/><path d="M10.3 12.9l3.9-1.3M10.3 14.1l3.9 1.3"/>',
+    "sync": '<path d="M5 10.5a7 7 0 0 1 12.6-3.6M19 13.5a7 7 0 0 1-12.6 3.6"/><path d="M17.8 3.5v3.6h-3.6M6.2 20.5v-3.6h3.6"/>',
     "control": '<rect x="3" y="5" width="18" height="6" rx="3"/><circle cx="15.5" cy="8" r="1.4"/><rect x="3" y="13" width="18" height="6" rx="3"/><circle cx="8.5" cy="16" r="1.4"/>',
 }
 
@@ -102,6 +103,7 @@ APP_MAP = {
     "updater": ["orbit-updater"],
     "windows": ["orbit-windows", "wine"],
     "sharing": ["orbit-sharing"],
+    "sync": ["orbit-sync", "syncthing"],
     "games": ["orbit-games", "applications-games"],
     "performance": ["orbit-performance"],
 }

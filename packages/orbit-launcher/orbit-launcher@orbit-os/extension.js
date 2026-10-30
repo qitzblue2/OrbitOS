@@ -54,7 +54,7 @@ class LauncherDialog extends ModalDialog.ModalDialog {
         this._appSystem = Shell.AppSystem.get_default();
 
         this._entry = new St.Entry({style_class: 'orbit-launcher-entry', hint_text: 'Search apps, files, settings, or type 2+2', can_focus: true});
-        this._results = new St.BoxLayout({vertical: true, style_class: 'orbit-launcher-results', x_expand: true});
+        this._results = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'orbit-launcher-results', x_expand: true});
         this._folders = new St.BoxLayout({style_class: 'orbit-launcher-folders'});
         this.contentLayout.add_child(this._entry);
         this.contentLayout.add_child(this._folders);
@@ -95,7 +95,7 @@ class LauncherDialog extends ModalDialog.ModalDialog {
             x_align: Clutter.ActorAlign.START});
         if (icon)
             box.add_child(new St.Icon({gicon: icon, icon_size: 24}));
-        const text = new St.BoxLayout({vertical: true, y_align: Clutter.ActorAlign.CENTER});
+        const text = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, y_align: Clutter.ActorAlign.CENTER});
         text.add_child(new St.Label({text: label, style_class: 'orbit-launcher-title'}));
         if (sub)
             text.add_child(new St.Label({text: sub, style_class: 'orbit-launcher-sub'}));

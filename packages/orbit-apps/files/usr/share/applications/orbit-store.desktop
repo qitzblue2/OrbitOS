@@ -2,7 +2,7 @@
 Type=Application
 Name=Store
 GenericName=App Store
-Comment=Hand-picked apps from Ubuntu and Flathub
+Comment=Hand-picked apps from Debian and Flathub
 Exec=orbit-store
 Icon=orbit-store
 Categories=GTK;Settings;PackageManager;

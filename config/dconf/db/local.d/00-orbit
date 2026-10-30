@@ -26,8 +26,8 @@ remember-recent-files=true
 event-sounds=false
 
 [org/gnome/shell]
-enabled-extensions=['ubuntu-dock@ubuntu.com', 'blur-my-shell@aunetx', 'orbit-launcher@orbit-os', 'orbit-control-center@orbit-os', 'orbit-widgets@orbit-os', 'orbit-clipboard@orbit-os', 'user-theme@gnome-shell-extensions.gcampax.github.com']
-favorite-apps=['orbit-files.desktop', 'firefox-esr.desktop', 'orbit-notes.desktop', 'org.gnome.Terminal.desktop', 'orbit-store.desktop', 'org.keepassxc.KeePassXC.desktop', 'orbit-settings.desktop']
+enabled-extensions=['dash-to-dock@micxgx.gmail.com', 'blur-my-shell@aunetx', 'orbit-launcher@orbit-os', 'orbit-control-center@orbit-os', 'orbit-widgets@orbit-os', 'orbit-clipboard@orbit-os', 'user-theme@gnome-shell-extensions.gcampax.github.com']
+favorite-apps=['orbit-files.desktop', 'aphelion.desktop', 'orbit-notes.desktop', 'org.gnome.Terminal.desktop', 'orbit-store.desktop', 'org.keepassxc.KeePassXC.desktop', 'orbit-settings.desktop']
 welcome-dialog-last-shown-version='999'
 
 [org/gnome/shell/extensions/user-theme]

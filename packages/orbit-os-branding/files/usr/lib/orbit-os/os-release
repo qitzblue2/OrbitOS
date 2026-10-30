@@ -1,11 +1,11 @@
-PRETTY_NAME="Orbit OS 1.0 (based on Ubuntu 24.04 LTS)"
+PRETTY_NAME="Orbit OS 2.0"
 NAME="Orbit OS"
-VERSION_ID="1.0"
-VERSION="1.0 (based on Ubuntu 24.04 LTS)"
-VERSION_CODENAME=noble
+VERSION_ID="2.0"
+VERSION="2.0 (Perihelion)"
+VERSION_CODENAME=trixie
+ORBIT_CODENAME=perihelion
 ID=orbit
-ID_LIKE="ubuntu debian"
-UBUNTU_CODENAME=noble
+ID_LIKE=debian
 HOME_URL="https://github.com/qitzblue2/OrbitOS"
 SUPPORT_URL="https://github.com/qitzblue2/OrbitOS/blob/main/README.md"
 BUG_REPORT_URL="https://github.com/qitzblue2/OrbitOS/issues"

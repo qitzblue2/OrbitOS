@@ -2,7 +2,8 @@
 
 Only numbers that were actually measured go here. Everything else is marked **not measured**.
 
-## Measured (build machine: cloud VM, 4 vCPU Xeon 2.8 GHz, no KVM)
+## Measured for Orbit 1.0 (Ubuntu 24.04 remix; 2.0 is Debian-based and has not been built yet)
+Build machine: cloud VM, 4 vCPU Xeon 2.8 GHz, no KVM.
 | What | Result | How |
 |---|---|---|
 | Full ISO size | **6.46 GB** (6,463,322,112 bytes) | `out/orbit-os-1.0.0-full-amd64.iso`, first build, before the Orbit apps were added |

@@ -2,3 +2,8 @@
 [Default Applications]
 inode/directory=orbit-files.desktop;org.gnome.Nautilus.desktop;
 text/markdown=orbit-notes.desktop;org.gnome.TextEditor.desktop;
+text/html=aphelion.desktop;firefox-esr.desktop;
+application/xhtml+xml=aphelion.desktop;firefox-esr.desktop;
+x-scheme-handler/http=aphelion.desktop;firefox-esr.desktop;
+x-scheme-handler/https=aphelion.desktop;firefox-esr.desktop;
+x-scheme-handler/about=aphelion.desktop;

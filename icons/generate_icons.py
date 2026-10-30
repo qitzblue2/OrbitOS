@@ -65,8 +65,8 @@ FOLDER_SYMBOLS = {
     "plain": "",
 }
 
-# freedesktop names each glyph/folder maps to (verified against Ubuntu 24.04 .desktop files
-# by tests/check-icon-names.sh at build time; aliases become symlinks).
+# freedesktop names each glyph/folder maps to (verified against Debian 13 .desktop files
+# by config/hooks/90-finish.sh at build time; aliases become symlinks).
 APP_MAP = {
     "files": ["orbit-files", "org.gnome.Nautilus", "system-file-manager"],
     "browser": ["firefox", "firefox-esr", "chromium", "web-browser"],
@@ -81,7 +81,7 @@ APP_MAP = {
     "activity": ["org.gnome.SystemMonitor", "utilities-system-monitor"],
     "passwords": ["org.keepassxc.KeePassXC", "keepassxc"],
     "archives": ["org.gnome.FileRoller", "file-roller"],
-    "launcher": ["orbit-launcher", "view-app-grid"],
+    "launcher": ["orbit-launcher", "view-app-grid", "orbit-installer"],
     "updates": ["org.gnome.Software", "system-software-update", "update-manager"],
     "network": ["preferences-system-network", "network-wireless", "nm-device-wireless"],
     "store": ["orbit-store"],

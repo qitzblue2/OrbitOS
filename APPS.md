@@ -99,8 +99,8 @@ Every screenshot here is real:
 |---|---|
 | ![Featured](docs/screenshots/app-store-featured.png) | ![Details](docs/screenshots/app-store-details.png) |
 
-- **Catalog:** 43 hand-picked apps, from Ubuntu's archive (signed by Ubuntu) and Flathub (sandboxed). All 35 apt package names were checked against Ubuntu 24.04's archive.
-- **Ubuntu apps** install through `pkexec orbit-store-helper`, which asks for your password once.
+- **Catalog:** 43 hand-picked apps, from Debian's archive (signed by Debian) and Flathub (sandboxed). All 35 apt package names were checked against the Debian 13 (trixie) archive; Chromium is `chromium` there.
+- **Debian apps** install through `pkexec orbit-store-helper`, which asks for your password once.
   - The helper re-reads the catalog itself and refuses any package that isn't in it.
   - Package names are passed after `--`, so they can never be read as apt options.
 - **Flathub apps** install for your user only, with no password. If Flathub is off, the Store offers to turn it on.

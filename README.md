@@ -1,79 +1,90 @@
 # Orbit OS
 
-A personal Linux remix **based on Ubuntu 24.04 LTS**. It has a calm GNOME 46 desktop with a frosted-glass look, preinstalled apps, a `~/Home` folder layout, a launcher on Super/Super+Space, and sane power and security defaults. It keeps Ubuntu's kernel, signed boot chain, installer and apt updates.
+A personal Linux distribution built **from Debian 13 ("trixie")**, with its own installer. It has a calm GNOME 48 desktop with a frosted-glass look, its own apps, the **Aphelion** browser, a `~/Home` folder layout, a launcher on Super/Super+Space, and sane power and security defaults.
 
-> Status: personal project. See **[What was tested](#what-was-tested)** before you trust any of it on real hardware.
+Debian provides the packages and security updates underneath; everything you see is Orbit's: theme, icons, boot menu, splash, login screen, apps, browser and installer.
+
+> Status: personal project, **2.0 not built or booted yet**. See **[What was tested](#what-was-tested)** before you trust any of it on real hardware.
 
 ![Orbit OS desktop: glass widgets, slim dock, frosted top bar](docs/screenshots/desktop-desktop.png)
 
-The screenshot is real: GNOME Shell 46 running headless with the Orbit packages, captured by `tests/shell/run-desktop-shots.sh`.
+This screenshot is from Orbit 1.0 (GNOME 46). It has not been retaken on GNOME 48 yet.
 
 ## Orbit's own apps
-**Files**, **Notes**, **Spaces**, **Screenshot**, **Store**, **Hardware** and **Backup**, plus the **Launcher**, **Control Center**, **Widgets** and **Clipboard** in the shell. See **[APPS.md](APPS.md)** for what each does, shortcuts and screenshots.
+**Files**, **Notes**, **Spaces**, **Screenshot**, **Store**, **Hardware** and **Backup**, plus the **Launcher**, **Control Center**, **Widgets** and **Clipboard** in the shell. See **[APPS.md](APPS.md)**.
 
 | | | |
 |---|---|---|
 | ![Files](docs/screenshots/app-files-pictures.png) | ![Notes](docs/screenshots/app-notes-preview.png) | ![Store](docs/screenshots/app-store-featured.png) |
 
+**Aphelion** (branch `Orbit-Apps`, folder `Orbit-Web`) is the default browser. It has a tracker shield, ad blocker, KeePass, 2FA codes, quick notes and reader view.
+
+## The Orbit installer
+Written for Orbit, from scratch (`packages/orbit-installer`). Its screens are Welcome, Keyboard, Disk, Account, Time zone, Review, then Install.
+
+- **Install next to Windows:** shrinks Windows (NTFS) by the amount you choose. Your Windows files stay. Orbit reuses the Windows EFI partition and offers a boot menu.
+- **Use free space:** puts Orbit into unpartitioned space and changes nothing else.
+- **Erase disk:** you have to type `ERASE` to confirm.
+- **Encryption:** optional full-disk encryption (LUKS2) for every option.
+- **Plain-language summary:** shown before anything is written.
+- **Refuses unsafe cases:** BitLocker, Windows in Fast Startup or hibernation, too little space. It explains each one.
+- **Split design:** the window runs as you, and a small root engine does the disk work from one checked plan. Secrets never reach the log.
+
+![The Orbit installer](docs/screenshots/installer-sheet.png)
+
 ## Quick start
 ```bash
 ./build.sh
 ```
-This builds the full ISO in a clean `ubuntu:24.04` container. Use `sudo ./build.sh --host` on an Ubuntu 24.04 VM instead.
+This builds the full ISO in a clean `debian:trixie` container (Docker or Podman). Use `sudo ./build.sh --host` on a Debian 13 VM instead.
 ```bash
 tests/run-checks.sh
 ```
-These are the fast checks (no root, no VM needed).
+These are the fast checks: syntax, lint, unit tests and packaging. No root or VM needed.
 ```bash
-tests/vm-boot-test.sh out/orbit-os-1.0.0-full-amd64.iso
+sudo ORBIT_INSTALLER=1 tests/run-checks.sh
+```
+This also runs the real installer engine against throwaway loop-device disks: it erases, shrinks a real NTFS partition, and encrypts.
+```bash
+tests/vm-boot-test.sh out/orbit-os-2.0.0-full-amd64.iso
 ```
 This boots the ISO in QEMU and passes only if the desktop appears.
 
-```bash
-tests/shell/run-desktop-shots.sh docs/screenshots-new
-```
-This boots the Orbit desktop in headless GNOME Shell and screenshots it. The run also reports whether each extension loaded.
+Then follow **[INSTALL.md](INSTALL.md)**.
 
-Then follow **[INSTALL.md](INSTALL.md)**. It is written for beginners and covers USB writing, live testing, dual boot, recovery and troubleshooting.
-
-## Layout
+## How the image is made
 ```
-build.sh                 one-command ISO build (verify → generate → debs → remaster → ISO + sha256)
-config/                  build.conf (pins), package lists, chroot hooks, dconf defaults, keys, TLP profile
-branding/tokens.json     every color/size/timing; generate.py turns it into GTK, Shell/GDM, Plymouth, GRUB,
-                         terminal, Qt themes and 4K wallpapers, and checks contrast
-icons/                   generate_icons.py (16 glyphs + folders + file types, Glass/Graphite/Light),
-                         check_and_raster.py (safety, completeness, 16 px legibility, PNG sizes, contact sheet)
-packages/                orbit-os-branding, orbit-os-desktop (meta-package), orbit-launcher (GNOME 46 extension),
-                         orbit-apps (the seven GTK apps), orbit-shell-extensions (Control Center, Widgets, Clipboard)
-skel/                    the ~/Home layout for new users
-tests/                   run-checks.sh (fast), test_orbit_apps.py, *.test.mjs, gui/ (app screenshots),
-                         shell/ (real GNOME Shell run), vm-boot-test.sh (ISO in QEMU)
-tools/                   hardware-check.sh, merge-overlay-upper.py
+build.sh                  A theme + icons → B Orbit .debs + Aphelion → C mmdebstrap Debian 13 (pinned snapshot)
+                          + config/hooks → D live medium (kernel, live-boot initrd, squashfs) → E tools/make-iso.sh
+config/build.conf         every pin: Debian suite, snapshot date, Aphelion branch, build container
+config/packages/*.list    system, desktop, full, live package sets (Debian 13 names, all checked)
+config/hooks/             10-system (identity, Aphelion default, firewall, zram, …), 30-live, 90-finish
+tools/make-iso.sh         hybrid ISO: GRUB BIOS El Torito + Debian's Microsoft-signed shim/GRUB for UEFI
+                          (Secure Boot), boots from DVD and from a USB stick written with dd/Etcher/Rufus
+packages/                 orbit-os-branding, orbit-os-desktop, orbit-launcher, orbit-apps,
+                          orbit-shell-extensions, orbit-installer
+branding/tokens.json      every colour, size and timing; generate.py makes GTK, Shell/GDM, Plymouth, GRUB themes
+icons/                    the Orbit icon themes (Glass, Graphite, Light)
+skel/                     the ~/Home layout for new users
+tests/                    run-checks.sh, test_installer_plan.py, installer_integration.py, gui/, shell/, vm-boot-test.sh
 ```
-
-## Convert an existing Ubuntu 24.04 install
-```bash
-./build.sh --debs-only
-```
-```bash
-sudo apt install ./out/orbit-os-branding_*.deb ./out/orbit-launcher_*.deb ./out/orbit-apps_*.deb ./out/orbit-shell-extensions_*.deb ./out/orbit-os-desktop_*.deb
-```
-Log out and back in. The Firefox ESR deb and the snap seed changes are only applied by the ISO build.
 
 ## Styles
-`orbit-style glass|graphite|light` (also in **Orbit Settings**) switches the icons, shell theme and wallpaper together. **Reduce transparency** replaces every glass surface with solid token colors. It turns on automatically when animations are off, high contrast is on, or the GPU is software-rendered.
+`orbit-style glass|graphite|light` (also in **Orbit Settings**) switches the icons, shell theme and wallpaper together. **Reduce transparency** replaces every glass surface with solid colours.
 
 ## What was tested
-See [HARDWARE-TEST.md](HARDWARE-TEST.md) and [PERFORMANCE.md](PERFORMANCE.md). In short, real hardware is **untested**, and so are suspend, fingerprint, battery and boot time. The docs say "untested" wherever nobody has checked.
+- **Installer, planner:** 17 unit tests covering Windows laptops, BitLocker, BIOS and MBR disks, too-small disks and account validation.
+- **Installer, engine:** the real engine ran on loop-device disks. It erased and partitioned a disk, shrank a real 100 GB NTFS partition to 60 GB with its files intact, reused the EFI partition without reformatting it, left the recovery partition alone and copied the system image. **Not tested here:** encryption (this sandbox's kernel has no device-mapper) and the final setup step (accounts, boot loader), which needs a built system.
+- **Installer, screens:** every screen was clicked through in a dry run on a simulated Windows laptop.
+- **Boot chain:** an ISO made by `tools/make-iso.sh` with Debian 13's real signed shim, GRUB and kernel was booted in QEMU from DVD and USB, in BIOS, UEFI and **UEFI with Secure Boot** (Microsoft keys). All reached the kernel.
+- **Packages:** every package name was checked against the Debian 13 archive.
+- **Not tested yet:** the full ISO, which has not been built (on request), GNOME 48 with the Orbit extensions, and real hardware. See [HARDWARE-TEST.md](HARDWARE-TEST.md).
 
 ## Honest limits
-- This is an Ubuntu 24.04 LTS remix. Canonical's standard security support for noble's `main` packages runs until **April 2029**; `universe` packages get community or Ubuntu Pro support. Check https://ubuntu.com/about/release-cycle.
-- There is no support or security team beyond Ubuntu's own updates.
-- Windows programs do not run natively. Wine helps with some of them, but anti-cheat games and many DRM apps will not run.
-- Hardware support depends on the exact chips in each machine. Only what is marked ✅ in HARDWARE-TEST.md has been checked.
-- Battery life may be lower than Windows with HP's tuning until it is measured and tuned. The TLP profile is provided but not active.
-- The installer is Ubuntu's own, unmodified, and still shows Ubuntu branding (see LICENSES.md).
-- Choose **Extended selection** in the installer, or the Orbit customizations are not installed (DECISIONS D-03).
+- Security updates come from Debian (trixie is supported until about mid-2028, then Debian LTS). There is no Orbit security team.
+- The installer's language list sets the system language. The installer's own screens are English only for now.
+- Under Secure Boot, GRUB shows its plain text menu (lockdown blocks custom fonts and themes). Without Secure Boot it shows the Orbit theme.
+- Windows programs do not run natively. Anti-cheat games and many DRM apps will not run.
+- Only what is marked ✅ in HARDWARE-TEST.md has been checked on real hardware.
 
 Docs: [APPS](APPS.md) · [DECISIONS](DECISIONS.md) · [INSTALL](INSTALL.md) · [HARDWARE-TEST](HARDWARE-TEST.md) · [PERFORMANCE](PERFORMANCE.md) · [SECURITY](SECURITY.md) · [LICENSES](LICENSES.md)

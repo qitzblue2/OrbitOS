@@ -5,7 +5,7 @@
 #
 # Pass criterion: two consecutive screenshots (20 s apart) both look like a
 # rendered desktop: not mostly black, many colors, mid-tones from the wallpaper
-# (tests/screen_check.py). The Ubuntu live kernel does not log to ttyS0, so the
+# (tests/screen_check.py). The live kernel does not log to ttyS0, so the
 # serial log is kept as evidence (GRUB output) but is not required.
 # Uses KVM when /dev/kvm exists; otherwise TCG (slow: allow 20+ min).
 # Never attaches a real disk: the only disk is a throwaway qcow2 in a temp dir.
@@ -20,10 +20,12 @@ for f in /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_CODE.fd /usr/share
 accel=tcg; cpu=max; [ -w /dev/kvm ] && accel=kvm && cpu=host
 TIMEOUT=${2:-$([ $accel = kvm ] && echo 300 || echo 1800)}
 qemu-img create -q -f qcow2 "$T/scratch.qcow2" 30G
-args=(-machine q35,accel=$accel -cpu $cpu -smp 4 -m 6144 -vga virtio -display none
+# shellcheck disable=SC2054  # commas belong to QEMU option values
+args=(-machine "q35,accel=$accel" -cpu "$cpu" -smp 4 -m 6144 -vga virtio -display none
       -cdrom "$ISO" -drive file="$T/scratch.qcow2",if=virtio,format=qcow2
       -boot d -serial file:"$OUTD/serial.log" -monitor unix:"$T/mon",server,nowait
       -netdev user,id=n0 -device virtio-net-pci,netdev=n0 -device virtio-tablet-pci)
+# shellcheck disable=SC2054
 [ -n "$OVMF" ] && args+=(-drive if=pflash,format=raw,readonly=on,file="$OVMF")
 echo "[vm-test] accel=$accel timeout=${TIMEOUT}s firmware=${OVMF:-BIOS}"
 qemu-system-x86_64 "${args[@]}" &

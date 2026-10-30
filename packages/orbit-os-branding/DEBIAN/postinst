@@ -2,7 +2,7 @@
 set -e
 if [ "$1" = configure ]; then
   # os-release belongs to base-files; divert rather than overwrite.
-  dpkg-divert --package orbit-os-branding --add --rename --divert /usr/lib/os-release.ubuntu /usr/lib/os-release
+  dpkg-divert --package orbit-os-branding --add --rename --divert /usr/lib/os-release.debian /usr/lib/os-release
   cp /usr/lib/orbit-os/os-release /usr/lib/os-release
   update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth \
     /usr/share/plymouth/themes/orbit/orbit.plymouth 150

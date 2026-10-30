@@ -2,7 +2,33 @@
 
 Each entry lists what was chosen, why, and what it costs. When a choice in the brief was ambiguous, the safest default was picked and written down here.
 
-## Build and base
+## Orbit 2.0: own distribution on Debian 13, own installer
+
+These replace the 1.0 entries about the Ubuntu remaster (D-01 to D-05, D-09 and anything else that names Ubuntu, casper, snaps or Ubuntu's installer). The 1.0 entries below are kept as history.
+
+**D-30 Base: Debian 13 "trixie", bootstrapped, not remastered.** `build.sh` builds the system with `mmdebstrap` straight from Debian's signed archive, pinned to one date of snapshot.debian.org. No other distribution's ISO is downloaded or modified. Why Debian: it is the stable parent of Ubuntu without snaps, ads or a vendor installer, has security updates for years, and almost all of Orbit carries over. Cost: GNOME 48 instead of 46 (D-34), and Debian names some packages differently (all names checked against the trixie index).
+
+**D-31 One system image for live and install.** The same `live/filesystem.squashfs` runs the live session (live-boot) and is copied to disk by the installer. Live-only parts (live-boot, live-config, the installer, its no-password rule, `/etc/live`) are purged from the copy by the installer. This keeps the image smaller and means what you try is exactly what you get.
+
+**D-32 Installer written from scratch, with proven tools underneath.** `packages/orbit-installer` is Orbit's own: screens, disk planning, Windows detection, user setup and boot loader setup. Writing to disks goes through `sfdisk`, `ntfsresize`, `mkfs.*`, `cryptsetup`, `unsquashfs` and `grub-install`, the standard tools every installer uses, because re-implementing partition tables or file systems would only add ways to lose data.
+- The disk planner (`plan.py`) is pure Python with exact sector numbers. It never touches a disk, so every layout is unit-tested.
+- The window runs as the user. A root engine (`engine.py`, started through pkexec) re-probes the disks and re-plans from the user's choice; it never trusts partition numbers or commands from the window.
+- Alongside Windows: shrink only NTFS that `ntfsresize` reports safe; refuse BitLocker, hibernated or Fast-Startup Windows; keep 20 GB free for Windows; never format the shared EFI partition; never write `EFI/BOOT/BOOTX64.EFI` on a disk shared with Windows.
+- Erase needs the word `ERASE` typed. Secrets go over a pipe, never on a command line, and are masked in the log.
+
+**D-33 Encryption: LUKS2 + argon2id, separate /boot.** GRUB cannot unlock LUKS2 with argon2id, so `/boot` (1 GB, ext4) stays outside; the root partition is encrypted. The key is asked by the initramfs at every start. No LVM: one root file system plus a swap file and zram are simpler to repair.
+
+**D-34 GNOME 48 only.** Debian 13 ships GNOME 48.7. The Orbit extensions now declare `shell-version: ["48"]` and use `orientation` instead of the deprecated `vertical` on St.BoxLayout. Dash to Dock replaces Ubuntu Dock (same `dash-to-dock` settings keys). Blur my Shell comes from Debian (v67, GNOME 48); the vendored GNOME 46 copy is gone. Not yet run on GNOME 48 here: `tests/shell/run-desktop-shots.sh` needs a Debian 13 host.
+
+**D-35 Boot: Debian's signed chain, Orbit's menu.** The ISO (`tools/make-iso.sh`) boots GRUB for BIOS (El Torito + hybrid MBR) and, for UEFI, Debian's shim (signed by Microsoft) loading Debian's signed GRUB, which finds the medium by `/.disk/info`. Tested in QEMU with Debian 13's real binaries: BIOS DVD/USB, UEFI DVD/USB and UEFI with Secure Boot (Microsoft keys) all reach the kernel. Under Secure Boot, GRUB's lockdown blocks custom fonts, so the menu is plain text there; without Secure Boot it shows the Orbit theme.
+
+**D-36 Aphelion is the default browser; Firefox is not shipped.** The build takes `aphelion_*.deb` from `ORBIT_APHELION_DEB`, `out/`, or builds it from the `Orbit-Apps` branch. Links open in Aphelion (`/etc/xdg/mimeapps.list`, `x-www-browser`). Firefox ESR stays one click away in Orbit Store.
+
+**D-37 Swap: swap file (1 to 4 GB) plus zram.** The installer makes `/swapfile`; `systemd-zram-generator` adds compressed RAM swap (half of RAM, at most 8 GB). Hibernation is not supported.
+
+**D-38 Installer language.** The language you pick sets the system language and suggests a keyboard and time zone. The installer's own screens are English only for now (no translations shipped yet).
+
+## Build and base (1.0, Ubuntu remaster: history)
 
 **D-01 Remaster the official ISO with a script, not Cubic.** `build.sh` is non-interactive and reproducible, and it can run in CI. Cubic is a GUI tool, so its steps cannot be reviewed in git.
 

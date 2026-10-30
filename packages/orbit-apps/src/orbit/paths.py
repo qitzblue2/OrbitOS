@@ -23,7 +23,7 @@ PLACES = [  # (label, relative path under ~/Home, icon)
 
 
 def orbit_home():
-    """~/Home if it exists (Orbit layout), else plain $HOME (converted Ubuntu installs)."""
+    """~/Home if it exists (Orbit layout), else plain $HOME (accounts made before Orbit was set up)."""
     return ORBIT_HOME if ORBIT_HOME.is_dir() else HOME
 
 

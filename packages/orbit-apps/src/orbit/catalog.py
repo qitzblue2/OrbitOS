@@ -1,4 +1,4 @@
-"""Orbit Store catalog: a curated list of apps from Ubuntu's archive or Flathub.
+"""Orbit Store catalog: a curated list of apps from Debian's archive or Flathub.
 
 Only packages listed in the catalog can be installed through the privileged
 helper (/usr/lib/orbit-os/orbit-store-helper re-checks the catalog itself).

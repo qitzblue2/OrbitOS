@@ -1,0 +1,77 @@
+# Core system: installed in every image. Debian 13 (trixie) package names.
+linux-image-amd64
+systemd-sysv
+systemd-timesyncd
+systemd-zram-generator
+sudo
+locales
+console-setup
+keyboard-configuration
+tzdata
+ca-certificates
+curl
+wget
+nano
+less
+bash-completion
+command-not-found
+zstd
+unzip
+p7zip-full
+# boot: GRUB for UEFI with Secure Boot (shim signed by Microsoft via Debian) and BIOS
+grub-efi-amd64
+grub-efi-amd64-signed
+shim-signed
+efibootmgr
+os-prober
+plymouth
+plymouth-themes
+initramfs-tools
+cryptsetup
+cryptsetup-initramfs
+# disks and file systems
+ntfs-3g
+exfatprogs
+dosfstools
+btrfs-progs
+udisks2
+gvfs-backends
+gvfs-fuse
+# hardware: drivers and firmware (non-free-firmware is needed for most Wi-Fi, GPUs and audio DSPs)
+firmware-linux-free
+firmware-misc-nonfree
+firmware-amd-graphics
+firmware-intel-graphics
+firmware-intel-sound
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+firmware-brcm80211
+firmware-mediatek
+firmware-sof-signed
+bluez-firmware
+amd64-microcode
+intel-microcode
+mesa-vulkan-drivers
+mesa-va-drivers
+intel-media-va-driver
+libgl1-mesa-dri
+fwupd
+power-profiles-daemon
+thermald
+fprintd
+libpam-fprintd
+bluez
+# network, sound, printing
+network-manager
+wpasupplicant
+pipewire-audio
+wireplumber
+cups
+printer-driver-all
+system-config-printer-common
+# updates and safety
+unattended-upgrades
+apt-listchanges
+ufw
+apparmor

@@ -10,7 +10,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const OUT = GLib.getenv('ORBIT_SHOT_DIR') ?? '/tmp/orbit-shots';
 const UUIDS = ['orbit-launcher@orbit-os', 'orbit-control-center@orbit-os', 'orbit-widgets@orbit-os',
-    'orbit-clipboard@orbit-os', 'ubuntu-dock@ubuntu.com', 'blur-my-shell@aunetx',
+    'orbit-clipboard@orbit-os', 'dash-to-dock@micxgx.gmail.com', 'blur-my-shell@aunetx',
     'user-theme@gnome-shell-extensions.gcampax.github.com'];
 
 function shot(name) {
@@ -68,7 +68,7 @@ export default class Driver extends Extension {
         // a few copies so the clipboard has history
         const cb = St.Clipboard.get_default();
         for (const t of ['Meeting moved to 15:00', 'https://github.com/qitzblue2/OrbitOS', 'sudo apt update && sudo apt upgrade',
-            'Orbit OS — based on Ubuntu 24.04 LTS']) {
+            'Orbit OS 2.0 — Debian 13 base']) {
             cb.set_text(St.ClipboardType.CLIPBOARD, t);
             await sleep(400);
         }

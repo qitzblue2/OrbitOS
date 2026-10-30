@@ -1,0 +1,53 @@
+# The Orbit desktop (GNOME 48) and its everyday apps.
+gdm3
+gnome-shell
+gnome-session
+gnome-control-center
+gnome-settings-daemon
+gnome-shell-extensions
+gnome-shell-extension-dashtodock
+gnome-shell-extension-blur-my-shell
+gnome-tweaks
+gnome-keyring
+gnome-online-accounts
+xdg-desktop-portal-gnome
+xdg-user-dirs-gtk
+dconf-cli
+nautilus
+gnome-terminal
+gnome-text-editor
+loupe
+evince
+totem
+gnome-calculator
+gnome-calendar
+gnome-system-monitor
+gnome-disk-utility
+file-roller
+gnome-software
+gnome-software-plugin-flatpak
+flatpak
+keepassxc
+endeavour
+apostrophe
+zenity
+librsvg2-bin
+# fonts
+fonts-inter
+fonts-jetbrains-mono
+fonts-noto-core
+fonts-noto-color-emoji
+# media codecs (all in Debian main)
+gstreamer1.0-plugins-good
+gstreamer1.0-plugins-bad
+gstreamer1.0-plugins-ugly
+gstreamer1.0-libav
+ffmpeg
+# Orbit apps need these
+python3-gi
+python3-gi-cairo
+gir1.2-gtk-4.0
+gir1.2-adw-1
+gir1.2-gtksource-5
+rsync
+libnotify-bin

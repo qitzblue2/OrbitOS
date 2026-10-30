@@ -21,6 +21,10 @@ from gi.repository import GLib, Graphene, Gtk  # noqa: E402
 ERRORS = []
 
 
+class Retry(Exception):
+    """Raise from a step to run it again on the next tick (waiting for something async)."""
+
+
 def excepthook(t, v, tb):
     ERRORS.append("".join(traceback.format_exception(t, v, tb)))
     sys.__excepthook__(t, v, tb)
@@ -60,8 +64,15 @@ def run(app, steps, outdir, settle_ms=700):
         try:
             if fn:
                 fn(win)
+        except Retry as r:
+            state["retries"] = state.get("retries", 0) + 1
+            if state["retries"] < 120:
+                state["i"] -= 1
+                return True
+            ERRORS.append(f"gave up waiting for {r}")
         except Exception:
             ERRORS.append(traceback.format_exc())
+        state["retries"] = 0
 
         def shot():
             if name:

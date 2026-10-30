@@ -1,0 +1,5 @@
+#!/usr/bin/python3
+import sys
+sys.path.insert(0, "/usr/lib/orbit-installer/python")
+from orbit_installer.app import main
+sys.exit(main())

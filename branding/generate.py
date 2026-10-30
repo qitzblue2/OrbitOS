@@ -235,7 +235,7 @@ title-text: ""
 desktop-color: "{s['canvas']}"
 terminal-font: "Unifont Regular 16"
 + boot_menu {{
-  left = 30%  top = 35%  width = 40%  height = 40%
+  left = 22%  top = 32%  width = 56%  height = 46%
   item_color = "{s['text_secondary']}"
   selected_item_color = "{s['lit_text']}"
   selected_item_pixmap_style = "select_*.png"
@@ -244,6 +244,21 @@ terminal-font: "Unifont Regular 16"
 + label {{ left = 0 top = 90% width = 100% align = "center" color = "{s['text_secondary']}"
   text = "Enter: boot   e: edit   c: command line" }}
 """
+
+
+def grub_select_pixmaps(gd, color):
+    """The highlight behind the selected boot entry: GRUB draws it from nine pieces
+    (corners, edges, centre). Without them the selected entry is invisible."""
+    from PIL import Image, ImageDraw
+    rgb = tuple(int(color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+    r = 6
+    full = Image.new("RGBA", (2 * r + 1, 2 * r + 1), (0, 0, 0, 0))
+    ImageDraw.Draw(full).rounded_rectangle((0, 0, 2 * r, 2 * r), radius=r, fill=rgb + (255,))
+    boxes = {"nw": (0, 0, r, r), "n": (r, 0, r + 1, r), "ne": (r + 1, 0, 2 * r + 1, r),
+             "w": (0, r, r, r + 1), "c": (r, r, r + 1, r + 1), "e": (r + 1, r, 2 * r + 1, r + 1),
+             "sw": (0, r + 1, r, 2 * r + 1), "s": (r, r + 1, r + 1, 2 * r + 1), "se": (r + 1, r + 1, 2 * r + 1, 2 * r + 1)}
+    for name, box in boxes.items():
+        full.crop(box).save(gd / f"select_{name}.png")
 
 
 # ---------- wallpapers ----------
@@ -317,6 +332,7 @@ def main():
     gd = out / "grub" / "orbit"
     gd.mkdir(parents=True, exist_ok=True)
     (gd / "theme.txt").write_text(grub_theme(schemes["graphite"]))
+    grub_select_pixmaps(gd, schemes["graphite"]["lit"])
 
     if not a.no_wallpapers:
         w, h = (int(v) for v in a.wallpaper_size.split("x"))

@@ -24,7 +24,7 @@ class HistoryDialog extends ModalDialog.ModalDialog {
         this._ext = ext;
         this._entry = new St.Entry({hint_text: 'Search clipboard history', can_focus: true,
             style_class: 'orbit-clipboard-entry'});
-        this._list = new St.BoxLayout({vertical: true, style_class: 'orbit-clipboard-list'});
+        this._list = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'orbit-clipboard-list'});
         const scroll = new St.ScrollView({style_class: 'orbit-clipboard-scroll', hscrollbar_policy: St.PolicyType.NEVER});
         scroll.set_child(this._list);
         this.contentLayout.add_child(this._entry);

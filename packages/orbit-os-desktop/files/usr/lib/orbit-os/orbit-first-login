@@ -9,7 +9,7 @@ if [ -f "$HOME/.config/gtk-3.0/bookmarks.in" ]; then
   sed "s|@HOME@|$HOME|g" "$HOME/.config/gtk-3.0/bookmarks.in" >> "$HOME/.config/gtk-3.0/bookmarks"
   rm -f "$HOME/.config/gtk-3.0/bookmarks.in"
 fi
-# converted Ubuntu installs have no skel copy: give libadwaita apps the Orbit colors too
+# accounts made before Orbit was set up have no skel copy: give libadwaita apps the Orbit colors too
 if [ ! -e "$HOME/.config/gtk-4.0/gtk.css" ]; then
   mkdir -p "$HOME/.config/gtk-4.0"
   cp /etc/skel/.config/gtk-4.0/gtk.css "$HOME/.config/gtk-4.0/gtk.css" 2>/dev/null || true

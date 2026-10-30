@@ -12,7 +12,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {cpuPercent, memPercent, monthGrid, parseCpu, parseWeather, weatherUrl} from './sysinfo.js';
 
-// x clears Ubuntu Dock's slim left sidebar (36 px icons + padding)
+// x clears Dash to Dock's slim left sidebar (36 px icons + padding)
 const DEFAULT_POS = {clock: [88, 64], calendar: [88, 282], system: [88, 530], weather: [370, 64]};
 
 function readFile(path) {
@@ -27,7 +27,7 @@ function readFile(path) {
 const Card = GObject.registerClass(
 class Card extends St.BoxLayout {
     _init(ext, id) {
-        super._init({vertical: true, reactive: true, track_hover: true, style_class: 'orbit-widget'});
+        super._init({orientation: Clutter.Orientation.VERTICAL, reactive: true, track_hover: true, style_class: 'orbit-widget'});
         this._ext = ext;
         this.widgetId = id;
         this.connect('button-press-event', (a, e) => this._press(e));
@@ -206,7 +206,7 @@ export default class OrbitWidgets extends Extension {
     }
 
     _bar(card, label) {
-        const row = new St.BoxLayout({vertical: true, style_class: 'orbit-widget-meter'});
+        const row = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'orbit-widget-meter'});
         const head = new St.BoxLayout();
         const name = new St.Label({text: label, style_class: 'orbit-widget-sub', x_expand: true});
         const value = new St.Label({style_class: 'orbit-widget-sub'});

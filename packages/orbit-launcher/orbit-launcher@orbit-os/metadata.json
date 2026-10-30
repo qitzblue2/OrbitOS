@@ -2,7 +2,7 @@
   "uuid": "orbit-launcher@orbit-os",
   "name": "Orbit Launcher",
   "description": "Search apps, files, settings and calculations; group apps into named, colored folders.",
-  "shell-version": ["46"],
+  "shell-version": ["48"],
   "settings-schema": "org.gnome.shell.extensions.orbit-launcher",
   "url": "https://github.com/qitzblue2/OrbitOS",
   "version": 1

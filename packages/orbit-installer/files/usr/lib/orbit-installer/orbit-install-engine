@@ -1,0 +1,6 @@
+#!/usr/bin/python3
+# Root half of the Orbit installer (started by orbit-installer through pkexec).
+import sys
+sys.path.insert(0, "/usr/lib/orbit-installer/python")
+from orbit_installer.engine import main
+sys.exit(main())

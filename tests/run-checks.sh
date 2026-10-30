@@ -2,9 +2,10 @@
 # Fast checks that need no root, ISO or VM. Run before every commit.
 #   tests/run-checks.sh            # syntax, unit tests, packaging
 #   ORBIT_GUI=1 tests/run-checks.sh   # + every app under Xvfb (needs xvfb, GTK 4, libadwaita)
-#   ORBIT_SHELL=1 tests/run-checks.sh # + the desktop in headless GNOME Shell 46
+#   ORBIT_SHELL=1 tests/run-checks.sh # + the desktop in headless GNOME Shell 48 (Debian 13 host)
+#   sudo ORBIT_INSTALLER=1 tests/run-checks.sh # + the installer engine on loop-device disks
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 PY=${ORBIT_PYTHON:-python3}
 fail=0; run() { echo "== $*"; "$@" || { echo "!! FAILED: $*"; fail=1; }; }
 
@@ -12,7 +13,7 @@ fail=0; run() { echo "== $*"; "$@" || { echo "!! FAILED: $*"; fail=1; }; }
 run bash -n build.sh
 for f in config/hooks/*.sh tests/*.sh tests/shell/*.sh tools/*.sh packages/orbit-os-desktop/files/usr/bin/* \
          packages/orbit-os-desktop/files/usr/lib/orbit-os/orbit-transparency \
-         packages/orbit-os-desktop/files/usr/lib/orbit-os/orbit-first-login config/overlay/usr/local/bin/*; do
+         packages/orbit-os-desktop/files/usr/lib/orbit-os/orbit-first-login; do
   if head -1 "$f" | grep -q bash; then run bash -n "$f"; else run sh -n "$f"; fi
 done
 command -v shellcheck >/dev/null && run shellcheck -S warning build.sh config/hooks/*.sh tools/*.sh tests/*.sh
@@ -22,7 +23,9 @@ for f in packages/orbit-os-desktop/files/usr/lib/orbit-os/orbit-{settings,welcom
          packages/orbit-apps/src/orbit/*.py packages/orbit-apps/files/usr/bin/* \
          packages/orbit-apps/files/usr/lib/orbit-os/orbit-store-helper \
          packages/orbit-apps/files/usr/share/nautilus-python/extensions/*.py \
-         branding/*.py icons/*.py tools/*.py tests/*.py tests/gui/*.py tests/gui/scenarios/*.py; do
+         packages/orbit-installer/src/orbit_installer/*.py packages/orbit-installer/files/usr/bin/* \
+         packages/orbit-installer/files/usr/lib/orbit-installer/orbit-install-engine \
+         branding/*.py icons/*.py tests/*.py tests/gui/*.py tests/gui/scenarios/*.py; do
   run $PY -m py_compile "$f"
 done
 find . -name __pycache__ -prune -exec rm -rf {} +
@@ -35,24 +38,24 @@ if command -v node >/dev/null; then
   for t in tests/*.test.mjs; do run node "$t"; done
 fi
 for m in packages/orbit-launcher/*/metadata.json packages/orbit-shell-extensions/*/metadata.json; do
-  run $PY -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['shell-version']==['46'], 'pin to GNOME 46'" "$m"
+  run $PY -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['shell-version']==['48'], 'pin to GNOME 48 (Debian 13)'" "$m"
 done
 for s in packages/*/*/schemas packages/orbit-os-desktop/files/usr/share/glib-2.0/schemas; do
   command -v glib-compile-schemas >/dev/null && run glib-compile-schemas --strict --dry-run "$s"
 done
 
 # data files
-run $PY -m json.tool packages/orbit-os-desktop/files/etc/firefox/policies/policies.json >/dev/null
 run $PY -c "import sys; sys.path.insert(0,'packages/orbit-apps/src'); from orbit import catalog; a,_=catalog.load(); assert len(a)>30"
 command -v desktop-file-validate >/dev/null && run desktop-file-validate packages/orbit-apps/files/usr/share/applications/*.desktop \
-  packages/orbit-os-desktop/files/usr/share/applications/*.desktop
+  packages/orbit-os-desktop/files/usr/share/applications/*.desktop packages/orbit-installer/files/usr/share/applications/*.desktop
 if command -v dconf >/dev/null; then
   T=$(mktemp -d); mkdir "$T/d"; cp config/dconf/db/local.d/00-orbit "$T/d/"; run dconf compile "$T/out" "$T/d"
 fi
 
 # unit tests
 run $PY tests/test_orbit_apps.py
-[ "$(id -u)" = 0 ] && run tests/test_merge_overlay.sh
+run $PY -m unittest tests/test_installer_plan.py
+if [ "${ORBIT_INSTALLER:-0}" = 1 ]; then run $PY tests/installer_integration.py; fi
 
 # packages
 run ./build.sh --debs-only >/dev/null

@@ -1,0 +1,7 @@
+// Live USB session only: the live user may start the installer engine without a password.
+// The installer deletes this file (with the whole orbit-installer package) from the installed system.
+polkit.addRule(function (action, subject) {
+  if (action.id === "org.orbitos.installer.engine" && subject.user === "orbit" && subject.local && subject.active) {
+    return polkit.Result.YES;
+  }
+});

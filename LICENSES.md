@@ -6,40 +6,34 @@ The scripts, generators, Orbit Launcher, Orbit Settings, the welcome app, the In
 The frosted-glass style follows a style reference picture (`icons/reference/`, not shipped in the image). Nothing from that picture or its icon pack is copied or redistributed.
 
 ## Included third-party software
-Everything in the image is an unmodified binary package with its upstream license intact. Licenses are in `/usr/share/doc/<package>/copyright` on the system, and the full package list of each build is in `casper/minimal.standard.manifest` on the ISO. Main additions:
+Everything in the image is an unmodified binary package with its upstream license intact. Licenses are in `/usr/share/doc/<package>/copyright` on the system, and the full package list of each build is in `live/filesystem.packages` on the ISO. Main additions:
 
 | Software | License | Source |
 |---|---|---|
-| Ubuntu 24.04 LTS base system | various free licenses (per package) | Ubuntu archive |
-| GNOME 46 (shell, apps), Ubuntu Dock | GPL/LGPL | Ubuntu archive |
-| Blur my Shell v76 | GPL-3.0 | vendored from extensions.gnome.org (`config/vendor/`, SHA-256 pinned); Ubuntu 24.04 has no package |
-| GtkSourceView 5, libadwaita 1.5, PyGObject | LGPL-2.1+ | Ubuntu archive (used by the Orbit apps) |
-| rsync | GPL-3.0 | Ubuntu archive (Orbit Backup) |
+| Debian 13 base system | various free licenses (per package) | Debian archive (main, contrib) |
+| Firmware (Wi-Fi, GPU, audio DSP, CPU microcode) | redistributable, non-free | Debian `non-free-firmware` |
+| GNOME 48 (shell, apps), Dash to Dock | GPL/LGPL | Debian archive |
+| Blur my Shell | GPL-3.0 | Debian archive |
+| GtkSourceView 5, libadwaita, PyGObject | LGPL-2.1+ | Debian archive (used by the Orbit apps and installer) |
+| rsync | GPL-3.0 | Debian archive (Orbit Backup) |
+| Aphelion (Electron/Chromium) | MIT/BSD + bundled licenses | built from the `Orbit-Apps` branch |
 | Open-Meteo API (only if weather is turned on) | data CC BY 4.0 | api.open-meteo.com, attribution: "Weather data by Open-Meteo.com" |
 | Inter font | SIL OFL 1.1 | `fonts-inter` |
 | JetBrains Mono | SIL OFL 1.1 | `fonts-jetbrains-mono` |
 | Firefox ESR | MPL-2.0 (Firefox trademark: Mozilla) | Mozilla APT repo, unmodified binary |
 | uBlock Origin | GPL-3.0 | installed by Firefox from addons.mozilla.org on first browser start |
-| KeePassXC | GPL-2/3 | Ubuntu archive |
-| LibreOffice (full) | MPL-2.0 | Ubuntu archive |
-| Wine (full) | LGPL-2.1 | Ubuntu archive |
-| Flatpak (full) | LGPL-2.1 | Ubuntu archive. Flathub apps carry their own licenses. |
-| intel-media-va-driver | MIT | Ubuntu archive (`multiverse` component) |
+| KeePassXC | GPL-2/3 | Debian archive |
+| LibreOffice (full) | MPL-2.0 | Debian archive |
+| Flatpak (full) | LGPL-2.1 | Debian archive. Flathub apps carry their own licenses. |
+| intel-media-va-driver | MIT | Debian archive |
 
-The base ISO's offline driver pool may hold restricted, non-free packages (such as NVIDIA drivers) that Canonical redistributes under its own terms. The **lite** image drops that pool. No other non-free software is added.
+No other non-free software is added. Firmware from Debian's `non-free-firmware` is included because most Wi-Fi, graphics and audio hardware does not work without it.
 
-## Trademarks (Canonical IP policy)
-"Ubuntu" and the Canonical and Circle of Friends logos are Canonical trademarks. Canonical's Intellectual Property Rights Policy (https://ubuntu.com/legal/intellectual-property-policy) allows a remix to say it is *based on Ubuntu*, but does not allow it to use the Ubuntu name or logos as its own name or branding.
+## Trademarks
+"Debian" is a trademark of Software in the Public Interest, Inc. Orbit OS does not use the Debian name or logo as its own name or branding. It names Debian only as its base, which Debian's trademark policy allows (https://www.debian.org/trademark). Debian's own artwork (the `desktop-base` package) may be installed as a dependency, but Orbit's wallpapers, boot splash, boot menu and login theme replace it.
 
-**Last checked:** 2026-10-28. The policy page was not re-read during this build, so re-read it before publishing anything.
+**Last checked:** 2026-10-30. The policy page was not re-read during this change, so re-read it before publishing anything.
 
-What Orbit OS does to comply:
-- **Name and identity:** the OS is named "Orbit OS". `os-release` says "based on Ubuntu 24.04 LTS".
-- **Removed:** `ubuntu-wallpapers*`, Ubuntu's Plymouth logo (replaced through the `default.plymouth` alternative), the GDM logo, and the live boot menu entries, which now say "Orbit OS".
-- **Known remaining Ubuntu branding:**
-  - The installer (`ubuntu-desktop-bootstrap` snap) still shows Ubuntu names and logos. It cannot be changed without breaking its signature (DECISIONS D-09).
-  - Package names and some About/Settings strings still contain "Ubuntu".
-  - Yaru is the fallback icon and sound theme.
-
-  This is acceptable for **personal use**. Before distributing the ISO publicly, read the policy and consider asking Canonical, or replace the installer.
+- **Name and identity:** the OS is named "Orbit OS" (`ID=orbit`, `ID_LIKE=debian` in os-release).
+- **Installer:** Orbit's own (`packages/orbit-installer`). No other distribution's installer or branding is used.
 - **Zephium:** no Zephium code, name or logo is used. Only the general visual language (neutral luminance steps, 8 px rhythm, quiet chrome) is reproduced from a written description.

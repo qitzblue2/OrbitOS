@@ -11,7 +11,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, Gtk
 
 PANELS = [  # (title, subtitle, icon, gnome-control-center panel)
-    ("Appearance", "Theme, wallpaper, dark mode", "preferences-desktop-appearance-symbolic", "ubuntu"),
+    ("Appearance", "Theme, wallpaper, dark mode", "preferences-desktop-appearance-symbolic", "background"),
     ("Displays", "Resolution, scale, night light", "video-display-symbolic", "display"),
     ("Network", "Wi-Fi, wired, VPN", "network-wireless-symbolic", "wifi"),
     ("Power", "Battery, power mode, suspend", "battery-symbolic", "power"),
@@ -67,7 +67,7 @@ class Win(Adw.ApplicationWindow):
              ["orbit-spaces"]),
             ("Backup", "Snapshot backups of your Home folder to a USB drive", "orbit-backup", ["orbit-backup"]),
             ("Hardware", "What works on this computer, plus guided tests", "orbit-hardware", ["orbit-hardware"]),
-            ("Store", "Hand-picked apps from Ubuntu and Flathub", "orbit-store", ["orbit-store"]),
+            ("Store", "Hand-picked apps from Debian and Flathub", "orbit-store", ["orbit-store"]),
             ("Desktop widgets", "Clock, calendar, system, weather", "orbit-widgets",
              ["gnome-extensions", "prefs", "orbit-widgets@orbit-os"]),
         ]:

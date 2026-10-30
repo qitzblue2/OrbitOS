@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Install Orbit OS
+Comment=Install Orbit OS on this computer
+Exec=orbit-installer
+Icon=orbit-installer
+Terminal=false
+Categories=System;
+Keywords=install;setup;

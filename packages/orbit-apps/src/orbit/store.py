@@ -1,6 +1,6 @@
-"""Orbit Store — a small, curated app shop over Ubuntu's archive and Flathub.
+"""Orbit Store — a small, curated app shop over Debian's archive and Flathub.
 
-Only vetted apps are listed (data/store-catalog.json). Ubuntu packages are
+Only vetted apps are listed (data/store-catalog.json). Debian packages are
 installed through a polkit-protected helper that refuses anything outside the
 catalog; Flathub apps are installed per-user and need no password.
 """
@@ -72,7 +72,7 @@ class AppCard(Gtk.Button):
         text.append(Gtk.Label(label=a["summary"], xalign=0, css_classes=["dim-label", "caption"], wrap=True, lines=2,
                               ellipsize=Pango.EllipsizeMode.END, max_width_chars=28))
         badges = Gtk.Box(spacing=6, margin_top=4)
-        badges.append(Gtk.Label(label="Ubuntu" if a["source"] == "apt" else "Flathub", css_classes=["orbit-pill"]))
+        badges.append(Gtk.Label(label="Debian" if a["source"] == "apt" else "Flathub", css_classes=["orbit-pill"]))
         self.state = Gtk.Label(css_classes=["orbit-pill", "orbit-lit"], visible=False, label="Installed")
         badges.append(self.state)
         text.append(badges)
@@ -158,7 +158,7 @@ class StoreWindow(Adw.ApplicationWindow):
         self.set_content(self._toasts)
         for name, cb in {"updates": lambda: ui.spawn(["gnome-software", "--mode=updates"]),
                          "about": lambda: ui.about(self, "Orbit Store", "orbit-store",
-                                                   "Hand-picked apps from Ubuntu and Flathub.")}.items():
+                                                   "Hand-picked apps from Debian and Flathub.")}.items():
             a = Gio.SimpleAction.new(name, None)
             a.connect("activate", lambda *_a, cb=cb: cb())
             self.add_action(a)
@@ -234,7 +234,7 @@ class StoreWindow(Adw.ApplicationWindow):
         g2.add(Gtk.Label(label=a.get("description", ""), xalign=0, wrap=True))
         page.add(g2)
         g3 = Adw.PreferencesGroup(title="Details")
-        src = "Ubuntu archive (signed by Ubuntu)" if a["source"] == "apt" else "Flathub (sandboxed, per user)"
+        src = "Debian archive (signed by Debian)" if a["source"] == "apt" else "Flathub (sandboxed, per user)"
         for k, v in (("Source", src), ("Category", a["category"]),
                      ("Package" if a["source"] == "apt" else "App ID",
                       " ".join(a["packages"]) if a["source"] == "apt" else a["id"]),

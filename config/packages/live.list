@@ -1,0 +1,5 @@
+# Live USB session only. The Orbit installer removes these from the installed system.
+live-boot
+live-config
+live-config-systemd
+live-tools

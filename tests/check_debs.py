@@ -19,9 +19,15 @@ need = {
                                "./usr/share/gnome-shell/extensions/orbit-widgets@orbit-os/schemas/gschemas.compiled",
                                "./usr/share/gnome-shell/extensions/orbit-clipboard@orbit-os/extension.js"],
     "orbit-os-desktop": ["./etc/dconf/db/local.d/00-orbit", "./etc/skel/Home/Inbox/.keep",
-                         "./etc/skel/.config/user-dirs.dirs", "./etc/firefox/policies/policies.json",
+                         "./etc/skel/.config/user-dirs.dirs", "./etc/apt/apt.conf.d/52orbit-unattended",
                          "./etc/skel/.config/gtk-4.0/gtk.css", "./usr/bin/orbit-hardware-check",
                          "./usr/share/glib-2.0/schemas/org.orbit-os.desktop.gschema.xml"],
+    "orbit-installer": ["./usr/bin/orbit-installer", "./usr/lib/orbit-installer/orbit-install-engine",
+                        "./usr/lib/orbit-installer/python/orbit_installer/engine.py",
+                        "./usr/lib/orbit-installer/python/orbit_installer/plan.py",
+                        "./usr/share/polkit-1/actions/org.orbitos.installer.policy",
+                        "./usr/share/polkit-1/rules.d/49-orbit-installer-live.rules",
+                        "./usr/share/applications/orbit-installer.desktop", "./etc/xdg/autostart/orbit-installer.desktop"],
 }
 bad = 0
 for pkg, files in need.items():

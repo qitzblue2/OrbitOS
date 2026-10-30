@@ -3,7 +3,7 @@
 
   python3 tests/gui/screenshots.py OUTDIR [app ...]
 
-Needs: xvfb-run, dbus-run-session, python3-gi + GTK 4 + libadwaita 1.5 (Ubuntu 24.04).
+Needs: xvfb-run, dbus-run-session, python3-gi + GTK 4 + libadwaita 1.5+ (Debian 13).
 Each app runs in its own process with a throwaway HOME; a scenario drives the
 window (navigate, select, open panes) and the harness saves PNGs. The run fails
 if any scenario raises, so this doubles as a GUI smoke test.

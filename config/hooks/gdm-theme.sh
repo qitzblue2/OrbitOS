@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build an Orbit GDM theme: stock Ubuntu shell gresource + Orbit color overrides
+# Build an Orbit GDM theme: stock GNOME shell gresource + Orbit color overrides
 # appended to its stylesheets, registered as the gdm-theme.gresource alternative.
 set -euo pipefail
 # The recompiled login-screen gresource is opt-in (ORBIT_GDM_THEME=1): a broken

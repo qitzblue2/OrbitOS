@@ -1,0 +1,9 @@
+# Extra in the full image only.
+libreoffice-writer
+libreoffice-calc
+libreoffice-impress
+libreoffice-gtk3
+libreoffice-style-colibre
+fonts-noto-cjk
+gimp
+simple-scan

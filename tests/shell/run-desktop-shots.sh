@@ -1,7 +1,7 @@
 #!/bin/bash
 # Boot the Orbit desktop in a headless GNOME Shell 46 and screenshot it.
 #   tests/shell/run-desktop-shots.sh OUTDIR
-# Needs (Ubuntu 24.04): gnome-shell, gnome-shell-extensions, gnome-shell-extension-ubuntu-dock,
+# Needs (Debian 13): gnome-shell 48, gnome-shell-extensions, gnome-shell-extension-dashtodock,
 # dconf-cli, dbus, and the Orbit .debs in out/ (./build.sh --debs-only). The Orbit packages'
 # files are unpacked into a throwaway prefix that XDG_DATA_DIRS points at; nothing is
 # installed system-wide and no package scripts run.
@@ -30,7 +30,7 @@ sed "s#/usr/share/backgrounds/orbit#$PREFIX/usr/share/backgrounds/orbit#g" \
 cat >> "$T/orbit.dconf" <<EOF
 
 [org/gnome/shell]
-enabled-extensions=['ubuntu-dock@ubuntu.com', 'blur-my-shell@aunetx', 'orbit-launcher@orbit-os', 'orbit-control-center@orbit-os', 'orbit-widgets@orbit-os', 'orbit-clipboard@orbit-os', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'orbit-test-driver@orbit-os']
+enabled-extensions=['dash-to-dock@micxgx.gmail.com', 'blur-my-shell@aunetx', 'orbit-launcher@orbit-os', 'orbit-control-center@orbit-os', 'orbit-widgets@orbit-os', 'orbit-clipboard@orbit-os', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'orbit-test-driver@orbit-os']
 favorite-apps=['orbit-files.desktop', 'firefox-esr.desktop', 'orbit-notes.desktop', 'org.gnome.Terminal.desktop', 'orbit-store.desktop', 'org.keepassxc.KeePassXC.desktop', 'orbit-settings.desktop']
 disable-extension-version-validation=true
 welcome-dialog-last-shown-version='999'
@@ -44,7 +44,7 @@ for i in orbit orbit-graphite orbit-light; do ln -s "$PREFIX/usr/share/icons/$i"
 export HOME="$T/home" XDG_CONFIG_HOME="$T/home/.config" XDG_DATA_HOME="$T/home/.local/share" \
        XDG_RUNTIME_DIR="$T/run" XDG_DATA_DIRS="$PREFIX/usr/share:/usr/local/share:/usr/share" \
        ORBIT_SHOT_DIR="$OUT" \
-       PATH="$PREFIX/usr/bin:$PATH" XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=ubuntu:GNOME
+       PATH="$PREFIX/usr/bin:$PATH" XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=GNOME
 mkdir -p -m 700 "$XDG_RUNTIME_DIR"
 python3 "$HERE/tests/gui/demo_home.py" "$HOME" >/dev/null 2>&1 || true
 # a private bus stands in for the system bus (logind/upower lookups just find nobody there)

@@ -11,8 +11,8 @@ build() {
   # only the three programs other builds need now
   # glibc 2.44 makes wmemchr & co. C23 _Generic macros; gnulib redeclares them, so
   # parenthesise the names to keep the macros from expanding in those declarations
-  find . -name wchar.in.h -exec sed -i -E \
-    's/^(_GL_EXTERN_C wchar_t \*)(wmemchr|wcschr|wcsrchr|wcspbrk|wcsstr) \(/\1(\2) (/' {} +
+  find . -name '*.in.h' -exec sed -i -E \
+    's/^(_GL_EXTERN_C [a-z_]+ \*)(bsearch|memchr|strchr|strrchr|strpbrk|strstr|wmemchr|wcschr|wcsrchr|wcspbrk|wcsstr) \(/\1(\2) (/' {} +
   ./configure --disable-shared
   make
   mkdir -p "$DESTDIR/usr/bin"

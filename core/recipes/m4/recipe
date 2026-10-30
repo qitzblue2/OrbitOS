@@ -1,0 +1,15 @@
+# GNU M4 macro processor: the final Orbit build (replaces the temporary one).
+name=m4
+version=1.4.21
+stage=base
+sources=(https://ftp.gnu.org/gnu/m4/m4-1.4.21.tar.xz)
+sha256=(f25c6ab51548a73a75558742fb031e0625d6485fe5f9155949d6486a2408ab66)
+depends=(base-files)
+replaces=(m4-temp)
+description="GNU M4 macro processor"
+
+build() {
+  ./configure --prefix=/usr
+  make
+  make DESTDIR="$DESTDIR" install
+}

@@ -1,0 +1,15 @@
+# zlib compression library: the final Orbit build.
+name=zlib
+version=1.3.1
+stage=base
+sources=(https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz)
+sha256=(9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23)
+depends=(base-files)
+description="zlib compression library"
+
+build() {
+  ./configure --prefix=/usr
+  make
+  make DESTDIR="$DESTDIR" install
+  rm -f "$DESTDIR/usr/lib/libz.a"
+}

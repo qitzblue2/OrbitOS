@@ -1,0 +1,23 @@
+# bzip2 compression: library and tools, the final Orbit build.
+name=bzip2
+version=1.0.8
+stage=base
+sources=(https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz)
+sha256=(ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269)
+depends=(base-files)
+description="bzip2 compression library and tools"
+
+build() {
+  # relative links, man pages under share/
+  sed -i 's@\(ln -s -f \)$(PREFIX)/bin/@\1@' Makefile
+  sed -i "s@(PREFIX)/man@(PREFIX)/share/man@g" Makefile
+  make -f Makefile-libbz2_so
+  make clean
+  make
+  make PREFIX="$DESTDIR/usr" install
+  cp -a libbz2.so.* "$DESTDIR/usr/lib"
+  ln -sf libbz2.so.1.0.8 "$DESTDIR/usr/lib/libbz2.so"
+  cp bzip2-shared "$DESTDIR/usr/bin/bzip2"
+  for i in bzcat bunzip2; do ln -sf bzip2 "$DESTDIR/usr/bin/$i"; done
+  rm -f "$DESTDIR/usr/lib/libbz2.a"
+}

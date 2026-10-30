@@ -1,0 +1,15 @@
+# XZ Utils: the final Orbit build (replaces the temporary one).
+name=xz
+version=5.8.3
+stage=base
+sources=(https://github.com/tukaani-project/xz/releases/download/v5.8.3/xz-5.8.3.tar.xz)
+sha256=(fff1ffcf2b0da84d308a14de513a1aa23d4e9aa3464d17e64b9714bfdd0bbfb6)
+depends=(base-files)
+replaces=(xz-temp)
+description="XZ Utils (LZMA compression)"
+
+build() {
+  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/xz-5.8.3
+  make
+  make DESTDIR="$DESTDIR" install
+}

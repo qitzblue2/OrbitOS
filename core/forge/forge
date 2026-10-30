@@ -49,7 +49,7 @@ CORE = os.path.dirname(HERE)
 REPO = os.path.dirname(CORE)
 RECIPES = os.path.join(CORE, "recipes")
 OPM = os.path.join(CORE, "opm", "opm")
-STAGES = ["cross", "temp", "system"]
+STAGES = ["cross", "temp", "system", "base"]
 TARGET = "x86_64-orbit-linux-gnu"
 FIELDS = ("name", "version", "stage", "description")
 ARRAYS = ("sources", "sha256", "depends", "replaces")
@@ -224,7 +224,7 @@ def chroot_umount(orbit):
 
 
 def build(rec, orbit, sources_dir, pkgs_dir, logs_dir, jobs):
-    inside = rec["stage"] == "system"   # build in the new tree, with only Orbit's own tools
+    inside = rec["stage"] in ("system", "base")   # build in the new tree, with only Orbit's own tools
     srcs = fetch(rec, sources_dir)
     if inside:
         os.makedirs(os.path.join(orbit, "var/tmp"), exist_ok=True)
@@ -337,7 +337,7 @@ def main(argv=None):
         for n in order(recs, wanted):
             if n not in todo:
                 print(f"[forge] {n} {recs[n]['version']} already built")
-        needs_chroot = any(recs[n]["stage"] == "system" for n in todo)
+        needs_chroot = any(recs[n]["stage"] in ("system", "base") for n in todo)
         try:
             if needs_chroot:
                 chroot_mount(orbit)

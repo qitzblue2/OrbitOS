@@ -31,7 +31,7 @@ build machine is left in Orbit.
 |---|---|---|
 | 1. cross | Orbit's own cross toolchain: binutils, GCC (C/C++), Linux API headers, glibc, libstdc++ | **built and checked** (about 42 min on 4 cores): `x86_64-orbit-linux-gnu-gcc` 15.3.0 compiles and links against Orbit's glibc 2.44 |
 | 2. temp | temporary tools cross-compiled with it: m4, ncurses, bash, coreutils, diffutils, file, findutils, gawk, grep, gzip, make, patch, sed, tar, xz, binutils/GCC pass 2 | **built** (about 45 min): 17 tools; inside the tree Orbit's own gcc compiles and runs programs |
-| 3. system | inside the new tree (chroot): the final toolchain, then the base system (about 80 programs: shell, core utilities, Python, OpenSSL, systemd, …), forge running in a chroot | to do |
+| 3. system | inside the new tree (chroot), with only Orbit's own tools. 3a (tools the rest needs: gettext, bison, Perl, Python, Texinfo, util-linux) **built**. 3b "base", the final system (about 80 programs): first 9 **built** (zlib, bzip2, xz, zstd, file, readline, m4, bc, flex); next the final toolchain (binutils, GMP/MPFR/MPC, GCC), then shell, core utilities, OpenSSL, systemd, … | in progress |
 | 4. boot | Linux kernel with Orbit's config, initramfs, GRUB from source, Orbit boot menu, a bootable ISO (reuse `tools/make-iso.sh`) | to do |
 | 5. graphics | Mesa, Wayland, libinput, fonts, GTK 4, libadwaita | to do |
 | 6. desktop | GNOME Shell + the Orbit extensions, theme, icons, Orbit apps, Orbit installer (adapted to opm) | to do |

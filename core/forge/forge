@@ -184,7 +184,17 @@ def is_built(orbit, rec):
         with open(built_marker(orbit, rec)) as f:
             return json.load(f)["version"] == rec["version"]
     except (OSError, ValueError, KeyError):
-        return False
+        pass
+    # replaced by a later package (e.g. libstdcxx by gcc-pass2): counts as built
+    db = os.path.join(orbit, "var/lib/opm/installed")
+    for name in os.listdir(db) if os.path.isdir(db) else []:
+        try:
+            with open(os.path.join(db, name, "meta.json")) as f:
+                if rec["name"] in json.load(f).get("provides", []):
+                    return True
+        except (OSError, ValueError):
+            continue
+    return False
 
 
 CHROOT_MOUNTS = [  # (source, target inside the tree, type, options)
@@ -282,8 +292,10 @@ def pack_and_install(rec, root, orbit, pkgs_dir):
     """Pack what a build installed (root = its DESTDIR tree) and install it into Orbit with opm."""
     os.makedirs(pkgs_dir, exist_ok=True)
     opk = os.path.join(pkgs_dir, f"{rec['name']}-{rec['version']}.opk")
+    # a package that replaces another also stands in for it, so whatever depended on the old one still installs
     if subprocess.run([sys.executable, OPM, "pack", root, opk, "--name", rec["name"], "--version", rec["version"],
-                       "--depends", ",".join(rec["depends"]), "--description", rec["description"]]).returncode:
+                       "--depends", ",".join(rec["depends"]), "--provides", ",".join(rec["replaces"]),
+                       "--description", rec["description"]]).returncode:
         raise ForgeError(f"{rec['name']}: packing failed")
     for old in rec["replaces"]:   # a newer build of the same files (e.g. GCC pass 2 over pass 1's libstdc++)
         subprocess.run([sys.executable, OPM, "--root", orbit, "--force", "remove", old], check=False)

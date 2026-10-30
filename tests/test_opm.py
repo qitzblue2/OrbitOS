@@ -91,6 +91,16 @@ class Opm(unittest.TestCase):
             opm.remove(self.root, ["libfoo"], out=self.quiet)
         opm.remove(self.root, ["app", "libfoo"], out=self.quiet)
 
+    def test_provides_satisfies_dependencies(self):
+        """A package that replaces another (GCC pass 2 over libstdc++) keeps its dependents installable."""
+        newer = os.path.join(self.tmp, "gcc.opk")
+        d = tempfile.mkdtemp(dir=self.tmp)
+        tree(d, {"usr/lib/libstdc++.so": "new"})
+        opm.pack(d, newer, "gcc-pass2", "15", provides=["libstdcxx"])
+        opm.install(self.root, [newer], out=self.quiet)
+        opm.install(self.root, [self.make("grep", "3", {"usr/bin/grep": "x"}, depends=["libstdcxx"])], out=self.quiet)
+        self.assertIn("grep", opm.installed(self.root))
+
     def test_damaged_and_unsafe_packages(self):
         good = self.make("pkg", "1", {"usr/share/pkg/data": "real"})
         bad = os.path.join(self.tmp, "bad.opk")

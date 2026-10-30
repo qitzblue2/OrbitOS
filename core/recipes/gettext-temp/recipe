@@ -9,7 +9,8 @@ description="GNU gettext message tools (temporary, built in Orbit)"
 
 build() {
   # only the three programs other builds need now
-  ./configure --disable-shared
+  # glibc 2.44 makes wmemchr & co. C23 _Generic macros; this gnulib predates that
+  ./configure --disable-shared CFLAGS="-O2 -std=gnu17"
   make
   mkdir -p "$DESTDIR/usr/bin"
   cp gettext-tools/src/{msgfmt,msgmerge,xgettext} "$DESTDIR/usr/bin"

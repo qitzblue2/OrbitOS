@@ -1,0 +1,22 @@
+# shadow: user accounts and passwords (login, passwd, useradd, su …).
+name=shadow
+version=4.18.0
+stage=base
+sources=(https://github.com/shadow-maint/shadow/releases/download/4.18.0/shadow-4.18.0.tar.xz)
+sha256=(add4604d3bc410344433122a819ee4154b79dd8316a56298c60417e637c07608)
+depends=(base-files libxcrypt acl attr)
+description="user accounts, passwords and login tools"
+
+build() {
+  # groups comes from coreutils
+  sed -i 's/groups$(EXEEXT) //' src/Makefile.in
+  find man -name Makefile.in -exec sed -i 's/groups\.1 / /' {} \;
+  # yescrypt passwords, mail in /var/mail, no separate /bin and /sbin in PATH (merged /usr)
+  sed -e 's:#ENCRYPT_METHOD DES:ENCRYPT_METHOD YESCRYPT:' -e 's:/var/spool/mail:/var/mail:' \
+      -e '/PATH=/{s@/sbin:@@;s@/bin:@@}' -i etc/login.defs
+  ./configure --sysconfdir=/etc --disable-static --with-yescrypt --without-libbsd \
+    --with-group-name-max-length=32
+  make
+  make exec_prefix=/usr DESTDIR="$DESTDIR" install
+  mkdir -p "$DESTDIR/etc/default"
+}

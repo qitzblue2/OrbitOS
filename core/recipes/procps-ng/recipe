@@ -1,0 +1,16 @@
+# procps-ng: ps, top, free, vmstat, watch …
+name=procps-ng
+version=4.0.5
+stage=base
+sources=(https://sourceforge.net/projects/procps-ng/files/Production/procps-ng-4.0.5.tar.xz)
+sha256=(c2e6d193cc78f84cd6ddb72aaf6d5c6a9162f0470e5992092057f5ff518562fa)
+depends=(base-files ncurses)
+description="process monitoring tools"
+
+build() {
+  # kill comes from util-linux; systemd support is added once systemd is built
+  ./configure --prefix=/usr --docdir=/usr/share/doc/procps-ng-4.0.5 --disable-static --disable-kill \
+    --enable-watch8bit --without-systemd
+  make
+  make DESTDIR="$DESTDIR" install
+}

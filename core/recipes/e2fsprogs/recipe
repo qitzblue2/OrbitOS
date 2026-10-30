@@ -1,0 +1,18 @@
+# e2fsprogs: create, check and repair ext2/3/4 file systems (Orbit installs on ext4).
+name=e2fsprogs
+version=1.47.3
+stage=base
+sources=(https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/v1.47.3/e2fsprogs-1.47.3.tar.gz)
+sha256=(2f5164e64dd7d91eadd1e0e8a77d92c06dd7837bb19f1d9189ce1939b363d2b4)
+depends=(base-files util-linux)
+description="ext2/3/4 file system tools"
+
+build() {
+  mkdir -v build && cd build
+  # libblkid, libuuid and fsck come from util-linux
+  ../configure --prefix=/usr --sysconfdir=/etc --enable-elf-shlibs --disable-libblkid --disable-libuuid \
+    --disable-uuidd --disable-fsck
+  make
+  make DESTDIR="$DESTDIR" install
+  rm -f "$DESTDIR"/usr/lib/{libcom_err,libe2p,libext2fs,libss}.a
+}

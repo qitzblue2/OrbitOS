@@ -1,0 +1,13 @@
+# iana-etc: names for network services and protocols (/etc/services, /etc/protocols).
+name=iana-etc
+version=20251022
+stage=base
+sources=(https://github.com/Mic92/iana-etc/releases/download/20251022/iana-etc-20251022.tar.gz)
+sha256=(4b944a355b326941a9ffb4461c98a746f148ec320449e919400467f8598c5479)
+depends=(base-files)
+description="network service and protocol names"
+
+build() {
+  mkdir -p "$DESTDIR/etc"
+  cp services protocols "$DESTDIR/etc"
+}

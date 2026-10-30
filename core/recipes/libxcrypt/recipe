@@ -9,7 +9,7 @@ description="modern password hashing library"
 
 build() {
   ./configure --prefix=/usr --enable-hashes=strong,glibc --enable-obsolete-api=no --disable-static \
-    --disable-failure-tokens
+    --disable-failure-tokens --disable-werror   # glibc 2.44 const-correct strchr & co. warn in older code
   make
   make DESTDIR="$DESTDIR" install
 }

@@ -6,6 +6,8 @@ api.on('settings', (s) => {
   S = s;
   draw();
 });
+let onUpdateProgress = null;   // set by the About section while it is shown
+api.on('update-progress', (f) => onUpdateProgress?.(f));
 
 // type: t = toggle, v = value (select), a = action button, x = custom block
 const SECTIONS = {
@@ -234,17 +236,35 @@ function totpBlock() {
 
 function aboutBlock() {
   const upd = h('span', { class: 'mono', text: 'Not checked' });
+  const bar = h('progress', { max: 1, value: 0, hidden: true, style: { width: '160px' } });
+  // Windows: download, check and run the new installer; Aphelion closes and comes back updated
+  const installBtn = h('button', { class: 'btn primary', text: 'Update now', hidden: true, onclick: async () => {
+    installBtn.disabled = true;
+    bar.hidden = false;
+    upd.textContent = 'Downloading…';
+    const r = await call('installUpdate');
+    upd.textContent = r.text;
+    if (r.status !== 'installing') {
+      installBtn.disabled = false;
+      bar.hidden = true;
+    }
+  } });
+  onUpdateProgress = (f) => {
+    bar.value = f;
+    upd.textContent = `Downloading… ${Math.round(f * 100)} %`;
+  };
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
     h('div', { class: 'about-mark' }, h('img', { src: 'shared/mark.svg', width: 48, height: 48, alt: '' }),
       h('div', {}, h('b', { text: 'Aphelion' }), h('div', { class: 'muted', text: 'The farthest point of an orbit: the calmest place to browse from.' }))),
     h('div', { class: 'card' },
-      row(['a', 'Updates', '', 'Check now', async (e) => {
+      row(['a', 'Updates', S.platform === 'win32' ? 'Aphelion also checks by itself once a day.' : '', 'Check now', async () => {
         upd.textContent = 'Checking…';
         const r = await call('checkUpdates');
         upd.textContent = r.text;
-        if (r.url) upd.append(' · ', h('a', { href: '#', text: 'Download page', onclick: (ev) => { ev.preventDefault(); call('open', r.url, 'tab'); } }));
+        installBtn.hidden = r.status !== 'available';
       }]),
-      h('div', { class: 'row' }, h('div', { class: 'lbl' }, h('b', { text: 'Status' })), upd),
+      h('div', { class: 'row' }, h('div', { class: 'lbl' }, h('b', { text: 'Status' })),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, upd, bar, installBtn)),
       h('div', { class: 'row' }, h('div', { class: 'lbl' }, h('b', { text: 'Engine' })), h('span', { class: 'mono', text: `Chromium ${S.chrome}` })),
       h('div', { class: 'row' }, h('div', { class: 'lbl' }, h('b', { text: 'Runtime' })), h('span', { class: 'mono', text: `Electron ${S.electron} · ${S.platform}` }))),
     h('p', { class: 'muted', style: { lineHeight: '1.6', margin: 0 } },

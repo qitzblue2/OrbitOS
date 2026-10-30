@@ -1,7 +1,7 @@
 {
   "name": "aphelion",
   "productName": "Aphelion",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Aphelion: a calm, private web browser from Orbit OS. Tracker shield, ad blocker, authenticator, KeePass, notes and media in the address bar.",
   "homepage": "https://github.com/qitzblue2/OrbitOS/tree/Orbit-Apps/Orbit-Web",
   "license": "GPL-3.0-or-later",
@@ -15,7 +15,7 @@
     "bundle": "node tools/bundle.mjs",
     "lists": "node tools/fetch-lists.mjs",
     "icons": "python3 tools/make-icons.py",
-    "test": "node --test test/unit/",
+    "test": "node --test test/unit/*.test.js",
     "test:e2e": "node test/e2e/run.mjs",
     "prepack": "npm run bundle",
     "dist:linux": "npm run lists && npm run bundle && electron-builder --linux deb AppImage",

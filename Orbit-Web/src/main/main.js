@@ -1,7 +1,8 @@
 'use strict';
 // Aphelion: main process. Owns settings, sessions, windows and every IPC handler.
 const { app, protocol, session, ipcMain, Menu, clipboard, dialog, shell, net, nativeTheme, safeStorage,
-        nativeImage, BaseWindow, powerMonitor } = require('electron');
+        nativeImage, BaseWindow, powerMonitor, Notification } = require('electron');
+const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -16,6 +17,7 @@ const { AuthVault } = require('./authvault');
 const { IconCache } = require('./icons');
 const platform = require('./platform');
 const { toUrl, hostOf } = require('./url');
+const updater = require('./updater');
 
 const ROOT = path.join(__dirname, '..', '..');
 const PAGES = path.join(ROOT, 'src', 'renderer', 'pages');
@@ -556,17 +558,43 @@ class Aphelion {
   }
 
   async checkUpdates() {
+    this.update = await updater.check({ fetch: net.fetch.bind(net), current: app.getVersion(),
+                                        platform: process.platform, orbit: platform.isOrbit() });
+    return { status: this.update.status, text: this.update.text };
+  }
+
+  async installUpdate() {
+    if (this.update?.status !== 'available') await this.checkUpdates();
+    if (this.update?.status !== 'available') return { status: this.update.status, text: this.update.text };
+    const feed = this.update.feed;
     try {
-      const res = await net.fetch('https://api.github.com/repos/qitzblue2/OrbitOS/releases?per_page=20');
-      if (!res.ok) throw new Error(`GitHub said ${res.status}`);
-      const rel = (await res.json()).find((r) => /^aphelion-v/.test(r.tag_name));
-      if (!rel) return { status: 'none', text: 'No Aphelion release published yet.' };
-      const latest = rel.tag_name.replace('aphelion-v', '');
-      const newer = latest.localeCompare(app.getVersion(), undefined, { numeric: true }) > 0;
-      return { status: newer ? 'available' : 'current', text: newer ? `Version ${latest} is available` : 'Up to date', url: rel.html_url };
+      const file = await updater.download({ fetch: net.fetch.bind(net), feed,
+                                            dir: path.join(app.getPath('temp'), 'aphelion-update'),
+                                            onProgress: (f) => this.pageEvent('update-progress', f) });
+      updater.install(file, spawn);
     } catch (e) {
-      return { status: 'error', text: `Couldn’t check: ${e.message}` };
+      return { status: 'error', text: `Update failed: ${e.message}` };
     }
+    setTimeout(() => app.quit(), 500);   // the installer waits for Aphelion to close, then starts it again
+    return { status: 'installing', text: `Installing ${feed.version}… Aphelion restarts by itself.` };
+  }
+
+  /** Windows: look once a day, quietly; say so once per new version. */
+  scheduleUpdateChecks() {
+    if (process.platform !== 'win32' || process.env.APHELION_TEST === '1') return;
+    const run = async () => {
+      const r = await this.checkUpdates();
+      const told = path.join(app.getPath('userData'), 'update-told.txt');   // say it once per version
+      const said = fs.existsSync(told) ? fs.readFileSync(told, 'utf8').trim() : '';
+      if (r.status !== 'available' || said === this.update.feed.version) return;
+      fs.writeFileSync(told, this.update.feed.version);
+      const n = new Notification({ title: `Aphelion ${this.update.feed.version} is ready`,
+                                   body: 'Click to update. It takes a minute and keeps your tabs and settings.' });
+      n.on('click', () => (this.current() || this.newWindow({})).newTab('aphelion://settings/#about'));
+      n.show();
+    };
+    setTimeout(run, 30_000);
+    setInterval(run, 24 * 3600_000);
   }
 }
 
@@ -623,6 +651,7 @@ app.whenReady().then(async () => {
   nativeTheme.on('updated', () => A.broadcast());
   if (!A.settings().vaultPath) A.store.data.vaultPath = platform.defaultVault();
   registerIpc(A);
+  A.scheduleUpdateChecks();
   // the authenticator locks with the computer
   for (const ev of ['lock-screen', 'suspend']) powerMonitor.on(ev, () => A.auth.lock());
   const saved = A.settings().restore ? A.sessionStore.data.windows : [];
@@ -994,6 +1023,7 @@ function registerIpc(a) {
     return a.publicSettings();
   });
   page('checkUpdates', () => a.checkUpdates());
+  page('installUpdate', () => a.installUpdate());
   page('makeDefault', () => {
     const ok = app.setAsDefaultProtocolClient('http') && app.setAsDefaultProtocolClient('https');
     return ok;

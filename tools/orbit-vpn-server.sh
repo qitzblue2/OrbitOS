@@ -39,41 +39,44 @@ public_address() {
   echo "$a"
 }
 
+# one-line nftables ruleset: let devices reach the internet through this server
+postup_rule() {
+  local wan="$1" i="\"$IFACE\"" w
+  w="\"$wan\""
+  printf '%s' "nft 'table inet orbit_vpn { chain forward { type filter hook forward priority 0; policy accept; iifname $i accept; oifname $i ct state established,related accept; oifname $i drop; }; chain postrouting { type nat hook postrouting priority 100; oifname $w ip saddr $NET4.0/24 masquerade; oifname $w ip6 saddr $NET6::/64 masquerade; }; }'"
+}
+
 setup() {
   if system; then
     command -v wg >/dev/null || { apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q wireguard-tools qrencode nftables; }
   fi
   mkdir -p "$CLIENTS"
-  if [ -f "$CONF" ]; then echo "already set up ($CONF)"; return; fi
+  if [ -f "$CONF" ]; then
+    if grep -q "orbit-nat.nft" "$CONF"; then   # set up by an older version: rules move into wg0.conf
+      local wan rule; wan=$(wan_iface); [ -n "$wan" ] || wan=eth0; rule=$(postup_rule "$wan")
+      awk -v r="PostUp = $rule" '/^PostUp = nft -f /{print r; next} {print}' "$CONF" > "$CONF.new" && cat "$CONF.new" > "$CONF"
+      rm -f "$CONF.new" "$WG_DIR/orbit-nat.nft"
+      system && systemctl restart "wg-quick@$IFACE"
+      echo "Repaired the firewall rules; the VPN server is running."
+    else
+      echo "already set up ($CONF)"
+    fi
+    return
+  fi
   local wan key
   wan=$(wan_iface); [ -n "$wan" ] || wan=eth0
   key=$(wg genkey)
   echo "$key" | wg pubkey > "$WG_DIR/server.pub"
   public_address > "$WG_DIR/endpoint"
+  # The NAT rules live in wg0.conf itself: AppArmor on Ubuntu won't let wg-quick's hooks read other files.
   cat > "$CONF" <<EOF
 # Orbit VPN server (tools/orbit-vpn-server.sh). Devices are added below by "add".
 [Interface]
 Address = $NET4.1/24, $NET6::1/64
 ListenPort = $PORT
 PrivateKey = $key
-PostUp = nft -f $WG_DIR/orbit-nat.nft
+PostUp = $(postup_rule "$wan")
 PostDown = nft delete table inet orbit_vpn
-EOF
-  cat > "$WG_DIR/orbit-nat.nft" <<EOF
-# Orbit VPN: let devices reach the internet through this server ($wan)
-table inet orbit_vpn {
-  chain forward {
-    type filter hook forward priority 0; policy accept;
-    iifname "$IFACE" accept
-    oifname "$IFACE" ct state established,related accept
-    oifname "$IFACE" drop
-  }
-  chain postrouting {
-    type nat hook postrouting priority 100;
-    oifname "$wan" ip saddr $NET4.0/24 masquerade
-    oifname "$wan" ip6 saddr $NET6::/64 masquerade
-  }
-}
 EOF
   if system; then
     printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\n' > /etc/sysctl.d/90-orbit-vpn.conf

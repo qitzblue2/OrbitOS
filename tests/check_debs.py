@@ -13,6 +13,7 @@ need = {
     "orbit-apps": ["./usr/bin/orbit-files", "./usr/bin/orbit-notes", "./usr/bin/orbit-spaces", "./usr/bin/orbit-screenshot",
                    "./usr/bin/orbit-store", "./usr/bin/orbit-hardware", "./usr/bin/orbit-backup",
                    "./usr/bin/orbit-optimizer", "./usr/bin/orbit-performance", "./usr/lib/orbit-os/orbit-tune-helper",
+                   "./usr/bin/orbit-games", "./usr/lib/orbit-os/orbit-games-helper",
                    "./usr/share/polkit-1/actions/org.orbit-os.tune.policy",
                    "./usr/lib/orbit-os/python/orbit/files.py", "./usr/lib/orbit-os/orbit-store-helper",
                    "./usr/share/orbit-os/store-catalog.json", "./usr/share/polkit-1/actions/org.orbit-os.store.policy",

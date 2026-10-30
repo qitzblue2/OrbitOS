@@ -1,0 +1,41 @@
+#!/usr/bin/python3 -I
+"""Privileged half of Orbit Games, run through pkexec.
+
+  orbit-games-helper setup
+
+Turns on Debian's 32-bit packages (Steam and most Windows games need them) and
+installs Steam, the 32-bit graphics drivers, GameMode and MangoHud. One fixed
+job: nothing from the caller is passed to apt.
+"""
+import os
+import subprocess
+import sys
+
+ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "DEBIAN_FRONTEND": "noninteractive", "LANG": "C.UTF-8"}
+PACKAGES = ["steam-installer", "steam-devices", "steam-libs", "steam-libs-i386",
+            "mesa-vulkan-drivers", "mesa-vulkan-drivers:i386", "libgl1-mesa-dri:i386",
+            "libglx-mesa0:i386", "gamemode", "mangohud", "mangohud:i386", "vulkan-tools"]
+# Steam's installer asks to accept Valve's license; the user accepted it in Orbit Games.
+DEBCONF = "steam steam/question select I AGREE\nsteam steam/license note \n"
+
+
+def run(cmd, **kw):
+    print("orbit-games-helper:", " ".join(cmd), flush=True)
+    return subprocess.run(cmd, env=ENV, **kw).returncode
+
+
+def main(argv):
+    if os.geteuid() != 0:
+        sys.exit("must run as root (via pkexec)")
+    if argv[1:] != ["setup"]:
+        sys.exit("usage: orbit-games-helper setup")
+    if run(["dpkg", "--add-architecture", "i386"]):
+        sys.exit("could not turn on 32-bit packages")
+    run(["debconf-set-selections"], input=DEBCONF, text=True)
+    if run(["apt-get", "update", "-q"]):
+        sys.exit("could not reach the package servers")
+    sys.exit(1 if run(["apt-get", "install", "-y", "-q", "--", *PACKAGES]) else 0)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

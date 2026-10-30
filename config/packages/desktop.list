@@ -32,6 +32,10 @@ endeavour
 apostrophe
 zenity
 librsvg2-bin
+# gaming: GameMode, and udev rules so controllers and VR headsets work without root
+gamemode
+steam-devices
+
 # fonts
 fonts-inter
 fonts-jetbrains-mono

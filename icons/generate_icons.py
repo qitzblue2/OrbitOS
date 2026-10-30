@@ -48,6 +48,7 @@ GLYPHS = {
     "widgets": '<rect x="4" y="4" width="7" height="9" rx="2"/><rect x="13" y="4" width="7" height="5" rx="2"/><rect x="13" y="11" width="7" height="9" rx="2"/><rect x="4" y="15" width="7" height="5" rx="2"/>',
     "optimizer": '<path d="M12 3.5l1.6 4.3 4.4 1.6-4.4 1.6L12 15.3l-1.6-4.3-4.4-1.6 4.4-1.6z"/><path d="M18 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8zM6 15.5l.6 1.4 1.4.6-1.4.6L6 19.5l-.6-1.4-1.4-.6 1.4-.6z"/>',
     "performance": '<path d="M4.2 17a8.5 8.5 0 1 1 15.6 0"/><path d="M12 13l4-5"/><circle cx="12" cy="13" r="1.4"/><path d="M7 20.5h10"/>',
+    "games": '<path d="M7.5 7.5h9a4.5 4.5 0 0 1 4.4 5.5l-.9 4a2.2 2.2 0 0 1-3.8 1L14.5 16h-5l-1.7 2a2.2 2.2 0 0 1-3.8-1l-.9-4a4.5 4.5 0 0 1 4.4-5.5z"/><path d="M8 10.5v3M6.5 12h3M15.5 11h.01M17.5 13h.01"/>',
     "control": '<rect x="3" y="5" width="18" height="6" rx="3"/><circle cx="15.5" cy="8" r="1.4"/><rect x="3" y="13" width="18" height="6" rx="3"/><circle cx="8.5" cy="16" r="1.4"/>',
 }
 
@@ -95,6 +96,7 @@ APP_MAP = {
     "widgets": ["orbit-widgets"],
     "control": ["orbit-control-center"],
     "optimizer": ["orbit-optimizer"],
+    "games": ["orbit-games", "applications-games"],
     "performance": ["orbit-performance"],
 }
 FOLDER_MAP = {

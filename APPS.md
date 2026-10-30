@@ -143,6 +143,15 @@ Every screenshot here is real:
 - Plain-language tips (memory almost full, running hot, too many login apps, lots to clean).
 - Your heaviest apps with a **Quit** button. It asks the app to close normally, and only works on your own apps.
 
+## Orbit Games
+| ![Library](docs/screenshots/app-games-library.png) | ![Setup](docs/screenshots/app-games-setup.png) |
+|---|---|
+
+- **Library:** your installed games and game stores (Steam, Lutris, Heroic, Bottles) with Play buttons.
+- **Game Mode:** one switch turns on the Performance power mode, holds back notifications and pauses Orbit's background jobs. Turning it off puts back exactly what was set before.
+- **Setup:** shows what is ready. **Set Up Gaming** runs `pkexec orbit-games-helper setup`, a single fixed job: it turns on Debian's 32-bit packages and installs Steam, the 32-bit Mesa/Vulkan drivers, GameMode and MangoHud. It also shows the graphics card and gives the Steam launch options (`gamemoderun mangohud %command%`) with a copy button.
+- Every Orbit image ships GameMode and `steam-devices` (controller and VR headset access without root). `vm.max_map_count` is raised for games that need it.
+
 ## Built-in speed tuning
 Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
 - Memory: zram first (`vm.swappiness=150`, `page-cluster=0`), folder metadata kept in cache, small write-back batches so copying to USB sticks doesn't stall the desktop, and `vm.max_map_count` raised for games.
@@ -176,7 +185,7 @@ Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
   - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
 
 ## Where the code is
-- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`), so it can be unit-tested.
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`), so it can be unit-tested.
 - `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
 - `packages/orbit-launcher/`: the launcher extension.
 - Tests:

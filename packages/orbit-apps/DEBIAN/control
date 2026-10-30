@@ -12,5 +12,5 @@ Description: Orbit OS apps
  Orbit Screenshot (capture and annotate), Orbit Store (curated apps from
  Debian and Flathub), Orbit Hardware (hardware report and guided tests),
  Orbit Backup (rsync snapshot backups), Orbit Optimizer (cleanup and
- login apps) and Orbit Performance (live load, power mode), plus a Spaces add-on for
- GNOME Files.
+ login apps), Orbit Performance (live load, power mode) and Orbit Games
+ (Steam setup, Game Mode, game library), plus a Spaces add-on for GNOME Files.

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Games
+GenericName=Game Center
+Comment=Set up Steam, turn on Game Mode and launch your games
+Exec=orbit-games
+Icon=orbit-games
+Categories=GTK;Game;
+StartupNotify=true
+DBusActivatable=false
+Keywords=steam;proton;gaming;gamemode;mangohud;controller;fps;

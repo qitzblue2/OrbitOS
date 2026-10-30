@@ -18,7 +18,7 @@ os.environ["XDG_CONFIG_HOME"] = str(TMP / "home/.config")
 os.environ["XDG_STATE_HOME"] = str(TMP / "home/.local/state")
 (TMP / "home/Home").mkdir(parents=True)
 
-from orbit import backup, catalog, fileops, hardware, notes, spaces, tune  # noqa: E402
+from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune  # noqa: E402
 
 
 class FileOps(unittest.TestCase):
@@ -361,6 +361,58 @@ class Tune(unittest.TestCase):
         self.assertEqual(levels, ["warn", "warn", "info", "info", "info"])
         ok = {"total": 100, "used": 10, "available": 90, "swap_total": 0, "swap_used": 0}
         self.assertEqual(tune.advice(ok, 50, 5, "balanced", 1, 0), [])
+
+
+class Games(unittest.TestCase):
+    def setUp(self):
+        self.d = pathlib.Path(tempfile.mkdtemp(dir=TMP))
+
+    def test_library(self):
+        a, b = self.d / "sys", self.d / "user"
+        a.mkdir(); b.mkdir()
+        (a / "steam.desktop").write_text("[Desktop Entry]\nType=Application\nName=Steam\nCategories=Network;\n")
+        (a / "tux.desktop").write_text("[Desktop Entry]\nType=Application\nName=Tux Kart\nCategories=Game;\n")
+        (a / "chess.desktop").write_text("[Desktop Entry]\nType=Application\nName=Chess\nCategories=Game;\n")
+        (a / "edit.desktop").write_text("[Desktop Entry]\nType=Application\nName=Editor\nCategories=Utility;\n")
+        (a / "orbit-games.desktop").write_text("[Desktop Entry]\nType=Application\nName=Games\nCategories=Game;\n")
+        (b / "chess.desktop").write_text("[Desktop Entry]\nType=Application\nName=Chess\nNoDisplay=true\n")
+        lib = games.library([a, b])
+        self.assertEqual([g["name"] for g in lib], ["Steam", "Tux Kart"])
+        self.assertTrue(lib[0]["launcher"])
+
+    def test_gpus_and_32bit(self):
+        for i, v in enumerate(("0x1002", "0x10de", "0x1002")):
+            p = self.d / f"class/drm/card{i}/device"
+            p.mkdir(parents=True)
+            (p / "vendor").write_text(v + "\n")
+        self.assertEqual(games.gpus(self.d), ["AMD", "NVIDIA"])
+        (self.d / "arch").write_text("amd64\ni386\n")
+        self.assertTrue(games.has_32bit(self.d))
+        self.assertFalse(games.has_32bit(self.d / "nope"))
+        self.assertEqual(games.launch_options({"gamemode": True, "mangohud": False}), "gamemoderun %command%")
+
+    def test_game_mode_restores_settings(self):
+        calls, prof = [], {"now": "balanced"}
+
+        def gs(*a):
+            calls.append(a)
+            return "true" if a[0] == "get" else ""
+
+        def profile(name=None):
+            if name:
+                prof["now"] = name
+            return prof["now"]
+        timers = lambda action: calls.append(("timer", action))
+        changed = games.set_game_mode(True, gs, profile, timers)
+        self.assertIn("Performance power mode", changed)
+        self.assertEqual(prof["now"], "performance")
+        self.assertTrue(games.game_mode_on())
+        self.assertEqual(games.set_game_mode(True, gs, profile, timers), [])
+        games.set_game_mode(False, gs, profile, timers)
+        self.assertEqual(prof["now"], "balanced")
+        self.assertFalse(games.game_mode_on())
+        self.assertIn(("set", "org.gnome.desktop.notifications", "show-banners", "true"), calls)
+        self.assertEqual([c for c in calls if c[0] == "timer"], [("timer", "stop"), ("timer", "start")])
 
 
 if __name__ == "__main__":

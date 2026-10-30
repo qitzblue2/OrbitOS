@@ -1,0 +1,15 @@
+# GNU sed, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=sed-temp
+version=4.10
+stage=temp
+sources=(https://ftp.gnu.org/gnu/sed/sed-4.10.tar.xz)
+sha256=(b8e72182b2ec96a3574e2998c47b7aaa64cc20ce000d8e9ac313cc07cecf28c7)
+depends=(libstdcxx)
+description="GNU sed (temporary)"
+
+build() {
+  ./configure --prefix=/usr --host="$TGT" --build="$(./build-aux/config.guess)"
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+}

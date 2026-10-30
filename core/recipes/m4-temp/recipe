@@ -1,0 +1,15 @@
+# GNU m4 macro processor, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=m4-temp
+version=1.4.21
+stage=temp
+sources=(https://ftp.gnu.org/gnu/m4/m4-1.4.21.tar.xz)
+sha256=(f25c6ab51548a73a75558742fb031e0625d6485fe5f9155949d6486a2408ab66)
+depends=(libstdcxx)
+description="GNU m4 macro processor (temporary)"
+
+build() {
+  ./configure --prefix=/usr --host="$TGT" --build="$(build-aux/config.guess)"
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+}

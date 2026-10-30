@@ -1,0 +1,16 @@
+# GNU Bourne-Again shell, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=bash-temp
+version=5.3
+stage=temp
+sources=(https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz)
+sha256=(0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba)
+depends=(libstdcxx ncurses-temp)
+description="GNU Bourne-Again shell (temporary)"
+
+build() {
+  ./configure --prefix=/usr --build="$(sh support/config.guess)" --host="$TGT" --without-bash-malloc
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+  ln -sf bash "$DESTDIR$ORBIT"/usr/bin/sh
+}

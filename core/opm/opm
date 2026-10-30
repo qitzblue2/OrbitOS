@@ -102,8 +102,15 @@ def pack(srcdir, out, name, version, depends=(), description="", provides=()):
         ti.size, ti.mode, ti.mtime = len(data), 0o644, int(time.time())
         tar.addfile(ti, io.BytesIO(data))
         for f in files:
-            tar.add(os.path.join(srcdir, f["path"]), arcname=f["path"], recursive=False,
-                    filter=lambda t: _normalise(t))
+            src = os.path.join(srcdir, f["path"])
+            ti = _normalise(tar.gettarinfo(src, arcname=f["path"]))
+            if f["type"] == "file":
+                # hard links (e.g. ld and ld.bfd) are stored as plain copies: one simple entry type
+                ti.type, ti.linkname, ti.size = tarfile.REGTYPE, "", os.path.getsize(src)
+                with open(src, "rb") as fh:
+                    tar.addfile(ti, fh)
+            else:
+                tar.addfile(ti)
     return meta
 
 

@@ -1,0 +1,16 @@
+# xz/LZMA compression, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=xz-temp
+version=5.8.3
+stage=temp
+sources=(https://github.com/tukaani-project/xz/releases/download/v5.8.3/xz-5.8.3.tar.xz)
+sha256=(fff1ffcf2b0da84d308a14de513a1aa23d4e9aa3464d17e64b9714bfdd0bbfb6)
+depends=(libstdcxx)
+description="xz/LZMA compression (temporary)"
+
+build() {
+  ./configure --prefix=/usr --host="$TGT" --build="$(build-aux/config.guess)" --disable-static --docdir=/usr/share/doc/xz-5.8.3
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+  rm -f "$DESTDIR$ORBIT"/usr/lib/liblzma.la
+}

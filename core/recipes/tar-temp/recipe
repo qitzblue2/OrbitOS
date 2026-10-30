@@ -1,0 +1,15 @@
+# GNU tar, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=tar-temp
+version=1.35
+stage=temp
+sources=(https://ftp.gnu.org/gnu/tar/tar-1.35.tar.xz)
+sha256=(4d62ff37342ec7aed748535323930c7cf94acf71c3591882b26a7ea50f3edc16)
+depends=(libstdcxx)
+description="GNU tar (temporary)"
+
+build() {
+  ./configure --prefix=/usr --host="$TGT" --build="$(build-aux/config.guess)"
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+}

@@ -58,6 +58,16 @@ class Opm(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.root, "usr/bin/hello")))
         self.assertEqual(opm.installed(self.root), {})
 
+    def test_hard_links_are_packed_as_files(self):
+        d = tempfile.mkdtemp(dir=self.tmp)
+        tree(d, {"tools/bin/ld": "linker"})
+        os.link(os.path.join(d, "tools/bin/ld"), os.path.join(d, "tools/bin/ld.bfd"))
+        out = os.path.join(self.tmp, "ld.opk")
+        opm.pack(d, out, "binutils", "1")
+        opm.install(self.root, [out], out=self.quiet)
+        self.assertEqual(open(os.path.join(self.root, "tools/bin/ld.bfd")).read(), "linker")
+        self.assertEqual(opm.verify(self.root, out=self.quiet), 0)
+
     def test_upgrade_drops_old_files(self):
         opm.install(self.root, [self.make("app", "1", {"usr/lib/app/a": "1", "usr/lib/app/old": "x"})], out=self.quiet)
         opm.install(self.root, [self.make("app", "2", {"usr/lib/app/a": "2"})], out=self.quiet)

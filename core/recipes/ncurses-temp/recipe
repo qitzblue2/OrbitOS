@@ -1,0 +1,22 @@
+# terminal library, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=ncurses-temp
+version=6.6
+stage=temp
+sources=(https://invisible-mirror.net/archives/ncurses/ncurses-6.6.tar.gz)
+sha256=(355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11)
+depends=(libstdcxx)
+description="terminal library (temporary)"
+
+build() {
+  # tic must run on the build machine: build a native copy first
+  mkdir build
+  (cd build && ../configure AWK=gawk && make -C include && make -C progs tic)
+  ./configure --prefix=/usr --host="$TGT" --build="$(./config.guess)" --mandir=/usr/share/man \
+    --with-manpage-format=normal --with-shared --without-normal --with-cxx-shared --without-debug \
+    --without-ada --disable-stripping AWK=gawk
+  make
+  make DESTDIR="$DESTDIR$ORBIT" TIC_PATH="$(pwd)/build/progs/tic" install
+  ln -sf libncursesw.so "$DESTDIR$ORBIT"/usr/lib/libncurses.so
+  sed -e 's/^#if.*XOPEN.*$/#if 1/' -i "$DESTDIR$ORBIT"/usr/include/curses.h
+}

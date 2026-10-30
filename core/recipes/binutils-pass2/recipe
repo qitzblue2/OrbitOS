@@ -1,0 +1,17 @@
+# binutils again, now built to run on Orbit itself (cross-compiled), into /usr.
+name=binutils-pass2
+version=2.47
+stage=temp
+sources=(https://ftp.gnu.org/gnu/binutils/binutils-2.47.tar.xz)
+sha256=(154ab23b60070e8f27013c22977f1129425d67d1e8acd6e13010e617811e4cff)
+depends=(libstdcxx)
+description="GNU binutils, second pass (temporary)"
+
+build() {
+  mkdir build && cd build
+  ../configure --prefix=/usr --build="$(../config.guess)" --host="$TGT" --disable-nls --enable-shared \
+    --enable-gprofng=no --disable-werror --enable-64-bit-bfd --enable-new-dtags --enable-default-hash-style=gnu
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+  rm -f "$DESTDIR$ORBIT"/usr/lib/lib{bfd,ctf,ctf-nobfd,opcodes,sframe}.{a,la}
+}

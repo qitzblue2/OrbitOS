@@ -1,0 +1,15 @@
+# GNU find, xargs, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=findutils-temp
+version=4.11.0
+stage=temp
+sources=(https://ftp.gnu.org/gnu/findutils/findutils-4.11.0.tar.xz)
+sha256=(bfd19cb06cc71f3352d567e90284d8cdac02ac89774bbeadf0b533b0c11432fd)
+depends=(libstdcxx)
+description="GNU find, xargs (temporary)"
+
+build() {
+  ./configure --prefix=/usr --localstatedir=/var/lib/locate --host="$TGT" --build="$(build-aux/config.guess)"
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+}

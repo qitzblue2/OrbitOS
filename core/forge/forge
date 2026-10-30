@@ -9,6 +9,7 @@ Every piece of software has a recipe at core/recipes/<name>/recipe, a bash file:
     sources=(https://.../binutils-2.47.tar.xz)
     sha256=(154ab23b...)          # one per source; a mismatch stops the build
     depends=(filesystem)          # recipes that must be built and installed first
+    replaces=(libstdcxx)          # optional: packages whose files this one takes over
     description="..."
     build() { ...; make DESTDIR="$DESTDIR" install; }
 
@@ -19,7 +20,8 @@ installs it into the Orbit tree with opm, so the next recipe can use it.
 Stages (the classic three-step way to build a system with nothing borrowed from the host):
   cross   a cross toolchain for the target x86_64-orbit-linux-gnu, built with the host's
           compiler, installed under $ORBIT/tools (recipes install to "$DESTDIR$ORBIT/...")
-  temp    temporary tools cross-compiled with that toolchain (next step)
+  temp    temporary tools cross-compiled with that toolchain, installed into $ORBIT/usr
+          (recipes install to "$DESTDIR$ORBIT")
   system  the real Orbit system, built inside $ORBIT (chroot) with the temporary tools
 
     forge list                    recipes with stage, version and build state
@@ -50,7 +52,7 @@ OPM = os.path.join(CORE, "opm", "opm")
 STAGES = ["cross", "temp", "system"]
 TARGET = "x86_64-orbit-linux-gnu"
 FIELDS = ("name", "version", "stage", "description")
-ARRAYS = ("sources", "sha256", "depends")
+ARRAYS = ("sources", "sha256", "depends", "replaces")
 
 
 class ForgeError(Exception):
@@ -186,8 +188,8 @@ def is_built(orbit, rec):
 
 
 def build(rec, orbit, sources_dir, pkgs_dir, logs_dir, jobs):
-    if rec["stage"] != "cross":
-        raise ForgeError(f"{rec['name']}: the {rec['stage']} stage is not implemented in forge yet")
+    if rec["stage"] == "system":
+        raise ForgeError(f"{rec['name']}: the system stage (chroot) is not implemented in forge yet")
     srcs = fetch(rec, sources_dir)
     work = tempfile.mkdtemp(prefix=f"forge-{rec['name']}-", dir=os.path.join(orbit, "..") if os.path.isdir(orbit) else None)
     dest = os.path.join(work, "dest")
@@ -220,9 +222,13 @@ def build(rec, orbit, sources_dir, pkgs_dir, logs_dir, jobs):
             raise ForgeError(f"{rec['name']}: nothing was installed under $DESTDIR$ORBIT")
         os.makedirs(pkgs_dir, exist_ok=True)
         opk = os.path.join(pkgs_dir, f"{rec['name']}-{rec['version']}.opk")
-        subprocess.run([sys.executable, OPM, "pack", root, opk, "--name", rec["name"], "--version", rec["version"],
-                        "--depends", ",".join(rec["depends"]), "--description", rec["description"]], check=True)
-        subprocess.run([sys.executable, OPM, "--root", orbit, "install", opk], check=True)
+        if subprocess.run([sys.executable, OPM, "pack", root, opk, "--name", rec["name"], "--version", rec["version"],
+                           "--depends", ",".join(rec["depends"]), "--description", rec["description"]]).returncode:
+            raise ForgeError(f"{rec['name']}: packing failed")
+        for old in rec["replaces"]:   # a newer build of the same files (e.g. GCC pass 2 over pass 1's libstdc++)
+            subprocess.run([sys.executable, OPM, "--root", orbit, "--force", "remove", old], check=False)
+        if subprocess.run([sys.executable, OPM, "--root", orbit, "install", opk]).returncode:
+            raise ForgeError(f"{rec['name']}: installing {opk} failed")
         print(f"[forge] {rec['name']} done in {(time.time() - started) / 60:.1f} min", flush=True)
     finally:
         shutil.rmtree(work, ignore_errors=True)

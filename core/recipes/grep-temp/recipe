@@ -1,0 +1,15 @@
+# GNU grep, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=grep-temp
+version=3.12
+stage=temp
+sources=(https://ftp.gnu.org/gnu/grep/grep-3.12.tar.xz)
+sha256=(2649b27c0e90e632eadcd757be06c6e9a4f48d941de51e7c0f83ff76408a07b9)
+depends=(libstdcxx)
+description="GNU grep (temporary)"
+
+build() {
+  ./configure --prefix=/usr --host="$TGT" --build="$(./build-aux/config.guess)"
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+}

@@ -1,0 +1,17 @@
+# GNU core utilities, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=coreutils-temp
+version=9.12
+stage=temp
+sources=(https://ftp.gnu.org/gnu/coreutils/coreutils-9.12.tar.xz)
+sha256=(a480198559733e9b3da999e90543ac6f888a2caa544d8d664c5a1f17e528e210)
+depends=(libstdcxx)
+description="GNU core utilities (temporary)"
+
+build() {
+  ./configure --prefix=/usr --host="$TGT" --build="$(build-aux/config.guess)" \
+    --enable-install-program=hostname --enable-no-install-program=kill,uptime
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+  mkdir -p "$DESTDIR$ORBIT"/usr/sbin && mv "$DESTDIR$ORBIT"/usr/bin/chroot "$DESTDIR$ORBIT"/usr/sbin/
+}

@@ -1,0 +1,33 @@
+# GCC again, now built to run on Orbit itself (cross-compiled), with threads and shared libgcc.
+name=gcc-pass2
+version=15.3.0
+stage=temp
+sources=(https://ftp.gnu.org/gnu/gcc/gcc-15.3.0/gcc-15.3.0.tar.xz
+         https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
+         https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz
+         https://ftp.gnu.org/gnu/mpc/mpc-1.4.1.tar.xz)
+sha256=(fa59c1beef8995f27c4d71c1df227587189315d3e6faff1bb4306e61b0c530eb
+        a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898
+        b67ba0383ef7e8a8563734e2e889ef5ec3c3b898a01d00fa0a6869ad81c6ce01
+        91204cd32f164bd3b7c992d4a6a8ce6519511aadab30f78b6982d0bf8d73e931)
+depends=(binutils-pass2)
+replaces=(libstdcxx)
+description="GNU Compiler Collection, second pass (temporary)"
+
+build() {
+  local srcs; read -ra srcs <<< "$SRCS"
+  tar -xf "${srcs[1]}" && mv gmp-6.3.0 gmp
+  tar -xf "${srcs[2]}" && mv mpfr-4.2.2 mpfr
+  tar -xf "${srcs[3]}" && mv mpc-1.4.1 mpc
+  sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64
+  # build libgcc and libstdc++ with POSIX threads support
+  sed '/thread_header =/s/@.*@/gthr-posix.h/' -i libgcc/Makefile.in libstdc++-v3/include/Makefile.in
+  mkdir build && cd build
+  ../configure --build="$(../config.guess)" --host="$TGT" --target="$TGT" LDFLAGS_FOR_TARGET="-L$PWD/$TGT/libgcc" \
+    --prefix=/usr --with-build-sysroot="$ORBIT" --enable-default-pie --enable-default-ssp --disable-nls \
+    --disable-multilib --disable-libatomic --disable-libgomp --disable-libquadmath --disable-libsanitizer \
+    --disable-libssp --disable-libvtv --enable-languages=c,c++
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+  ln -sf gcc "$DESTDIR$ORBIT"/usr/bin/cc
+}

@@ -1,0 +1,15 @@
+# GNU make, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=make-temp
+version=4.4.1
+stage=temp
+sources=(https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz)
+sha256=(dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3)
+depends=(libstdcxx)
+description="GNU make (temporary)"
+
+build() {
+  ./configure --prefix=/usr --host="$TGT" --build="$(build-aux/config.guess)"
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+}

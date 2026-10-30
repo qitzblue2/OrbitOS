@@ -1,0 +1,19 @@
+# file type detection, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=file-temp
+version=5.48
+stage=temp
+sources=(https://astron.com/pub/file/file-5.48.tar.gz)
+sha256=(ed14656883b23a364b4057c05595d93252da9bc473d30106519519d0da141283)
+depends=(libstdcxx)
+description="file type detection (temporary)"
+
+build() {
+  # the magic database is compiled by a native file of the same version
+  mkdir build
+  (cd build && ../configure --disable-bzlib --disable-libseccomp --disable-xzlib --disable-zlib && make)
+  ./configure --prefix=/usr --host="$TGT" --build="$(./config.guess)"
+  make FILE_COMPILE="$(pwd)/build/src/file"
+  make DESTDIR="$DESTDIR$ORBIT" install
+  rm -f "$DESTDIR$ORBIT"/usr/lib/libmagic.la
+}

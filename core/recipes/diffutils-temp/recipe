@@ -1,0 +1,15 @@
+# GNU diff, cmp, sdiff, cross-compiled with the Orbit toolchain into the new tree.
+# Temporary: replaced by the final build inside Orbit in the system stage.
+name=diffutils-temp
+version=3.12
+stage=temp
+sources=(https://ftp.gnu.org/gnu/diffutils/diffutils-3.12.tar.xz)
+sha256=(7c8b7f9fc8609141fdea9cece85249d308624391ff61dedaf528fcb337727dfd)
+depends=(libstdcxx)
+description="GNU diff, cmp, sdiff (temporary)"
+
+build() {
+  ./configure --prefix=/usr --host="$TGT" --build="$(./build-aux/config.guess)" gl_cv_func_strcasecmp_works=y
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+}

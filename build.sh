@@ -187,7 +187,9 @@ INCLUDE=$(for l in "${lists[@]}"; do grep -vE '^\s*(#|$)' "$HERE/config/packages
 HOOKENV="ORBIT_VARIANT=$VARIANT ORBIT_VERSION=$ORBIT_VERSION DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8"
 # A finished system is reused when nothing that goes into it changed (package lists, hooks,
 # config, the Orbit packages, Aphelion), so a failure in a later stage costs minutes, not a rebuild.
-INPUTS=$( { echo "$VARIANT $INCLUDE"; cat "$HERE/config/build.conf"; find "$HERE/config" "$PKGS" -type f -print0 | sort -z | xargs -0 sha256sum; } | sha256sum | cut -c1-16)
+# fingerprint the sources, not the freshly built .debs (those get new timestamps on every run)
+INPUTS=$( { echo "$VARIANT $INCLUDE"; find "$HERE/config" "$HERE/packages" "$HERE/skel" "$HERE/branding" "$HERE/icons" "$HERE/tools" \
+            "$PKGS"/aphelion_*.deb -type f ! -path '*/build/*' ! -name '*.pyc' -print0 | sort -z | xargs -0 sha256sum; } | sha256sum | cut -c1-16)
 if [ -f "$WORK/rootfs.done" ] && [ "$(cat "$WORK/rootfs.done")" = "$INPUTS" ] && [ -d "$ROOT/usr" ]; then
   log "system unchanged since the last build ($INPUTS): reusing $ROOT"
 else
@@ -220,7 +222,11 @@ X="$WORK/iso"
 rm -rf "$X"; mkdir -p "$X/live" "$X/boot/grub" "$X/.disk" "$X/EFI/boot"
 kver=$(ls "$ROOT/lib/modules" | sort -V | tail -1)
 [ -f "$ROOT/boot/vmlinuz-$kver" ] && [ -f "$ROOT/boot/initrd.img-$kver" ] || die "no kernel/initrd for $kver in the system"
-chroot "$ROOT" lsinitramfs "/boot/initrd.img-$kver" | grep -q '^scripts/live$' || die "live-boot is not in the initrd"
+# live-boot must be installed before 90-finish rebuilds the initrd (it is: it comes with the
+# bootstrap); check its package and boot scripts are there (unpacking the zstd initrd would need
+# /dev inside the finished system)
+chroot "$ROOT" dpkg-query -W -f='${Status}' live-boot-initramfs-tools 2>/dev/null | grep -q 'install ok installed' \
+  && [ -f "$ROOT/usr/share/initramfs-tools/scripts/live" ] || die "live-boot is not installed in the system"
 cp "$ROOT/boot/vmlinuz-$kver" "$X/live/vmlinuz"
 cp "$ROOT/boot/initrd.img-$kver" "$X/live/initrd.img"
 log "compressing the system ($(du -sh "$ROOT" | cut -f1)) into live/filesystem.squashfs"

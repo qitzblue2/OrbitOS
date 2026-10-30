@@ -77,12 +77,14 @@ def pack(srcdir, out, name, version, depends=(), description="", provides=()):
     """Make an .opk from a staged install tree (DESTDIR)."""
     if not name or "/" in name or not version:
         raise OpmError("pack needs --name and --version")
-    files = []
+    files, dir_modes = [], {}
     for dirpath, dirnames, filenames in os.walk(srcdir):
         dirnames.sort()
         rel_dir = os.path.relpath(dirpath, srcdir)
         if rel_dir == ".ORBIT" or rel_dir.startswith(".ORBIT/"):
             continue
+        if rel_dir != ".":   # every directory, empty ones too (/tmp, /proc), with its mode (/tmp is 1777)
+            dir_modes[os.path.normpath(rel_dir)] = stat.S_IMODE(os.lstat(dirpath).st_mode)
         for fn in sorted(filenames) + sorted(d for d in dirnames if os.path.islink(os.path.join(dirpath, d))):
             full = os.path.join(dirpath, fn)
             rel = os.path.normpath(os.path.join(rel_dir, fn))
@@ -92,9 +94,9 @@ def pack(srcdir, out, name, version, depends=(), description="", provides=()):
             elif stat.S_ISREG(st.st_mode):
                 files.append({"path": rel, "type": "file", "mode": stat.S_IMODE(st.st_mode),
                               "size": st.st_size, "sha256": sha256_file(full)})
-    dirs = sorted({os.path.dirname(f["path"]) for f in files} - {""})
+    dirs = sorted(({os.path.dirname(f["path"]) for f in files} | set(dir_modes)) - {""})
     meta = {"format": FORMAT, "name": name, "version": version, "depends": list(depends),
-            "provides": list(provides), "description": description,
+            "provides": list(provides), "description": description, "dir_modes": dir_modes,
             "built": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "dirs": dirs, "files": files}
     data = json.dumps(meta, indent=1, sort_keys=True).encode()
     with tarfile.open(out, "w:xz", preset=6, format=tarfile.PAX_FORMAT) as tar:
@@ -172,8 +174,14 @@ def _install_one(root, opk, meta, old):
         for f in meta["files"]:
             if f["type"] == "file" and sha256_file(os.path.join(stage, f["path"])) != f["sha256"]:
                 raise OpmError(f"{opk}: {f['path']} does not match its checksum (damaged package)")
+        modes = meta.get("dir_modes", {})
         for d in meta["dirs"]:
-            os.makedirs(os.path.join(root, d), exist_ok=True)
+            p = os.path.join(root, d)
+            if os.path.islink(p):     # a merged-/usr link such as /bin -> usr/bin: leave it
+                continue
+            os.makedirs(p, exist_ok=True)
+            if d in modes:
+                os.chmod(p, modes[d])
         # move every file into place atomically (rename over the old one)
         for f in meta["files"]:
             dst = os.path.join(root, f["path"])

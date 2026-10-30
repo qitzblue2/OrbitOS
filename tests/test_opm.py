@@ -91,6 +91,17 @@ class Opm(unittest.TestCase):
             opm.remove(self.root, ["libfoo"], out=self.quiet)
         opm.remove(self.root, ["app", "libfoo"], out=self.quiet)
 
+    def test_empty_directories_and_modes(self):
+        d = tempfile.mkdtemp(dir=self.tmp)
+        os.makedirs(os.path.join(d, "tmp"))
+        os.chmod(os.path.join(d, "tmp"), 0o1777)
+        os.makedirs(os.path.join(d, "proc"))
+        out = os.path.join(self.tmp, "fs.opk")
+        opm.pack(d, out, "filesystem", "2")
+        opm.install(self.root, [out], out=self.quiet)
+        self.assertTrue(os.path.isdir(os.path.join(self.root, "proc")))
+        self.assertEqual(os.stat(os.path.join(self.root, "tmp")).st_mode & 0o7777, 0o1777)
+
     def test_provides_satisfies_dependencies(self):
         """A package that replaces another (GCC pass 2 over libstdc++) keeps its dependents installable."""
         newer = os.path.join(self.tmp, "gcc.opk")

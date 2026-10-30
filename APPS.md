@@ -156,6 +156,12 @@ Every screenshot here is real:
 - The firewall lets replies from PCs on the local network in (`3702`, `5353`, `137` udp, from private addresses only), so they can be found. Until you turn on **Sharing**, this PC shares nothing and doesn't announce itself.
 - OneDrive: Settings → Online Accounts → Microsoft 365 puts your OneDrive in Files.
 
+## Phone Link
+- Pair an Android phone: its notifications on the PC (and you can reply), send files both ways, one shared clipboard, texts, battery level, ring a lost phone, use the phone as a remote.
+- On the phone, install **KDE Connect** (Google Play or F-Droid). On Orbit, open **Phone Link** (or Orbit Settings → Phone), pick the phone and press **Pair**; accept on the phone. Both must be on the same Wi-Fi.
+- Built on GSConnect (Debian's `gnome-shell-extension-gsconnect`). The firewall lets KDE Connect in (ports 1714–1764) from private networks only.
+- iPhones: KDE Connect for iOS can send files and share the clipboard; Apple doesn't allow notifications to be mirrored.
+
 ## Orbit VPN
 ![VPN](docs/screenshots/app-vpn.png)
 

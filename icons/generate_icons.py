@@ -54,6 +54,7 @@ GLYPHS = {
     "sharing": '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><circle cx="9" cy="13.5" r="1.4"/><circle cx="15.5" cy="11" r="1.4"/><circle cx="15.5" cy="16" r="1.4"/><path d="M10.3 12.9l3.9-1.3M10.3 14.1l3.9 1.3"/>',
     "sync": '<path d="M5 10.5a7 7 0 0 1 12.6-3.6M19 13.5a7 7 0 0 1-12.6 3.6"/><path d="M17.8 3.5v3.6h-3.6M6.2 20.5v-3.6h3.6"/>',
     "vpn": '<path d="M12 3.5l7 2.8v5.2c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6.3z"/><rect x="9" y="11" width="6" height="4.5" rx="1"/><path d="M10.3 11V9.8a1.7 1.7 0 0 1 3.4 0V11"/>',
+    "phone": '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/><path d="M9.5 9.5l2 2 3-3.5"/>',
     "control": '<rect x="3" y="5" width="18" height="6" rx="3"/><circle cx="15.5" cy="8" r="1.4"/><rect x="3" y="13" width="18" height="6" rx="3"/><circle cx="8.5" cy="16" r="1.4"/>',
 }
 
@@ -106,6 +107,7 @@ APP_MAP = {
     "sharing": ["orbit-sharing"],
     "sync": ["orbit-sync", "syncthing"],
     "vpn": ["orbit-vpn"],
+    "phone": ["orbit-phone", "org.gnome.Shell.Extensions.GSConnect"],
     "games": ["orbit-games", "applications-games"],
     "performance": ["orbit-performance"],
 }

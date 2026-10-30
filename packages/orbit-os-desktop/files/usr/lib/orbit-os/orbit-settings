@@ -73,6 +73,8 @@ class Win(Adw.ApplicationWindow):
             ("Performance", "What slows the computer down, power mode", "orbit-performance",
              ["orbit-performance"]),
             ("Windows Apps", "Install and run Windows programs (.exe, .msi)", "orbit-windows", ["orbit-windows"]),
+            ("Phone", "Pair your Android phone: notifications, files, clipboard", "orbit-phone",
+             ["gnome-extensions", "prefs", "gsconnect@andyholmes.github.io"]),
             ("VPN", "Connect to your own WireGuard server", "orbit-vpn", ["orbit-vpn"]),
             ("Orbit Sync", "Keep folders the same on all your PCs", "orbit-sync", ["orbit-sync"]),
             ("Sharing", "Share folders with Windows PCs on your network", "orbit-sharing", ["orbit-sharing"]),

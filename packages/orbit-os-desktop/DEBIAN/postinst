@@ -13,6 +13,12 @@ if [ "$1" = configure ]; then
       ufw allow proto udp from "$net" to any port "$port" comment 'Orbit: find Windows PCs' >/dev/null 2>&1 || true
     done
   done
+  # Phone link (GSConnect / KDE Connect): phones on the local network only.
+  for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+    for proto in tcp udp; do
+      ufw allow proto "$proto" from "$net" to any port 1714:1764 comment 'Orbit: phone link' >/dev/null 2>&1 || true
+    done
+  done
   ufw --force enable >/dev/null 2>&1 || true   # fails harmlessly inside a chroot; re-enabled at first boot
   systemctl enable ufw.service >/dev/null 2>&1 || true
   # Fingerprint for login, lock screen and sudo (password stays a fallback).

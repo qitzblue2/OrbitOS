@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Phone Link
+GenericName=Connect your Phone
+Comment=Pair your Android phone: notifications, files, clipboard and texts
+Exec=gnome-extensions prefs gsconnect@andyholmes.github.io
+Icon=orbit-phone
+Categories=GTK;Network;
+StartupNotify=true
+TryExec=gnome-extensions
+Keywords=phone;android;kde connect;gsconnect;sms;notifications;

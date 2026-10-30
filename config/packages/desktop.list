@@ -45,6 +45,9 @@ smbclient
 # safety snapshots before updates (Orbit Updater can undo an update)
 timeshift
 
+# Phone link: pair an Android phone through the KDE Connect app
+gnome-shell-extension-gsconnect
+
 # Orbit Sync: direct, encrypted folder sync between your PCs
 syncthing
 

@@ -169,7 +169,7 @@ if [ "${1:-}" = "--debs-only" ]; then
 fi
 
 [ "$(id -u)" = 0 ] || die "building the system needs root (run inside the container or a throwaway VM)"
-for t in mmdebstrap mksquashfs xorriso grub-mkimage mkfs.vfat mcopy lsinitramfs python3 dpkg-deb; do
+for t in mmdebstrap mksquashfs xorriso grub-mkimage mkfs.vfat mcopy python3 dpkg-deb; do
   command -v "$t" >/dev/null || die "missing tool: $t (apt install $HOST_DEPS)"
 done
 [ -f /usr/share/keyrings/debian-archive-keyring.gpg ] || die "missing debian-archive-keyring (apt install debian-archive-keyring)"
@@ -181,13 +181,19 @@ get_aphelion
 
 # ---------- stage C: the system ----------
 ROOT="$WORK/rootfs"
-log "bootstrapping Debian $DEBIAN_SUITE (snapshot $ORBIT_SNAPSHOT) with the Orbit package set ($VARIANT)"
-if mountpoint -q "$ROOT/proc" 2>/dev/null; then die "$ROOT is still in use by an earlier build; reboot or unmount it"; fi
-rm -rf "$ROOT"
 lists=(system desktop live)
 [ "$VARIANT" = full ] && lists+=(full)
 INCLUDE=$(for l in "${lists[@]}"; do grep -vE '^\s*(#|$)' "$HERE/config/packages/$l.list"; done | sort -u | paste -sd, -)
 HOOKENV="ORBIT_VARIANT=$VARIANT ORBIT_VERSION=$ORBIT_VERSION DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8"
+# A finished system is reused when nothing that goes into it changed (package lists, hooks,
+# config, the Orbit packages, Aphelion), so a failure in a later stage costs minutes, not a rebuild.
+INPUTS=$( { echo "$VARIANT $INCLUDE"; cat "$HERE/config/build.conf"; find "$HERE/config" "$PKGS" -type f -print0 | sort -z | xargs -0 sha256sum; } | sha256sum | cut -c1-16)
+if [ -f "$WORK/rootfs.done" ] && [ "$(cat "$WORK/rootfs.done")" = "$INPUTS" ] && [ -d "$ROOT/usr" ]; then
+  log "system unchanged since the last build ($INPUTS): reusing $ROOT"
+else
+log "bootstrapping Debian $DEBIAN_SUITE (snapshot $ORBIT_SNAPSHOT) with the Orbit package set ($VARIANT)"
+if mountpoint -q "$ROOT/proc" 2>/dev/null; then die "$ROOT is still in use by an earlier build; reboot or unmount it"; fi
+rm -rf "$ROOT" "$WORK/rootfs.done"
 mmdebstrap --mode=root --variant=apt --architectures=amd64 \
   --components="$DEBIAN_COMPONENTS" \
   --keyring=/usr/share/keyrings/debian-archive-keyring.gpg \
@@ -206,13 +212,15 @@ mmdebstrap --mode=root --variant=apt --architectures=amd64 \
   "deb $DEBIAN_MIRROR $DEBIAN_SUITE $DEBIAN_COMPONENTS" \
   "deb $DEBIAN_MIRROR $DEBIAN_SUITE-updates $DEBIAN_COMPONENTS" \
   "deb $DEBIAN_SECURITY_MIRROR $DEBIAN_SUITE-security $DEBIAN_COMPONENTS"
+echo "$INPUTS" > "$WORK/rootfs.done"
+fi
 
 # ---------- stage D: live medium ----------
 X="$WORK/iso"
 rm -rf "$X"; mkdir -p "$X/live" "$X/boot/grub" "$X/.disk" "$X/EFI/boot"
 kver=$(ls "$ROOT/lib/modules" | sort -V | tail -1)
 [ -f "$ROOT/boot/vmlinuz-$kver" ] && [ -f "$ROOT/boot/initrd.img-$kver" ] || die "no kernel/initrd for $kver in the system"
-lsinitramfs "$ROOT/boot/initrd.img-$kver" | grep -q '^scripts/live$' || die "live-boot is not in the initrd"
+chroot "$ROOT" lsinitramfs "/boot/initrd.img-$kver" | grep -q '^scripts/live$' || die "live-boot is not in the initrd"
 cp "$ROOT/boot/vmlinuz-$kver" "$X/live/vmlinuz"
 cp "$ROOT/boot/initrd.img-$kver" "$X/live/initrd.img"
 log "compressing the system ($(du -sh "$ROOT" | cut -f1)) into live/filesystem.squashfs"

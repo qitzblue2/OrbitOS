@@ -37,7 +37,7 @@ for desk, icon in sorted(names.items()):
         print(f"OK      {desk:55} {icon}")
 for want in ["org.gnome.Nautilus", "org.gnome.Terminal", "org.gnome.Settings", "org.gnome.Calculator",
              "org.gnome.TextEditor", "org.gnome.FileRoller", "org.gnome.SystemMonitor",
-             "org.keepassxc.KeePassXC", "aphelion", "org.gnome.Software", "orbit-installer"]:
+             "keepassxc", "aphelion", "org.gnome.Software", "orbit-installer"]:
     if want not in names.values():
         print(f"MISSING no installed .desktop uses Icon={want} (symlink or mapping needed)")
 PY

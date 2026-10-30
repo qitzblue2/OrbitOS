@@ -16,9 +16,25 @@ class JsonStore {
 
   save(delay = 400) {
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.flush(), delay);
+    this.timer = setTimeout(() => this.flushAsync(), delay);
   }
 
+  // Background save: the main process (and with it the toolbar, scrolling, resizing) never
+  // waits for the disk. Writes are serialised so an older one cannot land after a newer one.
+  flushAsync() {
+    clearTimeout(this.timer);
+    this.timer = null;
+    const text = JSON.stringify(this.data);
+    const tmp = `${this.file}.tmp`;
+    this.writing = (this.writing || Promise.resolve()).then(async () => {
+      await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
+      await fs.promises.writeFile(tmp, text, { mode: 0o600 });
+      await fs.promises.rename(tmp, this.file);
+    }).catch(() => { /* disk full or removed: the next save tries again */ });
+    return this.writing;
+  }
+
+  // synchronous save, used when the app quits
   flush() {
     clearTimeout(this.timer);
     this.timer = null;
@@ -44,7 +60,7 @@ class History {
     const prev = i >= 0 ? items.splice(i, 1)[0] : null;
     items.unshift({ url, title: title || prev?.title || url, time: Date.now(), visits: (prev?.visits || 0) + 1 });
     if (items.length > this.limit) items.length = this.limit;
-    this.store.save();
+    this.store.save(2000);   // history is large and changes on every page: save it at most every 2 s
   }
 
   setTitle(url, title) {

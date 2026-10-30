@@ -95,6 +95,7 @@ class Pipeline {
     this.engines = engines;
     this.ctx = ctx;
     this.httpAllowed = new Set();   // hosts the user chose to visit over plain http this session
+    this.matchCache = new WeakMap();   // engine -> Map(request key -> answer); a new engine starts empty
     this.install();
   }
 
@@ -148,23 +149,45 @@ class Pipeline {
 
     const site = siteOf(top);
     const prefs = this.ctx.sitePrefs(site);
-    const req = Request.fromRawDetails({ url, sourceUrl: top || url, type: RESOURCE[details.resourceType] || 'other' });
+    const type = RESOURCE[details.resourceType] || 'other';
+    let req = null;
     const E = this.engines.engines;
+    // Every request of every page passes here, in the main process, so a busy page can starve
+    // the toolbar. Pages repeat the same requests a lot: remember each list's answer per
+    // (list, type, page site, url) instead of matching again.
+    const match = (key) => {
+      const engine = E[key];
+      let cache = this.matchCache.get(engine);
+      if (!cache) {
+        cache = new Map();
+        this.matchCache.set(engine, cache);
+      }
+      const ck = `${type}\n${site}\n${url}`;
+      let m = cache.get(ck);
+      if (m === undefined) {
+        req ||= Request.fromRawDetails({ url, sourceUrl: top || url, type });
+        const r = engine.match(req);
+        m = { match: r.match && !r.exception, redirect: r.redirect ? r.redirect.dataUrl : null };
+        if (cache.size >= 4000) cache.delete(cache.keys().next().value);
+        cache.set(ck, m);
+      }
+      return m;
+    };
 
     if (s.shield && prefs.shield !== false && E.trackers) {
-      const m = E.trackers.match(req);
-      if (m.match && !m.exception) {
+      const m = match('trackers');
+      if (m.match) {
         this.ctx.onBlocked(tab, 'trackers', url);
-        return m.redirect ? { redirectURL: m.redirect.dataUrl } : { cancel: true };
+        return m.redirect ? { redirectURL: m.redirect } : { cancel: true };
       }
     }
     if (s.ads && prefs.ads !== false) {
       for (const [key, on] of [['ads', s.easy], ['annoyances', s.annoy], ['social', s.social]]) {
         if (!on || !E[key]) continue;
-        const m = E[key].match(req);
-        if (m.match && !m.exception) {
+        const m = match(key);
+        if (m.match) {
           this.ctx.onBlocked(tab, 'ads', url);
-          return m.redirect ? { redirectURL: m.redirect.dataUrl } : { cancel: true };
+          return m.redirect ? { redirectURL: m.redirect } : { cancel: true };
         }
       }
     }

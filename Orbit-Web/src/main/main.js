@@ -583,6 +583,12 @@ function uniquePath(p) {
 const A = new Aphelion();
 if (process.env.APHELION_TEST === '1') global.__aphelion = A;   // test hook only (Playwright e2e); never set in releases
 if (!A.settings().gpu) app.disableHardwareAcceleration();
+else {
+  // draw pages on the GPU, and hand finished frames to the compositor without copies:
+  // smoother scrolling and resizing when the CPU is busy with something else
+  app.commandLine.appendSwitch('enable-gpu-rasterization');
+  app.commandLine.appendSwitch('enable-zero-copy');
+}
 app.setAppUserModelId('os.orbit.aphelion');
 app.commandLine.appendSwitch('disable-features', 'InterestFeedContentSuggestions,OptimizationHints,MediaRouter');
 

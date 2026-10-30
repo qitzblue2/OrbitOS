@@ -283,6 +283,20 @@ await sleep(800);
 const after = await A(() => global.__aphelion.current().activeId);
 check(before !== after, 'clicking a tab in the strip switches tabs');
 
+// resizing: the page fills the window below the toolbar at every size
+let resizeOk = true;
+for (const [w, h] of [[900, 600], [1300, 820], [700, 500], [1440, 900]]) {
+  const r = await A((_e, sz) => {
+    const win = global.__aphelion.current();
+    win.win.setBounds({ x: 0, y: 0, width: sz[0], height: sz[1] });
+    win.layout();
+    const c = win.win.getContentBounds();
+    return { c, v: win.active().view.getBounds(), top: win.chromeHeight() };
+  }, [w, h]);
+  if (r.v.width !== r.c.width || r.v.y !== r.top || r.v.y + r.v.height !== r.c.height) resizeOk = false;
+}
+check(resizeOk, 'the page fills the window at every size');
+
 // 13. suggestions: local matches appear without waiting for the search engine
 await ui.click('#addr');
 await ui.keyboard.type('wik', { delay: 30 });

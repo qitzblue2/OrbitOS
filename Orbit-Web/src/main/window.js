@@ -39,6 +39,9 @@ class BrowserWindowController {
       this.changed();
       this.win.show();
     });
+    // will-resize (Windows, macOS) gives the new size before the window changes: lay the page
+    // out in the same frame, so it does not trail behind the window edge while dragging
+    this.win.on('will-resize', (_e, b) => this.layout(b));
     this.win.on('resize', () => this.layout());
     this.win.on('maximize', () => this.changed());
     this.win.on('unmaximize', () => this.changed());
@@ -62,9 +65,10 @@ class BrowserWindowController {
     return (s.compact ? STRIP.compact : STRIP.normal) + TOOLBAR + this.bars.length * BAR + (this.find ? BAR : 0);
   }
 
-  layout() {
+  layout(next = null) {
     if (this.win.isDestroyed()) return;
-    const { width, height } = this.win.getContentBounds();
+    // the window is frameless, so window size == content size
+    const { width, height } = next || this.win.getContentBounds();
     const top = this.win.isFullScreen() && this.app.settings().immersive ? 0 : this.chromeHeight();
     const t = this.active();
     if (t?.view) t.view.setBounds({ x: 0, y: top, width, height: Math.max(0, height - top) });

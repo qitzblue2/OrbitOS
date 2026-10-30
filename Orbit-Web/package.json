@@ -128,6 +128,7 @@
         "NSCameraUsageDescription": "Websites can ask to use your camera.",
         "NSMicrophoneUsageDescription": "Websites can ask to use your microphone."
       }
-    }
+    },
+    "publish": null
   }
 }

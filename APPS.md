@@ -156,6 +156,27 @@ Every screenshot here is real:
 - The firewall lets replies from PCs on the local network in (`3702`, `5353`, `137` udp, from private addresses only), so they can be found. Until you turn on **Sharing**, this PC shares nothing and doesn't announce itself.
 - OneDrive: Settings → Online Accounts → Microsoft 365 puts your OneDrive in Files.
 
+## Orbit VPN
+![VPN](docs/screenshots/app-vpn.png)
+
+Your own VPN: your VPS runs WireGuard, and Orbit connects to it.
+
+**On the VPS** (Debian or Ubuntu, as root):
+```bash
+git clone https://github.com/qitzblue2/OrbitOS && cd OrbitOS
+sudo ./tools/orbit-vpn-server.sh setup          # once: WireGuard, keys, NAT, firewall (UDP 51820)
+sudo ./tools/orbit-vpn-server.sh add laptop     # a config for one device, also shown as a QR code for phones
+sudo ./tools/orbit-vpn-server.sh list           # devices and when they last connected
+sudo ./tools/orbit-vpn-server.sh remove laptop  # that device can't connect any more
+```
+If your VPS provider has its own firewall in its web panel, allow UDP 51820 there too.
+
+**On the laptop:** copy the config over (`scp root@YOUR-VPS:/etc/wireguard/orbit-clients/laptop.conf ~/Downloads/`), open **VPN**, choose **Import Config…** (or paste it), and switch it on. All traffic, IPv4 and IPv6, then goes through your VPS, and the window shows the address websites see. **Connect automatically** turns it on whenever the laptop goes online.
+
+- Each device has its own key plus a pre-shared key. Removing one device never affects the others.
+- The laptop side is NetworkManager's built-in WireGuard (`nmcli connection import type wireguard`). The private key is stored in NetworkManager's root-only settings, and the VPN also appears in the top-bar network menu.
+- The config file holds the device's private key: delete the copy in Downloads after importing.
+
 ## Orbit Sync
 ![Orbit Sync](docs/screenshots/app-sync.png)
 
@@ -230,7 +251,7 @@ Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
   - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
 
 ## Where the code is
-- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`, `sync.py`, `snapshots.py`), so it can be unit-tested.
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`, `sync.py`, `snapshots.py`, `vpn.py`), so it can be unit-tested.
 - `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
 - `packages/orbit-launcher/`: the launcher extension.
 - Tests:

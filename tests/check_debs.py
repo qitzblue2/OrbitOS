@@ -16,7 +16,7 @@ need = {
                    "./usr/bin/orbit-games", "./usr/lib/orbit-os/orbit-games-helper",
                    "./usr/bin/orbit-updater", "./usr/lib/orbit-os/orbit-updater-helper",
                    "./usr/bin/orbit-windows", "./usr/lib/orbit-os/orbit-windows-helper",
-                   "./usr/bin/orbit-sharing", "./usr/lib/orbit-os/orbit-sharing-helper", "./usr/bin/orbit-sync",
+                   "./usr/bin/orbit-sharing", "./usr/lib/orbit-os/orbit-sharing-helper", "./usr/bin/orbit-sync", "./usr/bin/orbit-vpn",
                    "./usr/lib/orbit-os/orbit-snapshot", "./etc/apt/apt.conf.d/40orbit-snapshot",
                    "./usr/lib/systemd/user/orbit-updater-check.path",
                    "./usr/share/polkit-1/actions/org.orbit-os.tune.policy",

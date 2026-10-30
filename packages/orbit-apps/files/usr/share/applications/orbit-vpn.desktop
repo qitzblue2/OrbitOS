@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=VPN
+GenericName=WireGuard VPN
+Comment=Connect to your own VPN server
+Exec=orbit-vpn %f
+Icon=orbit-vpn
+Categories=GTK;Network;
+StartupNotify=true
+DBusActivatable=false
+Keywords=vpn;wireguard;vps;privacy;tunnel;

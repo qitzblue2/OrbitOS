@@ -18,7 +18,7 @@ os.environ["XDG_CONFIG_HOME"] = str(TMP / "home/.config")
 os.environ["XDG_STATE_HOME"] = str(TMP / "home/.local/state")
 (TMP / "home/Home").mkdir(parents=True)
 
-from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, sharing, snapshots, sync, updater, winapps  # noqa: E402
+from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, sharing, snapshots, sync, updater, vpn, winapps  # noqa: E402
 
 
 class FileOps(unittest.TestCase):
@@ -605,6 +605,50 @@ Num     Name                 Tags  Description
                      ("last_ts", 10**9 - 60)):
             self.assertFalse(snapshots.should_snapshot(**dict(ok, **{k: v}))[0], k)
         self.assertTrue(snapshots.load_conf("/nonexistent")["enabled"])
+
+
+class Vpn(unittest.TestCase):
+    def server_conf(self):
+        """A real device config from tools/orbit-vpn-server.sh (test mode), or None without wireguard-tools."""
+        if not shutil.which("wg"):
+            return None
+        d = pathlib.Path(tempfile.mkdtemp(dir=TMP))
+        env = dict(os.environ, ORBIT_WG_DIR=str(d), ORBIT_VPN_NO_SYSTEM="1", ORBIT_VPN_ENDPOINT="203.0.113.7")
+        script = str(ROOT / "tools/orbit-vpn-server.sh")
+        if os.geteuid() != 0:
+            return None
+        subprocess.run([script, "setup"], env=env, check=True, capture_output=True)
+        subprocess.run([script, "add", "laptop"], env=env, check=True, capture_output=True)
+        return (d / "orbit-clients/laptop.conf").read_text()
+
+    def test_server_config_is_accepted(self):
+        text = self.server_conf()
+        if text is None:
+            self.skipTest("needs root and wireguard-tools")
+        info = vpn.parse_conf(text)
+        self.assertEqual(info["endpoint"], "203.0.113.7:51820")
+        self.assertTrue(info["full_tunnel"] and info["ipv6"])
+        self.assertIn("10.66.66.2/32", info["address"])
+
+    def test_bad_configs(self):
+        key = "a" * 42 + "A="
+        good = f"[Interface]\nPrivateKey = {key}\nAddress = 10.0.0.2/32\n[Peer]\nPublicKey = {key}\n" \
+               "Endpoint = vpn.example.org:51820\nAllowedIPs = 10.0.0.0/24\n"
+        self.assertFalse(vpn.parse_conf(good)["full_tunnel"])
+        for bad in ("hello", good.replace(key, "short", 1), good.replace("Endpoint = vpn.example.org:51820", ""),
+                    good.replace("[Peer]", "[Nope]"), good.replace("10.0.0.2/32", "999.1.1.1/32")):
+            with self.assertRaises(vpn.VpnError):
+                vpn.parse_conf(bad)
+
+    def test_names_and_connection_list(self):
+        self.assertEqual(vpn.clean_name("My VPS!"), "my-vps")
+        self.assertEqual(vpn.clean_name("***"), "orbit-vpn")
+        self.assertEqual(len(vpn.clean_name("a" * 40)), 15)
+        out = "Wired connection 1:802-3-ethernet:eth0:yes\nlaptop:wireguard:laptop:yes\nvps:wireguard::no\n"
+        self.assertEqual(vpn.parse_connections(out), [{"name": "laptop", "active": True},
+                                                      {"name": "vps", "active": False}])
+        self.assertEqual(vpn.public_ip(lambda: "203.0.113.7\n"), "203.0.113.7")
+        self.assertIsNone(vpn.public_ip(lambda: "<html>"))
 
 
 if __name__ == "__main__":

@@ -29,6 +29,17 @@ case "$VARIANT" in full|lite) ;; *) die "ORBIT_VARIANT must be full or lite" ;; 
 
 # ---------- container re-exec ----------
 if [ "${1:-}" != "--host" ] && [ "${1:-}" != "--debs-only" ] && [ -z "${ORBIT_IN_CONTAINER:-}" ]; then
+  # the build container has no Node.js: build Aphelion out here first if no package is ready
+  if [ -z "${ORBIT_APHELION_DEB:-}" ] && ! ls "$OUT"/aphelion_*_amd64.deb >/dev/null 2>&1; then
+    command -v npm >/dev/null || die "no Aphelion package: install Node.js + npm, or put aphelion_*.deb in out/, or set ORBIT_APHELION_DEB"
+    log "building Aphelion on this machine (the build container has no Node.js)"
+    mkdir -p "$WORK" "$OUT"
+    rm -rf "$WORK/Orbit-Web"
+    git -C "$HERE" fetch -q origin "$APHELION_BRANCH"
+    git -C "$HERE" archive "origin/$APHELION_BRANCH" Orbit-Web | tar -x -C "$WORK"
+    (cd "$WORK/Orbit-Web" && npm ci --no-audit --no-fund && npm run lists && npm run bundle && npx electron-builder --linux deb --x64)
+    cp "$(ls -t "$WORK"/Orbit-Web/dist/aphelion_*_amd64.deb | head -1)" "$OUT/"
+  fi
   command -v docker >/dev/null || command -v podman >/dev/null || \
     die "need docker or podman (or run: sudo ./build.sh --host on a Debian 13 / Ubuntu 24.04 VM)"
   engine=$(command -v docker || command -v podman)

@@ -1,0 +1,11 @@
+# Tell the user the moment an update run finishes, however it ran: Orbit Updater,
+# "sudo orbit-update" in a terminal, or the automatic nightly updates.
+[Unit]
+Description=Watch for finished Orbit updates
+
+[Path]
+PathChanged=/var/log/apt/history.log
+Unit=orbit-updater-check.service
+
+[Install]
+WantedBy=default.target

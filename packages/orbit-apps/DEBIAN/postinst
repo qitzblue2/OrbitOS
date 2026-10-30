@@ -3,4 +3,6 @@ set -e
 if [ "$1" = configure ]; then
   command -v update-desktop-database >/dev/null && update-desktop-database -q /usr/share/applications || true
   python3 -m compileall -q /usr/lib/orbit-os/python/orbit >/dev/null 2>&1 || true
+  # Update notifications for every user (an hourly check, plus right after any update run).
+  systemctl --global enable orbit-updater-check.timer orbit-updater-check.path >/dev/null 2>&1 || true
 fi

@@ -1,0 +1,6 @@
+[Unit]
+Description=Orbit Updater: notify about new and finished updates
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/orbit-updater --background

@@ -128,6 +128,13 @@ Every screenshot here is real:
 - **Restore** a whole snapshot or one folder. Restoring never deletes anything: files it would replace are kept as `name.before-restore`.
 - **Limitation:** change detection uses rsync's normal check (size and modification time). A same-size edit made in the same second as a backup is only picked up at the next change.
 
+## Orbit Updater
+![Orbit Updater](docs/screenshots/app-updater.png)
+
+- Lists what can be updated: Orbit's own packages and Aphelion first, then Debian security fixes, then the rest. **Update Now** installs everything with a live progress bar (`pkexec orbit-updater-helper upgrade`, the same steps as `sudo orbit-update`).
+- **Recently installed** shows the last update runs, including the automatic nightly ones.
+- **Notifications:** `orbit-updater-check.path` fires the moment any update run finishes (this app, `sudo orbit-update` in a terminal, or the automatic updates) and says what was installed, or that it didn't finish. `orbit-updater-check.timer` checks every hour and says when new updates are ready. Each notification is sent once; clicking it opens Orbit Updater.
+
 ## Orbit Optimizer
 | ![Clean Up](docs/screenshots/app-optimizer-clean.png) | ![Startup](docs/screenshots/app-optimizer-startup.png) |
 |---|---|
@@ -185,7 +192,7 @@ Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
   - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
 
 ## Where the code is
-- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`), so it can be unit-tested.
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`), so it can be unit-tested.
 - `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
 - `packages/orbit-launcher/`: the launcher extension.
 - Tests:

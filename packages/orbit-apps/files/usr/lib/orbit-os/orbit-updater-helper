@@ -1,0 +1,57 @@
+#!/usr/bin/python3 -I
+"""Privileged half of Orbit Updater, run through pkexec.
+
+  orbit-updater-helper refresh    download the latest list of updates
+  orbit-updater-helper upgrade    install every update (same as orbit-update)
+
+Fixed jobs only; prints "orbit-progress: <percent> <text>" lines for the window.
+"""
+import os
+import re
+import subprocess
+import sys
+
+ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "DEBIAN_FRONTEND": "noninteractive", "LANG": "C.UTF-8"}
+STATUS = re.compile(r"^(dlstatus|pmstatus):[^:]*:([\d.]+):(.*)$")
+
+
+def apt(args, lo, hi):
+    """Run apt-get, turning its status lines into orbit-progress lines between lo and hi percent."""
+    r, w = os.pipe()
+    p = subprocess.Popen(["apt-get", "-o", f"APT::Status-Fd={w}", *args], env=ENV, pass_fds=(w,),
+                         stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    os.close(w)
+    with os.fdopen(r) as status:
+        for line in status:
+            m = STATUS.match(line.strip())
+            if m:
+                pct = lo + (hi - lo) * float(m.group(2)) / 100
+                print(f"orbit-progress: {pct:.0f} {m.group(3).strip()}", flush=True)
+    err = p.stderr.read()
+    if p.wait():
+        sys.stderr.write(err)
+    return p.returncode
+
+
+def main(argv):
+    if os.geteuid() != 0:
+        sys.exit("must run as root (via pkexec)")
+    if argv[1:] == ["refresh"]:
+        print("orbit-progress: 0 Checking for updates", flush=True)
+        sys.exit(1 if apt(["update", "-q"], 0, 100) else 0)
+    if argv[1:] == ["upgrade"]:
+        print("orbit-progress: 0 Checking for updates", flush=True)
+        if apt(["update", "-q"], 0, 10):
+            sys.exit(1)
+        if apt(["full-upgrade", "-y", "-q", "-o", "Dpkg::Options::=--force-confdef",
+                "-o", "Dpkg::Options::=--force-confold"], 10, 95):
+            sys.exit(1)
+        print("orbit-progress: 96 Removing what is no longer needed", flush=True)
+        apt(["autoremove", "-y", "-q"], 96, 100)
+        print("orbit-progress: 100 Done", flush=True)
+        sys.exit(0)
+    sys.exit("usage: orbit-updater-helper refresh|upgrade")
+
+
+if __name__ == "__main__":
+    main(sys.argv)

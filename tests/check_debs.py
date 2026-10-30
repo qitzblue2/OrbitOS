@@ -14,6 +14,8 @@ need = {
                    "./usr/bin/orbit-store", "./usr/bin/orbit-hardware", "./usr/bin/orbit-backup",
                    "./usr/bin/orbit-optimizer", "./usr/bin/orbit-performance", "./usr/lib/orbit-os/orbit-tune-helper",
                    "./usr/bin/orbit-games", "./usr/lib/orbit-os/orbit-games-helper",
+                   "./usr/bin/orbit-updater", "./usr/lib/orbit-os/orbit-updater-helper",
+                   "./usr/lib/systemd/user/orbit-updater-check.path",
                    "./usr/share/polkit-1/actions/org.orbit-os.tune.policy",
                    "./usr/lib/orbit-os/python/orbit/files.py", "./usr/lib/orbit-os/orbit-store-helper",
                    "./usr/share/orbit-os/store-catalog.json", "./usr/share/polkit-1/actions/org.orbit-os.store.policy",

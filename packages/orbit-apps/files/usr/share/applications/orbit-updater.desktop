@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Orbit Updater
+GenericName=Software Updates
+Comment=Install Orbit and security updates, and see what changed
+Exec=orbit-updater
+Icon=orbit-updater
+Categories=GTK;System;Settings;PackageManager;
+StartupNotify=true
+DBusActivatable=false
+Keywords=update;upgrade;security;aphelion;patch;

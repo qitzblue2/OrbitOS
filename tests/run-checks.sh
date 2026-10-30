@@ -21,7 +21,7 @@ command -v shellcheck >/dev/null && run shellcheck -S warning build.sh config/ho
 # python syntax (every module, every launcher)
 for f in packages/orbit-os-desktop/files/usr/lib/orbit-os/orbit-{settings,welcome,inbox-sorter} \
          packages/orbit-apps/src/orbit/*.py packages/orbit-apps/files/usr/bin/* \
-         packages/orbit-apps/files/usr/lib/orbit-os/orbit-{store,tune,games}-helper \
+         packages/orbit-apps/files/usr/lib/orbit-os/orbit-{store,tune,games,updater}-helper \
          packages/orbit-apps/files/usr/share/nautilus-python/extensions/*.py \
          packages/orbit-installer/src/orbit_installer/*.py packages/orbit-installer/files/usr/bin/* \
          packages/orbit-installer/files/usr/lib/orbit-installer/orbit-install-engine \

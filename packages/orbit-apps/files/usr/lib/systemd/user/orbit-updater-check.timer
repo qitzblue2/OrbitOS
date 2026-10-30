@@ -1,0 +1,10 @@
+# On for every user (orbit-apps postinst runs systemctl --global enable).
+[Unit]
+Description=Check for Orbit updates every hour
+
+[Timer]
+OnStartupSec=3min
+OnUnitActiveSec=1h
+
+[Install]
+WantedBy=timers.target

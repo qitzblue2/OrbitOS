@@ -18,7 +18,7 @@ os.environ["XDG_CONFIG_HOME"] = str(TMP / "home/.config")
 os.environ["XDG_STATE_HOME"] = str(TMP / "home/.local/state")
 (TMP / "home/Home").mkdir(parents=True)
 
-from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune  # noqa: E402
+from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, updater  # noqa: E402
 
 
 class FileOps(unittest.TestCase):
@@ -413,6 +413,60 @@ class Games(unittest.TestCase):
         self.assertFalse(games.game_mode_on())
         self.assertIn(("set", "org.gnome.desktop.notifications", "show-banners", "true"), calls)
         self.assertEqual([c for c in calls if c[0] == "timer"], [("timer", "stop"), ("timer", "start")])
+
+
+class Updater(unittest.TestCase):
+    LIST = """Listing...
+aphelion/orbit 1.1.1 amd64 [upgradable from: 1.1.0]
+libssl3t64/trixie-security 3.5.1-1+deb13u1 amd64 [upgradable from: 3.5.1-1]
+orbit-apps/orbit 2.0.0.5 all [upgradable from: 2.0.0.3]
+nano/trixie 8.4-2 amd64 [upgradable from: 8.4-1]
+"""
+    HISTORY = """
+Start-Date: 2026-10-30  03:10:01
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: orbit-apps:amd64 (2.0.0.3, 2.0.0.5), aphelion:amd64 (1.1.0, 1.1.1)
+End-Date: 2026-10-30  03:10:40
+
+Start-Date: 2026-10-30  19:00:00
+Commandline: apt-get -y full-upgrade
+Install: gamemode:amd64 (1.8.2-1, automatic)
+Upgrade: nano:amd64 (8.4-1, 8.4-2)
+Error: Sub-process /usr/bin/dpkg returned an error code (1)
+End-Date: 2026-10-30  19:00:09
+"""
+
+    def test_upgradable(self):
+        u = updater.parse_upgradable(self.LIST)
+        self.assertEqual([(x["name"], x["kind"]) for x in u],
+                         [("aphelion", "orbit"), ("orbit-apps", "orbit"), ("libssl3t64", "security"),
+                          ("nano", "system")])
+        self.assertEqual(u[0]["old"], "1.1.0")
+
+    def test_history_and_summary(self):
+        runs = updater.parse_history(self.HISTORY)
+        self.assertEqual(len(runs), 2)
+        self.assertEqual(runs[0]["upgraded"], ["orbit-apps", "aphelion"])
+        self.assertEqual(runs[1]["installed"], ["gamemode"])
+        self.assertTrue(runs[1]["error"])
+        self.assertEqual(updater.summary(["aphelion", "orbit-apps"]), "Aphelion and Orbit apps")
+        self.assertEqual(updater.summary(["a", "b", "c", "d", "e"]), "a, b, c and 2 more")
+
+    def test_background_says_each_thing_once(self):
+        runs = updater.parse_history(self.HISTORY)
+        ups = updater.parse_upgradable(self.LIST)
+        ev, st = updater.background_events(ups, runs[:1], {})
+        self.assertEqual([t for t, _ in ev], ["4 updates ready"])  # first run: no old history replayed
+        self.assertIn("1 security fix", ev[0][1])
+        ev, st = updater.background_events(ups, runs[:1], st)
+        self.assertEqual(ev, [])
+        ev, st = updater.background_events([], runs, st)
+        self.assertEqual([t for t, _ in ev], ["Updates didn’t finish"])
+        ev, _ = updater.background_events([], runs, dict(st, last_end=runs[0]["start"]))
+        self.assertEqual(ev[0][0], "Orbit updated 2 packages")
+        self.assertIn("Aphelion", ev[0][1])
+        ev, _ = updater.background_events([], runs, dict(st, last_end=runs[0]["start"], window_upgrading=True))
+        self.assertEqual(ev, [])
 
 
 if __name__ == "__main__":

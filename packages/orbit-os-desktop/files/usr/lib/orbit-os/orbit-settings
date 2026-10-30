@@ -67,6 +67,7 @@ class Win(Adw.ApplicationWindow):
              ["orbit-spaces"]),
             ("Backup", "Snapshot backups of your Home folder to a USB drive", "orbit-backup", ["orbit-backup"]),
             ("Hardware", "What works on this computer, plus guided tests", "orbit-hardware", ["orbit-hardware"]),
+            ("Orbit Updater", "Install updates and see what changed", "orbit-updater", ["orbit-updater"]),
             ("Optimizer", "Free up space and choose what starts at login", "orbit-optimizer",
              ["orbit-optimizer"]),
             ("Performance", "What slows the computer down, power mode", "orbit-performance",

@@ -51,6 +51,7 @@ GLYPHS = {
     "games": '<path d="M7.5 7.5h9a4.5 4.5 0 0 1 4.4 5.5l-.9 4a2.2 2.2 0 0 1-3.8 1L14.5 16h-5l-1.7 2a2.2 2.2 0 0 1-3.8-1l-.9-4a4.5 4.5 0 0 1 4.4-5.5z"/><path d="M8 10.5v3M6.5 12h3M15.5 11h.01M17.5 13h.01"/>',
     "updater": '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 4v4h-4"/><path d="M12 8.5v5M9.8 11.5l2.2 2.2 2.2-2.2"/>',
     "windows": '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 8.5h17M8 13l2 2-2 2M12.5 17h3.5"/>',
+    "sharing": '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><circle cx="9" cy="13.5" r="1.4"/><circle cx="15.5" cy="11" r="1.4"/><circle cx="15.5" cy="16" r="1.4"/><path d="M10.3 12.9l3.9-1.3M10.3 14.1l3.9 1.3"/>',
     "control": '<rect x="3" y="5" width="18" height="6" rx="3"/><circle cx="15.5" cy="8" r="1.4"/><rect x="3" y="13" width="18" height="6" rx="3"/><circle cx="8.5" cy="16" r="1.4"/>',
 }
 
@@ -100,6 +101,7 @@ APP_MAP = {
     "optimizer": ["orbit-optimizer"],
     "updater": ["orbit-updater"],
     "windows": ["orbit-windows", "wine"],
+    "sharing": ["orbit-sharing"],
     "games": ["orbit-games", "applications-games"],
     "performance": ["orbit-performance"],
 }

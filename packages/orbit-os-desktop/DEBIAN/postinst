@@ -17,8 +17,9 @@ if [ "$1" = configure ]; then
   systemctl enable ufw.service >/dev/null 2>&1 || true
   # Fingerprint for login, lock screen and sudo (password stays a fallback).
   pam-auth-update --enable fprintd --package >/dev/null 2>&1 || true
-  # wsdd is only used by Files to find Windows PCs; don't announce this PC (nothing is shared).
-  systemctl disable --now wsdd.service >/dev/null 2>&1 || true
+  # wsdd is only used by Files to find Windows PCs; this PC announces itself only while
+  # Orbit Sharing is on (it enables smbd and wsdd together).
+  systemctl is-enabled smbd.service >/dev/null 2>&1 || systemctl disable --now wsdd.service >/dev/null 2>&1 || true
   # SSH stays off unless the user installs and enables it.
   systemctl disable --now ssh.service ssh.socket >/dev/null 2>&1 || true
   # Speed: weekly SSD TRIM, kill runaway memory hogs before the desktop freezes,

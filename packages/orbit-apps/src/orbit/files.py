@@ -1098,6 +1098,8 @@ class FilesWindow(Adw.ApplicationWindow):
             "compress": lambda *_: self.compress(),
             "extract": lambda *_: self.extract(),
             "terminal": lambda *_: self.terminal(),
+            "share": lambda *_: [ui.spawn(["orbit-sharing", f.get_path()])
+                                 for f in self.current().selected_files()[:1] if f.get_path()],
             "sort-inbox": lambda *_: self.sort_inbox(),
             "about": lambda *_: ui.about(self, "Orbit Files", "orbit-files",
                                          "Browse, organise and find your files."),
@@ -1197,6 +1199,8 @@ class FilesWindow(Adw.ApplicationWindow):
         s.append("Compress to ZIP", "win.compress")
         if len(infos) == 1 and infos[0].get_name().lower().endswith(ARCHIVE_SUFFIXES):
             s.append("Extract Here", "win.extract")
+        if len(infos) == 1 and infos[0].get_file_type() == Gio.FileType.DIRECTORY:
+            s.append("Share with Windows PCs…", "win.share")
         m.append_section(None, s)
         s = Gio.Menu()
         s.append("Move to Trash", "win.trash")

@@ -1,0 +1,5 @@
+#!/usr/bin/python3
+import sys
+sys.path.insert(0, "/usr/lib/orbit-os/python")
+from orbit.sharing_app import main
+sys.exit(main())

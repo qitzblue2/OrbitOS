@@ -18,7 +18,7 @@ os.environ["XDG_CONFIG_HOME"] = str(TMP / "home/.config")
 os.environ["XDG_STATE_HOME"] = str(TMP / "home/.local/state")
 (TMP / "home/Home").mkdir(parents=True)
 
-from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, updater, winapps  # noqa: E402
+from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, sharing, updater, winapps  # noqa: E402
 
 
 class FileOps(unittest.TestCase):
@@ -508,6 +508,47 @@ class WinApps(unittest.TestCase):
         (m / "Uninstall.desktop").write_text("[Desktop Entry]\nName=Uninstall Notepad++\nExec=wine u\n")
         self.assertEqual([a["name"] for a in winapps.library(self.d / "Programs")], ["Notepad++"])
         self.assertEqual(winapps.library(self.d / "missing"), [])
+
+
+class Sharing(unittest.TestCase):
+    def setUp(self):
+        self.home = pathlib.Path(tempfile.mkdtemp(dir=TMP))
+        for d in ("Music", "Projects/Game", ".ssh"):
+            (self.home / d).mkdir(parents=True)
+
+    def test_validate(self):
+        ok = sharing.validate([{"name": "Music", "path": str(self.home / "Music"), "writable": 0},
+                               {"name": "Game files", "path": str(self.home / "Projects/Game"), "writable": 1}],
+                              self.home)
+        self.assertEqual([s["writable"] for s in ok], [False, True])
+        bad = [
+            [{"name": "Etc", "path": "/etc"}],
+            [{"name": "Keys", "path": str(self.home / ".ssh")}],
+            [{"name": "x", "path": str(self.home / "Music/../../..")}],
+            [{"name": "IPC$", "path": str(self.home / "Music")}],
+            [{"name": "a]\npath = /", "path": str(self.home / "Music")}],
+            [{"name": "Music", "path": "Music"}],
+            [{"name": "Dup", "path": str(self.home / "Music")}, {"name": "dup", "path": str(self.home / "Music")}],
+        ]
+        for b in bad:
+            with self.assertRaises(sharing.ShareError, msg=b):
+                sharing.validate(b, self.home)
+        (self.home / "Music/out").symlink_to("/etc")
+        with self.assertRaises(sharing.ShareError):
+            sharing.validate([{"name": "Out", "path": str(self.home / "Music/out")}], self.home)
+
+    def test_conf_and_names(self):
+        text = sharing.conf_text([{"name": "Music", "path": "/home/a/Music", "writable": False}], "a")
+        self.assertIn("[Music]", text)
+        self.assertIn("valid users = a", text)
+        self.assertIn("read only = yes", text)
+        self.assertIn("guest ok = no", text)
+        self.assertIn("follow symlinks = no", text)
+        self.assertEqual(sharing.suggest_name("/x/My Photos!", ["My Photos"]), "My Photos 2")
+        self.assertEqual(sharing.suggest_name("/x/.."), "Shared")
+        self.assertFalse(sharing.password_ok("short"))
+        self.assertFalse(sharing.password_ok("long enough\nx"))
+        self.assertTrue(sharing.password_ok("long enough"))
 
 
 if __name__ == "__main__":

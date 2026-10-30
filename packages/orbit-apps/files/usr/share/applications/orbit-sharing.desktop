@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Sharing
+GenericName=Share Folders
+Comment=Share folders with Windows PCs on your network
+Exec=orbit-sharing %f
+Icon=orbit-sharing
+Categories=GTK;System;Network;
+StartupNotify=true
+DBusActivatable=false
+Keywords=share;samba;smb;windows;network;folder;

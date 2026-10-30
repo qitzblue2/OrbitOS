@@ -151,8 +151,16 @@ Every screenshot here is real:
 
 ## Windows networks
 - **Files → Windows Network** shows Windows PCs and shared folders on your network (through GNOME Files, which asks for the Windows user name and password). Windows drives (NTFS) and USB sticks open like any other drive.
-- The firewall lets replies from PCs on the local network in (`3702`, `5353`, `137` udp, from private addresses only), so they can be found. This PC shares nothing and doesn't announce itself.
+- The firewall lets replies from PCs on the local network in (`3702`, `5353`, `137` udp, from private addresses only), so they can be found. Until you turn on **Sharing**, this PC shares nothing and doesn't announce itself.
 - OneDrive: Settings → Online Accounts → Microsoft 365 puts your OneDrive in Files.
+
+## Orbit Sharing
+![Sharing](docs/screenshots/app-sharing.png)
+
+- One switch shares folders with Windows PCs on your network. Turning it on asks for a **sharing password**. On the Windows PC you type `\\your-pc-name` in File Explorer and sign in with your Orbit user name and that password. Password-less (guest) sharing isn't offered: Windows 11 refuses it, and it's unsafe.
+- Add folders with **+**, or right-click a folder in Files → **Share with Windows PCs…**. Each folder is **Read only** unless you pick **Can change**.
+- Only folders inside your home can be shared. Hidden folders (`.ssh`, browser profiles …) and hidden files are never shared, and links that point outside a shared folder aren't followed.
+- Behind it, `pkexec orbit-sharing-helper` installs Samba when it's first needed and writes `/etc/samba/orbit-shares.conf` for your user only. It opens the firewall for SMB (445) and Windows' network view (5357) from private networks only, and starts announcing the PC. Turning the switch off stops all of that and closes the firewall again.
 
 ## Orbit Optimizer
 | ![Clean Up](docs/screenshots/app-optimizer-clean.png) | ![Startup](docs/screenshots/app-optimizer-startup.png) |
@@ -211,7 +219,7 @@ Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
   - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
 
 ## Where the code is
-- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`), so it can be unit-tested.
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`), so it can be unit-tested.
 - `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
 - `packages/orbit-launcher/`: the launcher extension.
 - Tests:

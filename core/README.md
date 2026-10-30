@@ -29,8 +29,8 @@ build machine is left in Orbit.
 
 | Stage | What | Status |
 |---|---|---|
-| 1. cross | Orbit's own cross toolchain: binutils, GCC (C/C++), Linux API headers, glibc, libstdc++ | recipes done, building |
-| 2. temp | temporary tools cross-compiled with it: m4, ncurses, bash, coreutils, diffutils, file, findutils, gawk, grep, gzip, make, patch, sed, tar, xz, binutils/GCC pass 2 | next |
+| 1. cross | Orbit's own cross toolchain: binutils, GCC (C/C++), Linux API headers, glibc, libstdc++ | **built and checked** (about 42 min on 4 cores): `x86_64-orbit-linux-gnu-gcc` 15.3.0 compiles and links against Orbit's glibc 2.44 |
+| 2. temp | temporary tools cross-compiled with it: m4, ncurses, bash, coreutils, diffutils, file, findutils, gawk, grep, gzip, make, patch, sed, tar, xz, binutils/GCC pass 2 | recipes done, not built yet |
 | 3. system | inside the new tree (chroot): the final toolchain, then the base system (about 80 programs: shell, core utilities, Python, OpenSSL, systemd, …), forge running in a chroot | to do |
 | 4. boot | Linux kernel with Orbit's config, initramfs, GRUB from source, Orbit boot menu, a bootable ISO (reuse `tools/make-iso.sh`) | to do |
 | 5. graphics | Mesa, Wayland, libinput, fonts, GTK 4, libadwaita | to do |

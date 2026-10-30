@@ -9,6 +9,36 @@ const HOME = os.homedir();
 const ORBIT_HOME = path.join(HOME, 'Home');
 const isOrbit = () => process.platform === 'linux' && fs.existsSync('/usr/share/orbit-os/tokens.json');
 
+// Orbit Focus (orbit-focus) writes ~/.config/orbit/focus.json while a focus session runs:
+// { until: <unix seconds>, sites: ['youtube.com', …] }. Read again only when the file changes.
+const FOCUS_FILE = path.join(process.env.XDG_CONFIG_HOME || path.join(HOME, '.config'), 'orbit', 'focus.json');
+let focusCache = { mtime: -1, sites: [], until: 0 };
+
+function focusSites(now = Date.now() / 1000, file = FOCUS_FILE) {
+  let st;
+  try {
+    st = fs.statSync(file);
+  } catch {
+    return [];
+  }
+  if (st.mtimeMs !== focusCache.mtime) {
+    focusCache = { mtime: st.mtimeMs, sites: [], until: 0 };
+    try {
+      const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (Array.isArray(j.sites) && typeof j.until === 'number') {
+        focusCache.sites = j.sites.filter((x) => typeof x === 'string' && /^[a-z0-9.-]{1,253}$/.test(x));
+        focusCache.until = j.until;
+      }
+    } catch { /* half-written or not ours: no focus */ }
+  }
+  return focusCache.until > now ? focusCache.sites : [];
+}
+
+function focusBlocks(host, sites) {
+  const h = String(host || '').toLowerCase().replace(/\.$/, '');
+  return sites.some((s) => h === s || h.endsWith(`.${s}`));
+}
+
 function orbitHome() {
   return fs.existsSync(ORBIT_HOME) ? ORBIT_HOME : null;
 }
@@ -47,4 +77,4 @@ function tilde(p) {
   return p.startsWith(HOME) ? `~${p.slice(HOME.length)}` : p;
 }
 
-module.exports = { isOrbit, orbitHome, downloadsDir, notesFile, defaultVault, orbitStyle, tilde };
+module.exports = { focusSites, focusBlocks, isOrbit, orbitHome, downloadsDir, notesFile, defaultVault, orbitStyle, tilde };

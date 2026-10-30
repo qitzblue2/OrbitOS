@@ -100,6 +100,13 @@ class Tab {
     this.win.changed();
   }
 
+  /** Orbit Focus kept this site away: a calm page instead of the site. */
+  showFocus(url) {
+    this.focusShown = url;
+    const q = new URLSearchParams({ code: 'focus', desc: '', url });
+    this.wc?.loadURL(`aphelion://error/?${q}`).catch(() => {});
+  }
+
   resetCounts() {
     this.counts = { trackers: 0, ads: 0 };
     this.win.changed();
@@ -176,6 +183,7 @@ class Tab {
     });
     wc.on('dom-ready', () => this.decorate());
     wc.on('did-fail-load', (_e, code, desc, url, isMain) => {
+      if (this.focusShown === url) return;   // cancelled by Orbit Focus; the focus page is on its way
       if (!isMain || code === -3 || /^aphelion:/.test(url)) return; // -3 = aborted (user navigated away)
       const q = new URLSearchParams({ code: String(code), desc, url });
       wc.loadURL(`aphelion://error/?${q}`).catch(() => {});

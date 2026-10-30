@@ -1,4 +1,5 @@
 'use strict';
+const platform = require('./platform');
 // The request pipeline for a browser session (one per profile: normal, and each private window).
 //
 // Electron allows ONE listener per webRequest event per session, so everything that
@@ -143,6 +144,12 @@ class Pipeline {
     }
 
     if (details.resourceType === 'mainFrame') {
+      // Orbit Focus is on and this is one of the sites to keep away: show the focus page instead
+      const sites = platform.focusSites();
+      if (sites.length && tab && platform.focusBlocks(new URL(url).hostname, sites)) {
+        setImmediate(() => tab.showFocus(url));
+        return { cancel: true };
+      }
       tab?.resetCounts();
       return {};
     }

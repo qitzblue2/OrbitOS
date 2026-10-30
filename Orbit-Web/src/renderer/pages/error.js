@@ -18,6 +18,7 @@ const MSG = {
   '-21': ['Your network changed', 'The connection changed while loading. Try again.'],
   '-20': ['Blocked', 'This request was blocked.'],
   '-300': ['That address isn’t valid', 'Check what you typed.'],
+  focus: ['Focus time', `${host} stays closed until your focus session ends. You’ve got this.`],
   crashed: ['This tab crashed', 'Something in the page made it stop. Reloading usually fixes it.'],
   cert: ['This connection isn’t private', `The security certificate for ${host} is not valid, so Aphelion stopped before anything was sent. ` +
          'Someone could be trying to read your data, or the site is misconfigured.'],
@@ -29,7 +30,7 @@ document.getElementById('url').textContent = url;
 document.getElementById('tech').textContent = `${code} ${desc}`;
 document.title = title;
 const actions = document.getElementById('actions');
-if (code !== 'cert') actions.append(h('button', { class: 'btn primary', text: 'Try again', onclick: () => call('retry', url) }));
+if (code !== 'cert' && code !== 'focus') actions.append(h('button', { class: 'btn primary', text: 'Try again', onclick: () => call('retry', url) }));
 // HTTPS-only upgraded this address and the secure version failed: offer the plain one, clearly labelled
 if (s.https && url.startsWith('https:') && code !== 'cert' && ['-102', '-105', '-118', '-107', '-200', '-201', '-202', '-100', '-101'].includes(code)) {
   actions.append(h('button', { class: 'btn', text: `Continue to http://${host} (not secure)`, onclick: () => call('httpContinue', url) }));

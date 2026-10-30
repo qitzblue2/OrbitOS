@@ -57,6 +57,8 @@ fi
 # unit tests
 run $PY tests/test_orbit_apps.py
 run $PY -m unittest tests/test_installer_plan.py
+run $PY -m unittest tests/test_opm.py
+run $PY core/forge/forge check
 if [ "${ORBIT_INSTALLER:-0}" = 1 ]; then run $PY tests/installer_integration.py; fi
 
 # packages

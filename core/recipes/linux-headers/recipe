@@ -1,0 +1,16 @@
+# The kernel's user-space API headers, which the C library is built against.
+name=linux-headers
+version=6.12.115
+stage=cross
+sources=(https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.115.tar.xz)
+sha256=(0ec90fe4b20422b1b664b77e6d2dde22b40bd41e7eb2cad8ac8739a4749cb1bb)
+depends=(filesystem)
+description="Linux 6.12 API headers"
+
+build() {
+  make mrproper
+  make headers
+  find usr/include -type f ! -name '*.h' -delete
+  mkdir -p "$DESTDIR$ORBIT/usr"
+  cp -r usr/include "$DESTDIR$ORBIT/usr"
+}

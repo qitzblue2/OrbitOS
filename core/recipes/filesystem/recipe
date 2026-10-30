@@ -1,0 +1,22 @@
+# The Orbit directory layout. Everything lives under /usr; /bin, /lib and /sbin are
+# links into it (merged /usr), so there is one place for every program and library.
+name=filesystem
+version=1
+stage=cross
+sources=()
+sha256=()
+depends=()
+description="Orbit directory layout (merged /usr)"
+
+build() {
+  local r="$DESTDIR$ORBIT"
+  mkdir -p "$r"/{etc,var,tools,boot,home,mnt,opt,srv,run,tmp,proc,sys,dev,root} \
+           "$r"/usr/{bin,lib,sbin,include,share,local} "$r"/var/{lib,log,cache,tmp} "$r"/lib64
+  for d in bin lib sbin; do ln -s "usr/$d" "$r/$d"; done
+  chmod 1777 "$r/tmp" "$r/var/tmp"
+  chmod 0750 "$r/root"
+  # opm and forge track directories through the files in them; leave a marker in each
+  for d in etc var/lib var/log var/cache tools boot home mnt opt srv usr/include usr/local usr/share lib64; do
+    : > "$r/$d/.orbit-keep"
+  done
+}

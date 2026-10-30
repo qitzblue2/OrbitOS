@@ -1,0 +1,33 @@
+# Cross GCC, first pass: C and C++ compilers for the target, no C library yet.
+name=gcc-pass1
+version=15.3.0
+stage=cross
+sources=(https://ftp.gnu.org/gnu/gcc/gcc-15.3.0/gcc-15.3.0.tar.xz
+         https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
+         https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz
+         https://ftp.gnu.org/gnu/mpc/mpc-1.4.1.tar.xz)
+sha256=(fa59c1beef8995f27c4d71c1df227587189315d3e6faff1bb4306e61b0c530eb
+        a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898
+        b67ba0383ef7e8a8563734e2e889ef5ec3c3b898a01d00fa0a6869ad81c6ce01
+        91204cd32f164bd3b7c992d4a6a8ce6519511aadab30f78b6982d0bf8d73e931)
+depends=(binutils-pass1)
+description="GNU Compiler Collection, first cross pass"
+
+build() {
+  local srcs; read -ra srcs <<< "$SRCS"
+  tar -xf "${srcs[1]}" && mv -v gmp-6.3.0 gmp
+  tar -xf "${srcs[2]}" && mv -v mpfr-4.2.2 mpfr
+  tar -xf "${srcs[3]}" && mv -v mpc-1.4.1 mpc
+  # 64-bit libraries go to lib, not lib64
+  sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64
+  mkdir -v build && cd build
+  ../configure --target="$TGT" --prefix="$ORBIT/tools" --with-glibc-version=2.44 --with-sysroot="$ORBIT" \
+    --with-newlib --without-headers --enable-default-pie --enable-default-ssp --disable-nls --disable-shared \
+    --disable-multilib --disable-threads --disable-libatomic --disable-libgomp --disable-libquadmath \
+    --disable-libssp --disable-libvtv --disable-libstdcxx --enable-languages=c,c++
+  make
+  make DESTDIR="$DESTDIR" install
+  # a complete limits.h, as the one installed by this pass is only a stub
+  cd ..
+  cat gcc/limitx.h gcc/glimits.h gcc/limity.h > "$DESTDIR$ORBIT/tools/lib/gcc/$TGT/15.3.0/include/limits.h"
+}

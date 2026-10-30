@@ -1,0 +1,17 @@
+# The C++ standard library for the target, from the GCC sources.
+name=libstdcxx
+version=15.3.0
+stage=cross
+sources=(https://ftp.gnu.org/gnu/gcc/gcc-15.3.0/gcc-15.3.0.tar.xz)
+sha256=(fa59c1beef8995f27c4d71c1df227587189315d3e6faff1bb4306e61b0c530eb)
+depends=(glibc)
+description="GNU C++ standard library (cross build)"
+
+build() {
+  mkdir -v build && cd build
+  ../libstdc++-v3/configure --host="$TGT" --build="$(../config.guess)" --prefix=/usr --disable-multilib \
+    --disable-nls --disable-libstdcxx-pch --with-gxx-include-dir="/tools/$TGT/include/c++/15.3.0"
+  make
+  make DESTDIR="$DESTDIR$ORBIT" install
+  rm -f "$DESTDIR$ORBIT"/usr/lib/lib{stdc++{,exp,fs},supc++}.la
+}

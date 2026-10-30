@@ -1,0 +1,273 @@
+#!/usr/bin/env python3
+"""forge, the Orbit builder: compiles Orbit from source, recipe by recipe.
+
+Every piece of software has a recipe at core/recipes/<name>/recipe, a bash file:
+
+    name=binutils-pass1           # unique; the package name
+    version=2.47
+    stage=cross                   # cross | temp | system (see below)
+    sources=(https://.../binutils-2.47.tar.xz)
+    sha256=(154ab23b...)          # one per source; a mismatch stops the build
+    depends=(filesystem)          # recipes that must be built and installed first
+    description="..."
+    build() { ...; make DESTDIR="$DESTDIR" install; }
+
+forge downloads and checks the sources, unpacks the first one, runs build() in it with
+a clean environment, packs what landed in $DESTDIR as an .opk (opm's format) and
+installs it into the Orbit tree with opm, so the next recipe can use it.
+
+Stages (the classic three-step way to build a system with nothing borrowed from the host):
+  cross   a cross toolchain for the target x86_64-orbit-linux-gnu, built with the host's
+          compiler, installed under $ORBIT/tools (recipes install to "$DESTDIR$ORBIT/...")
+  temp    temporary tools cross-compiled with that toolchain (next step)
+  system  the real Orbit system, built inside $ORBIT (chroot) with the temporary tools
+
+    forge list                    recipes with stage, version and build state
+    forge fetch [NAME...]         download and verify sources (all if no names)
+    forge build NAME...           build these and everything they need, in order
+    forge stage cross|temp|system build a whole stage
+    forge check                   validate every recipe (fields, checksums, dependencies)
+
+Environment: ORBIT (the system tree, default ./work/orbit), ORBIT_SOURCES (download
+cache), ORBIT_JOBS (parallel jobs).
+"""
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CORE = os.path.dirname(HERE)
+REPO = os.path.dirname(CORE)
+RECIPES = os.path.join(CORE, "recipes")
+OPM = os.path.join(CORE, "opm", "opm")
+STAGES = ["cross", "temp", "system"]
+TARGET = "x86_64-orbit-linux-gnu"
+FIELDS = ("name", "version", "stage", "description")
+ARRAYS = ("sources", "sha256", "depends")
+
+
+class ForgeError(Exception):
+    pass
+
+
+def env_paths():
+    orbit = os.path.abspath(os.environ.get("ORBIT", os.path.join(REPO, "work", "orbit")))
+    sources = os.path.abspath(os.environ.get("ORBIT_SOURCES", os.path.join(REPO, "work", "sources")))
+    pkgs = os.path.abspath(os.environ.get("ORBIT_PACKAGES", os.path.join(REPO, "work", "opk")))
+    logs = os.path.abspath(os.environ.get("ORBIT_LOGS", os.path.join(REPO, "work", "logs")))
+    return orbit, sources, pkgs, logs
+
+
+# ------------------------------------------------------------------ recipes
+def load(name):
+    path = os.path.join(RECIPES, name, "recipe")
+    if not os.path.isfile(path):
+        raise ForgeError(f"no recipe {name!r} ({path})")
+    script = ('set -e; source "$1"; '
+              'printf "%s\\0" ' + " ".join(f'"${{{f}:-}}"' for f in FIELDS) + "; "
+              + "; ".join(f'printf "%s\\0" "${{#{a}[@]}}"; for x in "${{{a}[@]}}"; do printf "%s\\0" "$x"; done' for a in ARRAYS)
+              + '; declare -F build >/dev/null && printf "yes\\0" || printf "no\\0"')
+    r = subprocess.run(["bash", "-c", script, "recipe", path], capture_output=True, text=True)
+    if r.returncode:
+        raise ForgeError(f"recipe {name}: {r.stderr.strip()}")
+    vals = r.stdout.split("\0")
+    rec = {f: vals[i] for i, f in enumerate(FIELDS)}
+    i = len(FIELDS)
+    for a in ARRAYS:
+        n = int(vals[i])
+        rec[a] = vals[i + 1:i + 1 + n]
+        i += 1 + n
+    rec["has_build"] = vals[i] == "yes"
+    rec["path"] = path
+    if rec["name"] != name:
+        raise ForgeError(f"recipe {name}: name={rec['name']!r} must match its directory")
+    return rec
+
+
+def all_recipes():
+    return {n: load(n) for n in sorted(os.listdir(RECIPES)) if os.path.isfile(os.path.join(RECIPES, n, "recipe"))}
+
+
+def check(recs):
+    problems = []
+    for n, r in recs.items():
+        if r["stage"] not in STAGES:
+            problems.append(f"{n}: stage must be one of {STAGES}")
+        if not r["version"]:
+            problems.append(f"{n}: no version")
+        if len(r["sources"]) != len(r["sha256"]):
+            problems.append(f"{n}: {len(r['sources'])} sources but {len(r['sha256'])} checksums")
+        for h in r["sha256"]:
+            if len(h) != 64 or any(c not in "0123456789abcdef" for c in h):
+                problems.append(f"{n}: bad sha256 {h!r}")
+        for s in r["sources"]:
+            if not s.startswith("https://"):
+                problems.append(f"{n}: sources must be https ({s})")
+        for d in r["depends"]:
+            if d not in recs:
+                problems.append(f"{n}: depends on unknown recipe {d}")
+            elif STAGES.index(recs[d]["stage"]) > STAGES.index(r["stage"]):
+                problems.append(f"{n}: depends on {d} from a later stage")
+        if not r["has_build"]:
+            problems.append(f"{n}: no build() function")
+    try:
+        order(recs, list(recs))
+    except ForgeError as e:
+        problems.append(str(e))
+    return problems
+
+
+def order(recs, wanted):
+    """Dependencies first; detects cycles."""
+    out, state = [], {}
+
+    def visit(n, chain):
+        if state.get(n) == "done":
+            return
+        if state.get(n) == "visiting":
+            raise ForgeError("dependency cycle: " + " -> ".join(chain + [n]))
+        state[n] = "visiting"
+        for d in recs[n]["depends"]:
+            visit(d, chain + [n])
+        state[n] = "done"
+        out.append(n)
+    for n in wanted:
+        if n not in recs:
+            raise ForgeError(f"no recipe {n!r}")
+        visit(n, [])
+    return out
+
+
+# ------------------------------------------------------------------ sources
+def fetch(rec, sources_dir):
+    os.makedirs(sources_dir, exist_ok=True)
+    paths = []
+    for url, want in zip(rec["sources"], rec["sha256"]):
+        dst = os.path.join(sources_dir, os.path.basename(url))
+        if not os.path.exists(dst) or sha256(dst) != want:
+            print(f"[forge] downloading {url}", flush=True)
+            tmp = dst + ".part"
+            with urllib.request.urlopen(url, timeout=60) as resp, open(tmp, "wb") as f:
+                shutil.copyfileobj(resp, f, 1 << 20)
+            os.replace(tmp, dst)
+        got = sha256(dst)
+        if got != want:
+            raise ForgeError(f"{rec['name']}: {os.path.basename(url)} has sha256 {got}, recipe pins {want}")
+        paths.append(dst)
+    return paths
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+# ------------------------------------------------------------------ build
+def built_marker(orbit, rec):
+    return os.path.join(orbit, "var/lib/opm/installed", rec["name"], "meta.json")
+
+
+def is_built(orbit, rec):
+    try:
+        with open(built_marker(orbit, rec)) as f:
+            return json.load(f)["version"] == rec["version"]
+    except (OSError, ValueError, KeyError):
+        return False
+
+
+def build(rec, orbit, sources_dir, pkgs_dir, logs_dir, jobs):
+    if rec["stage"] != "cross":
+        raise ForgeError(f"{rec['name']}: the {rec['stage']} stage is not implemented in forge yet")
+    srcs = fetch(rec, sources_dir)
+    work = tempfile.mkdtemp(prefix=f"forge-{rec['name']}-", dir=os.path.join(orbit, "..") if os.path.isdir(orbit) else None)
+    dest = os.path.join(work, "dest")
+    os.makedirs(dest)
+    os.makedirs(logs_dir, exist_ok=True)
+    log = os.path.join(logs_dir, f"{rec['name']}.log")
+    started = time.time()
+    try:
+        srcdir = work
+        if srcs:
+            subprocess.run(["tar", "-xf", srcs[0], "-C", work], check=True)
+            top = [d for d in os.listdir(work) if d != "dest"]
+            srcdir = os.path.join(work, top[0]) if len(top) == 1 else work
+        env = {
+            "PATH": f"{orbit}/tools/bin:/usr/bin:/bin",
+            "LC_ALL": "POSIX", "HOME": work, "TERM": os.environ.get("TERM", "dumb"),
+            "ORBIT": orbit, "ORBIT_TGT": TARGET, "TGT": TARGET, "DESTDIR": dest,
+            "SOURCES": sources_dir, "SRCS": " ".join(srcs),
+            "MAKEFLAGS": f"-j{jobs}", "CONFIG_SITE": f"{orbit}/usr/share/config.site",
+        }
+        script = f'set -euo pipefail; source "{rec["path"]}"; cd "{srcdir}"; build'
+        print(f"[forge] building {rec['name']} {rec['version']} (log: {log})", flush=True)
+        with open(log, "w") as lf:
+            r = subprocess.run(["bash", "-c", script], cwd=srcdir, env=env, stdout=lf, stderr=subprocess.STDOUT)
+        if r.returncode:
+            tail = open(log).read().splitlines()[-25:]
+            raise ForgeError(f"{rec['name']} failed (exit {r.returncode}); last lines of {log}:\n" + "\n".join(tail))
+        root = os.path.join(dest, orbit.lstrip("/"))
+        if not os.path.isdir(root):
+            raise ForgeError(f"{rec['name']}: nothing was installed under $DESTDIR$ORBIT")
+        os.makedirs(pkgs_dir, exist_ok=True)
+        opk = os.path.join(pkgs_dir, f"{rec['name']}-{rec['version']}.opk")
+        subprocess.run([sys.executable, OPM, "pack", root, opk, "--name", rec["name"], "--version", rec["version"],
+                        "--depends", ",".join(rec["depends"]), "--description", rec["description"]], check=True)
+        subprocess.run([sys.executable, OPM, "--root", orbit, "install", opk], check=True)
+        print(f"[forge] {rec['name']} done in {(time.time() - started) / 60:.1f} min", flush=True)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="forge", description="build Orbit from source")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("list")
+    sub.add_parser("check")
+    sub.add_parser("fetch").add_argument("name", nargs="*")
+    sub.add_parser("build").add_argument("name", nargs="+")
+    sub.add_parser("stage").add_argument("stage", choices=STAGES)
+    a = ap.parse_args(argv)
+    orbit, sources_dir, pkgs_dir, logs_dir = env_paths()
+    jobs = int(os.environ.get("ORBIT_JOBS", os.cpu_count() or 2))
+    try:
+        recs = all_recipes()
+        if a.cmd == "check":
+            problems = check(recs)
+            for p in problems:
+                print("FAIL", p)
+            print(f"{len(recs)} recipes, {len(problems)} problem(s)")
+            return 1 if problems else 0
+        if a.cmd == "list":
+            for n in order(recs, list(recs)):
+                r = recs[n]
+                print(f"{r['stage']:7} {n:24} {r['version']:12} {'built' if is_built(orbit, r) else '-'}")
+            return 0
+        if a.cmd == "fetch":
+            for n in a.name or list(recs):
+                fetch(recs[n], sources_dir)
+            return 0
+        wanted = a.name if a.cmd == "build" else [n for n, r in recs.items() if r["stage"] == a.stage]
+        os.makedirs(orbit, exist_ok=True)
+        for n in order(recs, wanted):
+            if is_built(orbit, recs[n]):
+                print(f"[forge] {n} {recs[n]['version']} already built")
+                continue
+            build(recs[n], orbit, sources_dir, pkgs_dir, logs_dir, jobs)
+    except ForgeError as e:
+        print(f"forge: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

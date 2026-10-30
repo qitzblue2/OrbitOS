@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+"""opm, the Orbit package manager.
+
+A package is one .opk file: an xz-compressed tar holding the package's files plus
+.ORBIT/meta.json, which records the name, version, dependencies and every file with
+its SHA-256. The database is one directory per installed package under
+$ROOT/var/lib/opm/installed/<name>/ (meta.json), so it can be read with any tool.
+
+    opm install PKG.opk...      install or upgrade (refuses files owned by another package)
+    opm remove NAME...          remove (refuses if another installed package depends on it)
+    opm list                    installed packages
+    opm info NAME|PKG.opk       metadata
+    opm files NAME              files of an installed package
+    opm owns PATH               which package installed a file
+    opm verify [NAME...]        compare installed files with their recorded SHA-256
+    opm pack DIR OUT.opk --name N --version V [--depends a,b] [--description TEXT]
+
+Options: --root DIR (operate on another system tree, e.g. while building Orbit),
+--force (install over conflicts).
+
+Only the Python standard library is used, so opm runs on a fresh Orbit system.
+"""
+import argparse
+import hashlib
+import io
+import json
+import os
+import shutil
+import stat
+import sys
+import tarfile
+import tempfile
+import time
+
+FORMAT = 1
+META = ".ORBIT/meta.json"
+
+
+class OpmError(Exception):
+    pass
+
+
+# ------------------------------------------------------------------ helpers
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def db_dir(root):
+    return os.path.join(root, "var/lib/opm/installed")
+
+
+def installed(root):
+    out = {}
+    d = db_dir(root)
+    if os.path.isdir(d):
+        for name in sorted(os.listdir(d)):
+            try:
+                with open(os.path.join(d, name, "meta.json")) as f:
+                    out[name] = json.load(f)
+            except (OSError, ValueError):
+                continue
+    return out
+
+
+def safe_member(name):
+    """Package paths are relative, normalised and never leave the root."""
+    norm = os.path.normpath(name)
+    return not (name.startswith("/") or norm == ".." or norm.startswith("../") or "\0" in name)
+
+
+# ------------------------------------------------------------------ pack
+def pack(srcdir, out, name, version, depends=(), description="", provides=()):
+    """Make an .opk from a staged install tree (DESTDIR)."""
+    if not name or "/" in name or not version:
+        raise OpmError("pack needs --name and --version")
+    files = []
+    for dirpath, dirnames, filenames in os.walk(srcdir):
+        dirnames.sort()
+        rel_dir = os.path.relpath(dirpath, srcdir)
+        if rel_dir == ".ORBIT" or rel_dir.startswith(".ORBIT/"):
+            continue
+        for fn in sorted(filenames) + sorted(d for d in dirnames if os.path.islink(os.path.join(dirpath, d))):
+            full = os.path.join(dirpath, fn)
+            rel = os.path.normpath(os.path.join(rel_dir, fn))
+            st = os.lstat(full)
+            if stat.S_ISLNK(st.st_mode):
+                files.append({"path": rel, "type": "link", "target": os.readlink(full)})
+            elif stat.S_ISREG(st.st_mode):
+                files.append({"path": rel, "type": "file", "mode": stat.S_IMODE(st.st_mode),
+                              "size": st.st_size, "sha256": sha256_file(full)})
+    dirs = sorted({os.path.dirname(f["path"]) for f in files} - {""})
+    meta = {"format": FORMAT, "name": name, "version": version, "depends": list(depends),
+            "provides": list(provides), "description": description,
+            "built": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "dirs": dirs, "files": files}
+    data = json.dumps(meta, indent=1, sort_keys=True).encode()
+    with tarfile.open(out, "w:xz", preset=6, format=tarfile.PAX_FORMAT) as tar:
+        ti = tarfile.TarInfo(META)
+        ti.size, ti.mode, ti.mtime = len(data), 0o644, int(time.time())
+        tar.addfile(ti, io.BytesIO(data))
+        for f in files:
+            tar.add(os.path.join(srcdir, f["path"]), arcname=f["path"], recursive=False,
+                    filter=lambda t: _normalise(t))
+    return meta
+
+
+def _normalise(t):
+    t.uid = t.gid = 0
+    t.uname = t.gname = "root"
+    return t
+
+
+def read_meta(opk):
+    with tarfile.open(opk, "r:xz") as tar:
+        try:
+            m = tar.extractfile(META)
+        except KeyError:
+            raise OpmError(f"{opk}: not an Orbit package (no {META})") from None
+        meta = json.load(m)
+    if meta.get("format") != FORMAT:
+        raise OpmError(f"{opk}: unknown package format {meta.get('format')}")
+    return meta
+
+
+# ------------------------------------------------------------------ install / remove
+def owners(root):
+    own = {}
+    for name, meta in installed(root).items():
+        for f in meta["files"]:
+            own[f["path"]] = name
+    return own
+
+
+def install(root, opks, force=False, out=print):
+    metas = [(opk, read_meta(opk)) for opk in opks]
+    have = installed(root)
+    own = owners(root)
+    names_now = set(have) | {m["name"] for _, m in metas}
+    provided = set(names_now) | {p for m in list(have.values()) + [m for _, m in metas] for p in m.get("provides", [])}
+    for opk, meta in metas:
+        missing = [d for d in meta["depends"] if d not in provided]
+        if missing and not force:
+            raise OpmError(f"{meta['name']} needs {', '.join(missing)} (install those first, or use --force)")
+        clash = [f["path"] for f in meta["files"] if own.get(f["path"]) not in (None, meta["name"])]
+        if clash and not force:
+            raise OpmError(f"{meta['name']}: {len(clash)} file(s) belong to other packages, e.g. "
+                           f"{clash[0]} ({own[clash[0]]})")
+    for opk, meta in metas:
+        _install_one(root, opk, meta, have.get(meta["name"]))
+        out(f"installed {meta['name']} {meta['version']}" + (f" (was {have[meta['name']]['version']})" if meta["name"] in have else ""))
+
+
+def _install_one(root, opk, meta, old):
+    stage = tempfile.mkdtemp(prefix=".opm-", dir=root)
+    try:
+        with tarfile.open(opk, "r:xz") as tar:
+            members = [m for m in tar.getmembers() if m.name != META]
+            for m in members:
+                if not safe_member(m.name) or not (m.isfile() or m.issym() or m.isdir()):
+                    raise OpmError(f"{opk}: refusing unsafe entry {m.name!r}")
+            tar.extractall(stage, members=members, filter="tar")
+        for f in meta["files"]:
+            if f["type"] == "file" and sha256_file(os.path.join(stage, f["path"])) != f["sha256"]:
+                raise OpmError(f"{opk}: {f['path']} does not match its checksum (damaged package)")
+        for d in meta["dirs"]:
+            os.makedirs(os.path.join(root, d), exist_ok=True)
+        # move every file into place atomically (rename over the old one)
+        for f in meta["files"]:
+            dst = os.path.join(root, f["path"])
+            if os.path.isdir(dst) and not os.path.islink(dst):
+                raise OpmError(f"{f['path']} is a directory on the system")
+            os.replace(os.path.join(stage, f["path"]), dst)
+        if old:  # files the old version had and the new one does not
+            new = {f["path"] for f in meta["files"]}
+            for f in old["files"]:
+                if f["path"] not in new:
+                    _unlink(root, f["path"])
+        d = os.path.join(db_dir(root), meta["name"])
+        os.makedirs(d, exist_ok=True)
+        tmp = os.path.join(d, "meta.json.new")
+        with open(tmp, "w") as fh:
+            json.dump({**meta, "installed": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, fh, indent=1)
+        os.replace(tmp, os.path.join(d, "meta.json"))
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
+def _unlink(root, rel):
+    p = os.path.join(root, rel)
+    try:
+        if os.path.islink(p) or os.path.isfile(p):
+            os.unlink(p)
+    except FileNotFoundError:
+        pass
+
+
+def remove(root, names, force=False, out=print):
+    have = installed(root)
+    for n in names:
+        if n not in have:
+            raise OpmError(f"{n} is not installed")
+    staying = {k: v for k, v in have.items() if k not in names}
+    for n in names:
+        need = [k for k, v in staying.items() if n in v["depends"]]
+        if need and not force:
+            raise OpmError(f"{', '.join(need)} need(s) {n}")
+    for n in names:
+        meta = have[n]
+        for f in meta["files"]:
+            _unlink(root, f["path"])
+        for d in sorted(meta["dirs"], key=len, reverse=True):  # empty directories only
+            try:
+                os.rmdir(os.path.join(root, d))
+            except OSError:
+                pass
+        shutil.rmtree(os.path.join(db_dir(root), n))
+        out(f"removed {n} {meta['version']}")
+
+
+def verify(root, names=None, out=print):
+    bad = 0
+    for n, meta in installed(root).items():
+        if names and n not in names:
+            continue
+        for f in meta["files"]:
+            p = os.path.join(root, f["path"])
+            if f["type"] == "link":
+                ok = os.path.islink(p) and os.readlink(p) == f["target"]
+            else:
+                ok = os.path.isfile(p) and sha256_file(p) == f["sha256"]
+            if not ok:
+                bad += 1
+                out(f"{n}: {f['path']} {'missing' if not os.path.lexists(p) else 'changed'}")
+    return bad
+
+
+# ------------------------------------------------------------------ cli
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="opm", description="Orbit package manager")
+    ap.add_argument("--root", default=os.environ.get("OPM_ROOT", "/"))
+    ap.add_argument("--force", action="store_true")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("install").add_argument("opk", nargs="+")
+    sub.add_parser("remove").add_argument("name", nargs="+")
+    sub.add_parser("list")
+    sub.add_parser("info").add_argument("what")
+    sub.add_parser("files").add_argument("name")
+    sub.add_parser("owns").add_argument("path")
+    sub.add_parser("verify").add_argument("name", nargs="*")
+    p = sub.add_parser("pack")
+    p.add_argument("dir")
+    p.add_argument("out")
+    p.add_argument("--name", required=True)
+    p.add_argument("--version", required=True)
+    p.add_argument("--depends", default="")
+    p.add_argument("--provides", default="")
+    p.add_argument("--description", default="")
+    a = ap.parse_args(argv)
+    root = os.path.abspath(a.root)
+    try:
+        if a.cmd == "install":
+            install(root, a.opk, a.force)
+        elif a.cmd == "remove":
+            remove(root, a.name, a.force)
+        elif a.cmd == "list":
+            for n, m in installed(root).items():
+                print(f"{n:28} {m['version']}")
+        elif a.cmd == "info":
+            m = read_meta(a.what) if a.what.endswith(".opk") else installed(root).get(a.what)
+            if not m:
+                raise OpmError(f"{a.what} is not installed")
+            print(json.dumps({k: v for k, v in m.items() if k not in ("files", "dirs")}, indent=1))
+        elif a.cmd == "files":
+            m = installed(root).get(a.name) or {}
+            for f in m.get("files", []):
+                print("/" + f["path"])
+        elif a.cmd == "owns":
+            rel = os.path.relpath(os.path.abspath(a.path), "/")
+            print(owners(root).get(rel, "(no package)"))
+        elif a.cmd == "verify":
+            return 1 if verify(root, a.name or None) else 0
+        elif a.cmd == "pack":
+            m = pack(a.dir, a.out, a.name, a.version, [d for d in a.depends.split(",") if d],
+                     a.description, [d for d in a.provides.split(",") if d])
+            print(f"packed {a.out}: {m['name']} {m['version']}, {len(m['files'])} files")
+    except (OpmError, OSError) as e:
+        print(f"opm: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

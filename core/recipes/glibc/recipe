@@ -1,0 +1,23 @@
+# The GNU C library, cross-compiled for Orbit with the pass-1 compiler.
+name=glibc
+version=2.44
+stage=cross
+sources=(https://ftp.gnu.org/gnu/glibc/glibc-2.44.tar.xz)
+sha256=(37f600f2bef3c5e8300147059568b2a2e40a7ad6ccc65ce942556d49429cc667)
+depends=(gcc-pass1 linux-headers)
+description="GNU C library"
+
+build() {
+  local r="$DESTDIR$ORBIT"
+  mkdir -p "$r/lib64"
+  ln -sf ../lib/ld-linux-x86-64.so.2 "$r/lib64/ld-linux-x86-64.so.2"
+  ln -sf ../lib/ld-linux-x86-64.so.2 "$r/lib64/ld-lsb-x86-64.so.3"
+  mkdir -v build && cd build
+  echo "rootsbindir=/usr/sbin" > configparms
+  ../configure --prefix=/usr --host="$TGT" --build="$(../scripts/config.guess)" --disable-nscd \
+    libc_cv_slibdir=/usr/lib --enable-kernel=5.4 --enable-stack-protector=strong
+  make
+  make DESTDIR="$r" install
+  # ldd must not look in /usr/lib64 etc. of the build host
+  sed '/RTLDLIST=/s@/usr@@g' -i "$r/usr/bin/ldd"
+}

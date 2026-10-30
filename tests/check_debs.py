@@ -17,6 +17,7 @@ need = {
                    "./usr/bin/orbit-updater", "./usr/lib/orbit-os/orbit-updater-helper",
                    "./usr/bin/orbit-windows", "./usr/lib/orbit-os/orbit-windows-helper",
                    "./usr/bin/orbit-sharing", "./usr/lib/orbit-os/orbit-sharing-helper", "./usr/bin/orbit-sync",
+                   "./usr/lib/orbit-os/orbit-snapshot", "./etc/apt/apt.conf.d/40orbit-snapshot",
                    "./usr/lib/systemd/user/orbit-updater-check.path",
                    "./usr/share/polkit-1/actions/org.orbit-os.tune.policy",
                    "./usr/lib/orbit-os/python/orbit/files.py", "./usr/lib/orbit-os/orbit-store-helper",

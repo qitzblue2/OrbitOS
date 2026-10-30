@@ -139,6 +139,16 @@ def mark_window_upgrading(on):
     save_state(state)
 
 
+def last_snapshot(stamp="/var/lib/orbit/last-snapshot"):
+    """When the newest safety snapshot was taken ('2026-10-30 19:00'), or None."""
+    import datetime as _dt
+    try:
+        ts = float(open(stamp).read())
+    except (OSError, ValueError):
+        return None
+    return _dt.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+
+
 def notify(title, body, urgency="normal"):
     """Desktop notification; clicking it opens Orbit Updater."""
     try:

@@ -18,7 +18,7 @@ os.environ["XDG_CONFIG_HOME"] = str(TMP / "home/.config")
 os.environ["XDG_STATE_HOME"] = str(TMP / "home/.local/state")
 (TMP / "home/Home").mkdir(parents=True)
 
-from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, sharing, sync, updater, winapps  # noqa: E402
+from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, sharing, snapshots, sync, updater, winapps  # noqa: E402
 
 
 class FileOps(unittest.TestCase):
@@ -573,6 +573,38 @@ class Sync(unittest.TestCase):
     def test_client_without_key(self):
         with self.assertRaises(sync.SyncError):
             sync.Client(key=None, base="http://127.0.0.1:9").my_id()  # no Syncthing config in this HOME
+
+
+class Snapshots(unittest.TestCase):
+    LIST = """Device : /dev/nvme0n1p2
+Mode   : RSYNC
+Status : OK
+3 snapshots, 40.1 GB free
+
+Num     Name                 Tags  Description
+------------------------------------------------------------------------------
+0    >  2026-10-01_10-00-00  O     my own
+1    >  2026-10-28_03-10-01  O     Orbit: before update
+2    >  2026-10-29_03-10-01  O     Orbit: before update
+3    >  2026-10-30_19-00-01  O     Orbit: before update
+4    >  2026-10-30_21-00-01  O     Orbit: before update
+"""
+
+    def test_parse_and_prune(self):
+        s = snapshots.parse_list(self.LIST)
+        self.assertEqual(len(s), 5)
+        self.assertEqual(s[0]["comment"], "my own")
+        self.assertFalse(s[0]["orbit"])
+        self.assertEqual(snapshots.to_delete(s), ["2026-10-28_03-10-01"])  # the user's own one stays
+        self.assertEqual(snapshots.nice_time("2026-10-30_19-00-01"), "2026-10-30 19:00")
+
+    def test_when_to_snapshot(self):
+        ok = dict(enabled=True, free_bytes=50 * 10**9, last_ts=0, now=10**9, live=False, chroot=False)
+        self.assertEqual(snapshots.should_snapshot(**ok), (True, ""))
+        for k, v in (("live", True), ("chroot", True), ("enabled", False), ("free_bytes", 10**9),
+                     ("last_ts", 10**9 - 60)):
+            self.assertFalse(snapshots.should_snapshot(**dict(ok, **{k: v}))[0], k)
+        self.assertTrue(snapshots.load_conf("/nonexistent")["enabled"])
 
 
 if __name__ == "__main__":

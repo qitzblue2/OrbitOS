@@ -42,6 +42,9 @@ fonts-wine
 wsdd
 smbclient
 
+# safety snapshots before updates (Orbit Updater can undo an update)
+timeshift
+
 # Orbit Sync: direct, encrypted folder sync between your PCs
 syncthing
 

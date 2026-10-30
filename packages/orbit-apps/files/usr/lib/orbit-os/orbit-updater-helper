@@ -3,6 +3,7 @@
 
   orbit-updater-helper refresh    download the latest list of updates
   orbit-updater-helper upgrade    install every update (same as orbit-update)
+  orbit-updater-helper snapshot list|undo|on|off   safety snapshots (see orbit-snapshot)
 
 Fixed jobs only; prints "orbit-progress: <percent> <text>" lines for the window.
 """
@@ -43,6 +44,7 @@ def main(argv):
         print("orbit-progress: 0 Checking for updates", flush=True)
         if apt(["update", "-q"], 0, 10):
             sys.exit(1)
+        print("orbit-progress: 10 Safety snapshot, then installing", flush=True)
         if apt(["full-upgrade", "-y", "-q", "-o", "Dpkg::Options::=--force-confdef",
                 "-o", "Dpkg::Options::=--force-confold"], 10, 95):
             sys.exit(1)
@@ -50,7 +52,9 @@ def main(argv):
         apt(["autoremove", "-y", "-q"], 96, 100)
         print("orbit-progress: 100 Done", flush=True)
         sys.exit(0)
-    sys.exit("usage: orbit-updater-helper refresh|upgrade")
+    if argv[1:2] == ["snapshot"] and argv[2:] in (["list"], ["undo"], ["on"], ["off"]):
+        os.execv("/usr/lib/orbit-os/orbit-snapshot", ["orbit-snapshot", argv[2]])
+    sys.exit("usage: orbit-updater-helper refresh|upgrade|snapshot list|undo|on|off")
 
 
 if __name__ == "__main__":

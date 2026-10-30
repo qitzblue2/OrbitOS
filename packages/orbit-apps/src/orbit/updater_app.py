@@ -7,6 +7,7 @@ notification when it finishes. `orbit-updater --background` is the hourly and
 after-every-update check run by orbit-updater-check.{timer,path}: it sends a
 notification for updates that are ready and for update runs that finished.
 """
+import shutil
 import subprocess
 import sys
 
@@ -16,7 +17,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
-from . import ui, updater  # noqa: E402
+from . import snapshots, ui, updater  # noqa: E402
 
 KIND = {"orbit": ("Orbit", "orbit-updater"), "security": ("Security fixes", "security-high-symbolic"),
         "system": ("System", "package-x-generic-symbolic")}
@@ -57,6 +58,20 @@ class UpdaterWindow(Adw.ApplicationWindow):
         self.recent = Adw.PreferencesGroup(title="Recently installed")
         self._recent_rows = []
         page.add(self.recent)
+        self.snap = Adw.PreferencesGroup(title="Safety snapshots")
+        self.snap_row = Adw.SwitchRow(title="Snapshot before each update",
+                                      subtitle="A copy of the system (not your files) that can be put back")
+        self.snap_row.add_prefix(Gtk.Image(icon_name="document-save-symbolic"))
+        self._snap_h = self.snap_row.connect("notify::active", self._snap_toggle)
+        self.snap.add(self.snap_row)
+        self.undo_row = Adw.ActionRow(title="Undo last update", activatable=True)
+        self.undo_row.add_prefix(Gtk.Image(icon_name="edit-undo-symbolic"))
+        self.undo_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
+        self.undo_row.connect("activated", lambda *_: self._undo())
+        self.snap.add(self.undo_row)
+        page.add(self.snap)
+        self._snap_state()
+
         auto = Adw.PreferencesGroup()
         row = Adw.ActionRow(title="Automatic updates",
                             subtitle="Orbit also installs updates by itself every night and tells you when it did.")
@@ -164,6 +179,43 @@ class UpdaterWindow(Adw.ApplicationWindow):
         self.progress.set_fraction(frac)
         self.progress.set_text(text[:60])
         return False
+
+    # ---- snapshots
+    def _snap_state(self):
+        have = shutil.which("timeshift") is not None
+        self.snap.set_visible(have)
+        if not have:
+            return
+        self.snap_row.handler_block(self._snap_h)
+        self.snap_row.set_active(snapshots.load_conf().get("enabled", True))
+        self.snap_row.handler_unblock(self._snap_h)
+        last = updater.last_snapshot()
+        self.undo_row.set_sensitive(last is not None)
+        self.undo_row.set_subtitle(f"Puts the system back as it was on {last}, then restarts" if last
+                                   else "Available after the next update")
+
+    def _snap_toggle(self, row, _pspec):
+        on = row.get_active()
+
+        def done(rc):
+            if rc != 0:
+                ui.toast(self, "Couldn’t change it")
+            self._snap_state()
+        ui.run_async(lambda: subprocess.run(["pkexec", updater.HELPER, "snapshot", "on" if on else "off"],
+                                            capture_output=True).returncode, done, lambda e: done(1))
+
+    def _undo(self):
+        def go():
+            self._busy(True, "Putting the system back…")
+            ui.run_async(lambda: subprocess.run(["pkexec", updater.HELPER, "snapshot", "undo"],
+                                                capture_output=True, text=True),
+                         lambda r: (self._busy(False), ui.toast(
+                             self, "Done. Restart to finish." if r.returncode == 0 else
+                             "Couldn’t undo: " + ((r.stderr.strip().splitlines() or ["cancelled"])[-1]), 6),
+                             self.check(refresh=False)))
+        ui.confirm(self, "Undo the last update?",
+                   "The system goes back to the snapshot from before the last update. Your own files aren’t "
+                   "touched. Save your work: the PC needs a restart afterwards.", "Undo Update", go)
 
     def _busy(self, on, title=None):
         self.busy = on

@@ -139,6 +139,8 @@ Every screenshot here is real:
 - Lists what can be updated: Orbit's own packages and Aphelion first, then Debian security fixes, then the rest. **Update Now** installs everything with a live progress bar (`pkexec orbit-updater-helper upgrade`, the same steps as `sudo orbit-update`).
 - **Recently installed** shows the last update runs, including the automatic nightly ones.
 - **Notifications:** `orbit-updater-check.path` fires the moment any update run finishes (this app, `sudo orbit-update` in a terminal, or the automatic updates) and says what was installed, or that it didn't finish. `orbit-updater-check.timer` checks every hour and says when new updates are ready. Each notification is sent once; clicking it opens Orbit Updater.
+- **Safety snapshots:** before packages change, apt runs `orbit-snapshot pre-update` (`/etc/apt/apt.conf.d/40orbit-snapshot`). It takes a Timeshift snapshot of the system (rsync mode, hard links; your files in `/home` aren't included), at most once an hour and only when at least 15 GB is free. It keeps the newest 3 Orbit snapshots and never touches snapshots you made yourself. A snapshot problem never stops an update. The first snapshot is a full copy of the system (roughly 8–12 GB); later ones only store what changed.
+- **Undo last update** puts the newest "before update" snapshot back (`pkexec orbit-updater-helper snapshot undo`) and restarts. The switch turns automatic snapshots off.
 
 ## Orbit Windows Apps
 ![Windows Apps](docs/screenshots/app-windows.png)
@@ -228,7 +230,7 @@ Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
   - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
 
 ## Where the code is
-- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`, `sync.py`), so it can be unit-tested.
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`, `sync.py`, `snapshots.py`), so it can be unit-tested.
 - `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
 - `packages/orbit-launcher/`: the launcher extension.
 - Tests:

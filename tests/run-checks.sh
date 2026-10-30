@@ -40,6 +40,8 @@ fi
 for m in packages/orbit-launcher/*/metadata.json packages/orbit-shell-extensions/*/metadata.json; do
   run $PY -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['shell-version']==['48'], 'pin to GNOME 48 (Debian 13)'" "$m"
 done
+# package dependencies must target the same GNOME as the extensions (Debian 13: GNOME 48)
+run $PY -c "import glob,re,sys; bad=[f for f in glob.glob('packages/*/DEBIAN/control') if re.search(r'gnome-shell \\((>=|<<?) (4[0-7])\\)', open(f).read())]; sys.exit(f'GNOME pin is not 48: {bad}' if bad else 0)"
 for s in packages/*/*/schemas packages/orbit-os-desktop/files/usr/share/glib-2.0/schemas; do
   command -v glib-compile-schemas >/dev/null && run glib-compile-schemas --strict --dry-run "$s"
 done

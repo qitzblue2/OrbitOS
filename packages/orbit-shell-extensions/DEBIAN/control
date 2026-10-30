@@ -2,7 +2,7 @@ Package: orbit-shell-extensions
 Version: @VERSION@
 Architecture: all
 Maintainer: Orbit OS builder <root@localhost>
-Depends: gnome-shell (>= 46), gnome-shell (<< 47), gir1.2-upowerglib-1.0, gir1.2-soup-3.0
+Depends: gnome-shell (>= 48), gnome-shell (<< 49), gir1.2-upowerglib-1.0, gir1.2-soup-3.0
 Section: gnome
 Priority: optional
 Description: Orbit OS GNOME Shell extensions

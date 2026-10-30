@@ -1,0 +1,14 @@
+# libcap: POSIX capabilities (fine-grained root powers).
+name=libcap
+version=2.76
+stage=base
+sources=(https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.76.tar.xz)
+sha256=(629da4ab29900d0f7fcc36227073743119925fd711c99a1689bbf5c9b40c8e6f)
+depends=(base-files attr)
+description="POSIX capabilities library and tools"
+
+build() {
+  sed -i '/install -m.*STA/d' libcap/Makefile   # no static library
+  make prefix=/usr lib=lib
+  make prefix=/usr lib=lib DESTDIR="$DESTDIR" install
+}

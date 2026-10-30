@@ -1,0 +1,24 @@
+# GCC (C and C++): the final Orbit compiler, built by Orbit with Orbit (replaces pass 2).
+name=gcc
+version=15.3.0
+stage=base
+sources=(https://ftp.gnu.org/gnu/gcc/gcc-15.3.0/gcc-15.3.0.tar.xz)
+sha256=(fa59c1beef8995f27c4d71c1df227587189315d3e6faff1bb4306e61b0c530eb)
+depends=(base-files binutils gmp mpfr mpc zlib zstd)
+replaces=(gcc-pass2 libstdcxx)
+description="GNU C and C++ compilers and runtime libraries"
+
+build() {
+  sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64   # 64-bit libraries in /usr/lib
+  mkdir -v build && cd build
+  ../configure --prefix=/usr LD=ld --enable-languages=c,c++ --enable-default-pie --enable-default-ssp \
+    --enable-host-pie --disable-multilib --disable-bootstrap --disable-fixincludes --with-system-zlib
+  make
+  make DESTDIR="$DESTDIR" install
+  ln -sfr "$DESTDIR/usr/bin/cpp" "$DESTDIR/usr/lib/cpp"
+  ln -sf gcc "$DESTDIR/usr/bin/cc"
+  # let ar, nm and ranlib use GCC's link-time optimisation plugin
+  plugin=$(cd "$DESTDIR/usr" && ls libexec/gcc/*/15.3.0/liblto_plugin.so)
+  mkdir -p "$DESTDIR/usr/lib/bfd-plugins"
+  ln -sf "../../$plugin" "$DESTDIR/usr/lib/bfd-plugins/"
+}

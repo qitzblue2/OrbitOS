@@ -1,0 +1,14 @@
+# MPC: multiple-precision complex numbers (GCC needs it).
+name=mpc
+version=1.4.1
+stage=base
+sources=(https://ftp.gnu.org/gnu/mpc/mpc-1.4.1.tar.xz)
+sha256=(91204cd32f164bd3b7c992d4a6a8ce6519511aadab30f78b6982d0bf8d73e931)
+depends=(base-files gmp mpfr)
+description="multiple-precision complex arithmetic library"
+
+build() {
+  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/mpc-1.4.1
+  make
+  make DESTDIR="$DESTDIR" install
+}

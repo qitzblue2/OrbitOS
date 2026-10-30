@@ -1,0 +1,16 @@
+# GMP: arbitrary-precision arithmetic (GCC needs it).
+name=gmp
+version=6.3.0
+stage=base
+sources=(https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz)
+sha256=(a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898)
+depends=(base-files)
+description="GNU multiple-precision arithmetic library"
+
+build() {
+  # configure's old-style test prototypes are errors in C23 (GCC 15's default)
+  sed -i '/long long t1;/,+1s/()/(...)/' configure
+  ./configure --prefix=/usr --enable-cxx --disable-static --docdir=/usr/share/doc/gmp-6.3.0
+  make
+  make DESTDIR="$DESTDIR" install
+}

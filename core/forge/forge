@@ -288,6 +288,15 @@ def build(rec, orbit, sources_dir, pkgs_dir, logs_dir, jobs):
         shutil.rmtree(work, ignore_errors=True)
 
 
+def installed_version(orbit, name):
+    """Version of an installed package in the Orbit tree, or None."""
+    try:
+        with open(os.path.join(orbit, "var/lib/opm/installed", name, "meta.json")) as f:
+            return json.load(f)["version"]
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 def pack_and_install(rec, root, orbit, pkgs_dir):
     """Pack what a build installed (root = its DESTDIR tree) and install it into Orbit with opm."""
     os.makedirs(pkgs_dir, exist_ok=True)
@@ -301,10 +310,18 @@ def pack_and_install(rec, root, orbit, pkgs_dir):
                        "--depends", ",".join(rec["depends"]), "--provides", ",".join(rec["replaces"]),
                        "--description", rec["description"]]).returncode:
         raise ForgeError(f"{rec['name']}: packing failed")
-    for old in rec["replaces"]:   # a newer build of the same files (e.g. GCC pass 2 over pass 1's libstdc++)
-        subprocess.run([sys.executable, OPM, "--root", orbit, "--force", "remove", old], check=False)
+    # a newer build of the same files (e.g. GCC pass 2 over pass 1's libstdc++): take the old one out first,
+    # and put it back if the new one doesn't install, so Orbit never ends up without the tool
+    removed = []
+    for old in rec["replaces"]:
+        prev = installed_version(orbit, old)
+        if prev and subprocess.run([sys.executable, OPM, "--root", orbit, "--force", "remove", old]).returncode == 0:
+            removed.append(os.path.join(pkgs_dir, f"{old}-{prev}.opk"))
     if subprocess.run([sys.executable, OPM, "--root", orbit, "install", opk]).returncode:
-        raise ForgeError(f"{rec['name']}: installing {opk} failed")
+        for back in removed:
+            if os.path.exists(back):
+                subprocess.run([sys.executable, OPM, "--root", orbit, "install", back], check=False)
+        raise ForgeError(f"{rec['name']}: installing {opk} failed" + (" (the previous build was put back)" if removed else ""))
 
 
 def main(argv=None):

@@ -1,7 +1,7 @@
 {
   "name": "aphelion",
   "productName": "Aphelion",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Aphelion: a calm, private web browser from Orbit OS. Tracker shield, ad blocker, authenticator, KeePass, notes and media in the address bar.",
   "homepage": "https://github.com/qitzblue2/OrbitOS/tree/Orbit-Apps/Orbit-Web",
   "license": "GPL-3.0-or-later",

@@ -13,12 +13,28 @@ const { BrowserWindowController } = require('./window');
 const { Vault, generatePassword } = require('./vault');
 const totpLib = require('./totp');
 const { AuthVault } = require('./authvault');
+const { IconCache } = require('./icons');
 const platform = require('./platform');
 const { toUrl, hostOf } = require('./url');
 
 const ROOT = path.join(__dirname, '..', '..');
 const PAGES = path.join(ROOT, 'src', 'renderer', 'pages');
 const INTERNAL = new Set(['newtab', 'settings', 'history', 'bookmarks', 'downloads', 'error', 'reader', 'about']);
+// New-tab page layout, all user choices; validated field by field in setNewtab()
+const NEWTAB_DEFAULTS = {
+  source: 'auto',          // 'auto' = bookmarks + most visited, 'mine' = only the shortcuts the user added
+  mine: [],                // [{ title, url }]
+  hidden: [],              // hosts removed from the automatic list
+  showBrand: true, showSearch: true, showTiles: true, showClock: true, labels: true,
+  greeting: '',            // optional line under the clock
+  shape: 'rounded',        // rounded | circle | square
+  size: 'm',               // s | m | l
+  columns: 6,              // 3..8
+  rows: 2,                 // 1..4
+  image: false,            // a background picture the user picked
+  dim: 25,                 // 0..70 % darkening over the picture
+  blur: 0,                 // 0..20 px
+};
 const UI_ONLY = 'ui';   // the toolbar page: served to the window UI only, never to a tab
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'aphelion', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
@@ -34,6 +50,9 @@ class Aphelion {
     this.sites = new JsonStore(dir, 'sites', { prefs: {}, zoom: {}, picked: {}, perms: {} });
     this.sessionStore = new JsonStore(dir, 'session', { windows: [] });
     this.notesStore = new JsonStore(dir, 'notes-meta', { text: '' });
+    this.icons = new IconCache(dir);
+    this.newtab = new JsonStore(dir, 'newtab', NEWTAB_DEFAULTS);
+    this.newtabImage = path.join(dir, 'newtab-background');
     this.windows = new Set();
     this.lastFocused = null;
     this.vault = new Vault();
@@ -49,6 +68,26 @@ class Aphelion {
   // ---------- settings ----------
   settings() {
     return this.store.data;
+  }
+
+  setNewtab(patch) {
+    const n = this.newtab.data;
+    const pick = (v, list) => (list.includes(v) ? v : undefined);
+    const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : undefined);
+    const rules = {
+      source: (v) => pick(v, ['auto', 'mine']), shape: (v) => pick(v, ['rounded', 'circle', 'square']),
+      size: (v) => pick(v, ['s', 'm', 'l']), columns: (v) => int(v, 3, 8), rows: (v) => int(v, 1, 4),
+      dim: (v) => int(v, 0, 70), blur: (v) => int(v, 0, 20),
+      greeting: (v) => (typeof v === 'string' ? v.slice(0, 80) : undefined),
+    };
+    for (const k of ['showBrand', 'showSearch', 'showTiles', 'showClock', 'labels', 'image']) rules[k] = (v) => (typeof v === 'boolean' ? v : undefined);
+    for (const [k, v] of Object.entries(patch || {})) {
+      if (!rules[k]) throw new Error(`unknown new-tab option ${k}`);
+      const ok = rules[k](v);
+      if (ok === undefined) throw new Error(`bad value for ${k}`);
+      n[k] = ok;
+    }
+    this.newtab.save();
   }
 
   setSetting(key, value) {
@@ -172,6 +211,14 @@ class Aphelion {
     const u = new URL(req.url);
     const page = u.hostname;
     if (!(INTERNAL.has(page) || (forUi && page === UI_ONLY))) return new Response('Not found', { status: 404 });
+    if (page === 'newtab' && u.pathname === '/background') {
+      try {
+        const type = fs.readFileSync(`${this.newtabImage}.type`, 'utf8');
+        return new Response(fs.readFileSync(this.newtabImage), { headers: { 'content-type': type, 'cache-control': 'no-store' } });
+      } catch {
+        return new Response('Not found', { status: 404 });
+      }
+    }
     const rel = u.pathname === '/' ? `${page}.html` : u.pathname.slice(1);
     const file = path.normalize(path.join(PAGES, rel));
     if (!file.startsWith(PAGES + path.sep)) return new Response('Forbidden', { status: 403 });
@@ -495,7 +542,10 @@ class Aphelion {
   // ---------- data ----------
   async clearData(what) {
     for (const ses of this.allSessions()) {
-      if (what === 'history' || what === 'all') this.history.clear();
+      if (what === 'history' || what === 'all') {
+        this.history.clear();
+        this.icons.clear();
+      }
       if (what === 'cookies' || what === 'all') {
         await ses.clearStorageData();
         await ses.clearCache();
@@ -861,9 +911,68 @@ function registerIpc(a) {
     return a.bookmarks.data.items;
   });
   page('topSites', () => {
-    const bm = a.bookmarks.data.items.slice(0, 8).map((b) => ({ url: b.url, title: b.title, host: hostOf(b.url) }));
-    const seen = new Set(bm.map((b) => b.host));
-    return [...bm, ...a.history.topSites(12).filter((x) => !seen.has(x.host))].slice(0, 8);
+    const n = a.newtab.data;
+    const max = n.columns * n.rows;
+    let list;
+    if (n.source === 'mine') {
+      list = n.mine.map((m) => ({ url: m.url, title: m.title, host: hostOf(m.url), mine: true }));
+    } else {
+      const hidden = new Set(n.hidden);
+      const mine = n.mine.map((m) => ({ url: m.url, title: m.title, host: hostOf(m.url), mine: true }));
+      const bm = a.bookmarks.data.items.map((b) => ({ url: b.url, title: b.title, host: hostOf(b.url) }));
+      const seen = new Set();
+      list = [...mine, ...bm, ...a.history.topSites(40)].filter((x) => {
+        if (!x.host || seen.has(x.host) || (!x.mine && hidden.has(x.host))) return false;
+        seen.add(x.host);
+        return true;
+      });
+    }
+    return list.slice(0, max).map((x) => ({ ...x, icon: a.icons.get(x.host) }));
+  });
+  page('newtab', () => ({ ...a.newtab.data, imageVersion: a.newtabImageVersion || 0 }));
+  page('newtabSet', (t, patch) => {
+    a.setNewtab(patch);
+    a.pageEvent('newtab', null);
+  });
+  page('newtabShortcut', (t, op, arg) => {
+    const n = a.newtab.data;
+    if (op === 'add') {
+      const raw = String(arg?.url || '').trim();
+      const url = /\s/.test(raw) ? null : toUrl(raw, 'none');
+      const host = url ? hostOf(url) : '';
+      if (!url || !/^https?:\/\//.test(url) || !(host.includes('.') || host === 'localhost') || url.includes('duckduckgo.com/?q=')) {
+        throw new Error('enter a web address, like example.com');
+      }
+      if (n.mine.length >= 32) throw new Error('32 shortcuts at most');
+      const title = String(arg?.title || '').trim().slice(0, 40) || hostOf(url).replace(/^www\./, '');
+      n.mine = [...n.mine.filter((m) => m.url !== url), { title, url }];
+    } else if (op === 'remove') {
+      const host = String(arg || '');
+      n.mine = n.mine.filter((m) => hostOf(m.url) !== host);
+      if (!n.hidden.includes(host)) n.hidden = [...n.hidden, host].slice(-200);
+    } else if (op === 'rename') {
+      n.mine = n.mine.map((m) => (hostOf(m.url) === arg?.host ? { ...m, title: String(arg.title || '').trim().slice(0, 40) || m.title } : m));
+    } else if (op === 'restore') {
+      n.hidden = [];
+    }
+    a.newtab.save();
+    a.pageEvent('newtab', null);
+  });
+  page('newtabImage', (t, dataUrl) => {
+    if (dataUrl === null) {
+      fs.rmSync(a.newtabImage, { force: true });
+      a.setNewtab({ image: false });
+    } else {
+      const m = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl));
+      if (!m) throw new Error('pick a PNG, JPEG, WebP or GIF picture');
+      const buf = Buffer.from(m[2], 'base64');
+      if (buf.length > 15 * 1024 * 1024) throw new Error('the picture is larger than 15 MB');
+      fs.writeFileSync(a.newtabImage, buf, { mode: 0o600 });
+      fs.writeFileSync(`${a.newtabImage}.type`, m[1]);
+      a.setNewtab({ image: true });
+    }
+    a.newtabImageVersion = Date.now();
+    a.pageEvent('newtab', null);
   });
   page('open', (t, url, where) => {
     const target = toUrl(url, a.settings().engine);

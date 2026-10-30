@@ -4,11 +4,19 @@
 <link rel="stylesheet" href="shared/tokens.css"><link rel="stylesheet" href="shared/page.css"><link rel="stylesheet" href="newtab.css">
 <script type="module" src="newtab.js"></script></head>
 <body>
+<div id="picture" aria-hidden="true"></div>
 <main>
-  <div class="brand"><img src="shared/mark.svg" alt="" width="34" height="34"><span>Aphelion</span></div>
+  <div id="clock" hidden><div class="time"></div><div class="greet"></div></div>
+  <div class="brand" id="brand"><img src="shared/mark.svg" alt="" width="34" height="34"><span>Aphelion</span></div>
   <form id="search" autocomplete="off"><input id="q" placeholder="Search the web" aria-label="Search the web" autofocus><span class="enter">↵</span></form>
   <div id="tiles" aria-label="Shortcuts"></div>
   <p id="note" class="faint"></p>
 </main>
+<button id="customize" class="btn" type="button" aria-expanded="false">
+  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M14 12h0"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="12.5" cy="12" r="1.5"/></svg>
+  Customize
+</button>
+<aside id="panel" hidden aria-label="Customize the new tab page"></aside>
+<div id="menu" class="ctx" hidden role="menu"></div>
 </body>
 </html>

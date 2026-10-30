@@ -323,7 +323,41 @@ const tr = (await state()).nav.url;
 check(tr.includes('.translate.goog/'), `Translate opens the page through Google Translate (${tr.slice(0, 60)})`);
 await shot('16c-translated');
 
-// 15. history page
+// 15. customizable new tab: real site icons, shortcuts, clock, own picture
+await A(() => global.__aphelion.current().newTab('aphelion://newtab/'));
+await sleep(2500);
+const nt = () => app.windows().filter((w) => w.url().startsWith('aphelion://newtab')).pop();
+let ntp = nt();
+const iconTiles = await ntp.evaluate(() => document.querySelectorAll('#tiles .ic img').length);
+check(iconTiles >= 2, `new-tab shortcuts show site icons (${iconTiles})`);
+const tabIcons = await ui.evaluate(() => [...document.querySelectorAll('.tab img.fav')].filter((i) => i.getAttribute('src')).length);
+check(tabIcons >= 3, `tabs show icons (${tabIcons})`);
+await ntp.evaluate(() => window.aphelion.call('newtabShortcut', 'add', { title: 'Orbit OS', url: 'github.com/qitzblue2/OrbitOS' }));
+const bad = await ntp.evaluate(() => window.aphelion.call('newtabShortcut', 'add', { url: 'not an address' }).then(() => 'accepted', (e) => e.message));
+check(/web address/.test(bad), 'a shortcut must be a web address');
+await shot('17-newtab-icons');
+await ntp.click('#customize');
+await sleep(800);
+await shot('18-newtab-customize');
+const picture = readFileSync(path.join(OUT, '14-newtab-lagoon.png')).toString('base64');
+await ntp.evaluate(async (b64) => {
+  await window.aphelion.call('newtabSet', { shape: 'circle', columns: 5, rows: 2, size: 'l', showBrand: false, greeting: 'Welcome back, Sam' });
+  await window.aphelion.call('newtabImage', `data:image/png;base64,${b64}`);
+  await window.aphelion.call('newtabSet', { dim: 35, blur: 6 });
+}, picture);
+await sleep(1500);
+const ntState = await ntp.evaluate(() => ({ pic: document.querySelector('#picture').classList.contains('on'),
+                                            circle: document.querySelector('#tiles').classList.contains('circle'),
+                                            clock: !document.querySelector('#clock').hidden,
+                                            greet: document.querySelector('#clock .greet').textContent }));
+check(ntState.pic && ntState.circle && ntState.clock && ntState.greet === 'Welcome back, Sam', `new-tab options apply live (${JSON.stringify(ntState)})`);
+await shot('19-newtab-custom');
+await ntp.click('#panel .close');
+await sleep(500);
+await shot('20-newtab-custom-clean');
+await ntp.evaluate(() => window.aphelion.call('newtabImage', null));
+
+// 16. history page
 await A(() => global.__aphelion.current().navigate('aphelion://history/'));
 await sleep(2000);
 await shot('16-history');

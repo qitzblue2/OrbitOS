@@ -32,6 +32,27 @@ const svg = (d, fill = false) => {
   if (fill) s.style.fill = 'currentColor';
   return s;
 };
+const GLOBE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" ' +
+  'stroke="#8a8a93" stroke-width="1.3"><circle cx="8" cy="8" r="5.8"/><path d="M2.2 8h11.6M8 2.2c1.7 1.6 2.5 3.5 2.5 5.8S9.7 12.2 8 13.8' +
+  'C6.3 12.2 5.5 10.3 5.5 8S6.3 3.8 8 2.2z"/></svg>')}`;
+// 16×16 line icons for the toolbar (stroke = currentColor, so they follow every style)
+const ICONS = {
+  ads: 'M3 3.5h10v9H3zM3 6h10M5.5 8.5l5 3M10.5 8.5l-5 3',
+  auth: 'M5 7V5.2a3 3 0 0 1 6 0V7M3.8 7h8.4v6.5H3.8zM8 9.6v1.8',
+  notes: 'M4 2.5h6l2.5 2.5v8.5H4zM9.8 2.5v2.8h2.7M6 8h4.5M6 10.5h3',
+  dl: 'M8 2.5v7.5M4.8 7l3.2 3.2L11.2 7M3 13.5h10',
+  media: 'M6 11.5V4l6.5-1.5v7.5M6 11.5a1.8 1.8 0 1 1-3.6 0 1.8 1.8 0 0 1 3.6 0zM12.5 10a1.8 1.8 0 1 1-3.6 0 1.8 1.8 0 0 1 3.6 0z',
+  kp: 'M10 2.5a3.5 3.5 0 1 1-2.9 5.5L2.5 12.6v1.4h2.2v-1.3H6v-1.3h1.3l1-1A3.5 3.5 0 0 1 10 2.5zM10.8 5.2h0',
+  shield: 'M8 1.8l5 2v4.1c0 3-2.1 5.3-5 6.3-2.9-1-5-3.3-5-6.3V3.8z',
+  star: 'M8 2.2l1.8 3.7 4 .6-2.9 2.8.7 4L8 11.4l-3.6 1.9.7-4L2.2 6.5l4-.6z',
+  reader: 'M2.5 3.5h4.2c.8 0 1.3.5 1.3 1.3v8.7c0-.7-.6-1.2-1.3-1.2H2.5zM13.5 3.5H9.3c-.8 0-1.3.5-1.3 1.3v8.7c0-.7.6-1.2 1.3-1.2h4.2z',
+  menu: 'M3.5 8h0M8 8h0M12.5 8h0',
+};
+const icon = (key) => {
+  const s = svg(ICONS[key] || ICONS.menu);
+  s.classList.add('ico');
+  return s;
+};
 const sw = (on, onClick, label) => h('button', { class: 'switch', role: 'switch', 'aria-checked': String(Boolean(on)),
                                                   'aria-label': label, onclick: onClick });
 const fmtBytes = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
@@ -137,8 +158,7 @@ function renderTabs() {
         img.src = t.favicon;
         img.classList.add('img');
         img.onerror = () => {
-          img.removeAttribute('src');
-          img.classList.remove('img');
+          img.src = GLOBE;   // the page announced an icon that does not load (often a missing favicon.ico)
         };
       } else if (!t.favicon) {
         img.removeAttribute('src');
@@ -173,7 +193,10 @@ function renderToolbar() {
   lock.className = !n.internal && n.url && !n.secure ? 'warn' : '';
   lock.title = n.internal ? 'Aphelion page' : n.secure ? 'Secure connection (HTTPS)' : 'Not secure: this page does not use HTTPS';
   const star = $('#star');
-  star.textContent = n.bookmarked ? '★' : '☆';
+  if (star._on !== Boolean(n.bookmarked) || !star.firstElementChild) {
+    star._on = Boolean(n.bookmarked);
+    star.replaceChildren(icon('star'));
+  }
   star.classList.toggle('on', n.bookmarked);
   star.hidden = n.internal || !n.url;
   $('#reader').hidden = !n.reader;
@@ -187,7 +210,7 @@ function renderToolbar() {
   wrap._key = wkey;
   wrap.replaceChildren(...S.widgets.map((w) => h('button', { type: 'button', class: `widget${S.overlay === w.key ? ' open' : ''}`, title: w.title,
                                                              'aria-label': w.title, onclick: () => togglePop(w.key) },
-                                                 w.icon, w.badge ? h('span', { class: 'badge', text: w.badge }) : null)));
+                                                 icon(w.key), w.badge ? h('span', { class: 'badge', text: w.badge }) : null)));
   }
   const shield = $('#shield');
   shield.classList.toggle('off', !S.shieldOnForSite);
@@ -220,6 +243,10 @@ $('#strip').addEventListener('pointerdown', (e) => {
 $('#strip').addEventListener('dblclick', (e) => {
   if (isStripGap(e.target)) call('win', 'max');
 });
+// swap the text glyphs in ui.html for line icons
+$('#reader').replaceChildren(icon('reader'));
+$('#menu-btn').replaceChildren(icon('menu'));
+$('#shield').replaceChildren(icon('shield'), $('#blocked'));
 $('#star').onclick = () => call('bookmark');
 $('#reader').onclick = () => call('menu', 'reader');
 $('#zoom').onclick = () => call('menu', 'zoomReset');

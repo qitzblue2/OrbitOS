@@ -5,6 +5,17 @@ const path = require('node:path');
 const { signInUserAgent } = require('./network');
 
 let nextId = 1;
+// shown for sites without an icon of their own
+const GLOBE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" ' +
+  'stroke="#8a8a93" stroke-width="1.3"><circle cx="8" cy="8" r="5.8"/><path d="M2.2 8h11.6M8 2.2c1.7 1.6 2.5 3.5 2.5 5.8S9.7 12.2 8 13.8' +
+  'C6.3 12.2 5.5 10.3 5.5 8S6.3 3.8 8 2.2z"/></svg>')}`;
+const hostOf = (url) => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+};
 const PRELOAD = path.join(__dirname, '..', '..', 'dist-bundle', 'tab-preload.js');
 
 class Tab {
@@ -148,6 +159,7 @@ class Tab {
     });
     wc.on('page-favicon-updated', (_e, icons) => {
       this.favicon = icons.find((u) => /^(https?|data):/.test(u)) || '';
+      if (!this.session.isPrivate) this.win.app.icons.remember(hostOf(this.url), this.favicon, this.session).then(() => this.win.changed());
       this.win.changed();
     });
     wc.on('audio-state-changed', (e) => {
@@ -199,9 +211,15 @@ class Tab {
     wc.setZoomFactor(site || base);
   }
 
+  // Aphelion's own pages show the Aphelion mark; websites their cached icon, else the live one
+  icon() {
+    if (/^aphelion:/.test(this.url) || !this.url) return 'shared/mark.svg';
+    return this.win.app.icons.get(hostOf(this.url)) || this.favicon || (this.loading ? '' : GLOBE);
+  }
+
   state(active) {
     return {
-      id: this.id, title: this.title || titleFor(this.url), url: this.url, favicon: this.favicon, loading: this.loading,
+      id: this.id, title: this.title || titleFor(this.url), url: this.url, favicon: this.icon(), loading: this.loading,
       audible: this.audible, playing: this.playing, sleeping: this.sleeping, crashed: this.crashed, active,
       internal: /^aphelion:/.test(this.url), private: Boolean(this.session.isPrivate),
     };

@@ -73,6 +73,8 @@ class Win(Adw.ApplicationWindow):
             ("Performance", "What slows the computer down, power mode", "orbit-performance",
              ["orbit-performance"]),
             ("Windows Apps", "Install and run Windows programs (.exe, .msi)", "orbit-windows", ["orbit-windows"]),
+            ("Assistant", "Ask in plain words; it can also do things on this PC", "orbit-assistant",
+             ["orbit-assistant"]),
             ("Focus", "A timer that holds back notifications and distracting sites", "orbit-focus", ["orbit-focus"]),
             ("Phone", "Pair your Android phone: notifications, files, clipboard", "orbit-phone",
              ["gnome-extensions", "prefs", "gsconnect@andyholmes.github.io"]),

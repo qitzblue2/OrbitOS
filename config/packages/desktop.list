@@ -48,6 +48,10 @@ timeshift
 # Phone link: pair an Android phone through the KDE Connect app
 gnome-shell-extension-gsconnect
 
+# Orbit Assistant installs the Claude library per user into a venv
+python3-venv
+gir1.2-secret-1
+
 # Orbit Sync: direct, encrypted folder sync between your PCs
 syncthing
 

@@ -156,6 +156,15 @@ Every screenshot here is real:
 - The firewall lets replies from PCs on the local network in (`3702`, `5353`, `137` udp, from private addresses only), so they can be found. Until you turn on **Sharing**, this PC shares nothing and doesn't announce itself.
 - OneDrive: Settings → Online Accounts → Microsoft 365 puts your OneDrive in Files.
 
+## Orbit Assistant
+![Assistant](docs/screenshots/app-assistant.png)
+
+- Ask in plain words ("how full is my disk?", "open Steam", "turn on dark mode", "find my CV", "focus for 50 minutes"). It answers, and it can do a few things on this PC. Each action it takes shows as a small line in the chat.
+- It uses **Claude** (Anthropic's `claude-opus-5-5`, quick answers at low effort, with Anthropic's automatic fallback model if a request is declined) with **your own API key** from console.anthropic.com. The key is kept in the GNOME keyring; your questions go to Anthropic.
+- **What it can do:** open an app or a website, find files in `~/Home` by name, read system status, switch the power mode or dark mode, start Orbit Focus. Nothing else. There is no shell and no tool that writes or deletes files, so a strange answer can't damage anything.
+- The Claude library (`anthropic`) is installed on first start into `~/.local/share/orbit/assistant-venv`, for your user only.
+- Tested through the real Anthropic SDK against a stand-in server: tool round trips, refusals and a rejected key each leave the conversation in a valid state. It hasn't been run against the live API here (no key in the build environment).
+
 ## Orbit Focus
 ![Focus](docs/screenshots/app-focus.png)
 
@@ -264,7 +273,7 @@ Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
   - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
 
 ## Where the code is
-- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`, `sync.py`, `snapshots.py`, `vpn.py`, `focus.py`), so it can be unit-tested.
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`, `sync.py`, `snapshots.py`, `vpn.py`, `focus.py`, `assistant.py`), so it can be unit-tested.
 - `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
 - `packages/orbit-launcher/`: the launcher extension.
 - Tests:

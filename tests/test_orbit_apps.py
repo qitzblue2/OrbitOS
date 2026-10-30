@@ -18,7 +18,7 @@ os.environ["XDG_CONFIG_HOME"] = str(TMP / "home/.config")
 os.environ["XDG_STATE_HOME"] = str(TMP / "home/.local/state")
 (TMP / "home/Home").mkdir(parents=True)
 
-from orbit import backup, catalog, fileops, focus, hardware, games, notes, spaces, tune, sharing, snapshots, sync, updater, vpn, winapps  # noqa: E402
+from orbit import assistant, backup, catalog, paths, fileops, focus, hardware, games, notes, spaces, tune, sharing, snapshots, sync, updater, vpn, winapps  # noqa: E402
 
 
 class FileOps(unittest.TestCase):
@@ -677,6 +677,31 @@ class Focus(unittest.TestCase):
         self.assertEqual(told, ["Focus time is over"])
         self.assertEqual(calls[-1], ("set", "org.gnome.desktop.notifications", "show-banners", "true"))
         self.assertFalse(focus.end(gs=gs, notify=lambda t, b: told.append(t)))
+
+
+class Assistant(unittest.TestCase):
+    def test_app_matching(self):
+        apps = {"org.gnome.Nautilus.desktop": ["files", "file manager", "org.gnome.nautilus"],
+                "steam.desktop": ["steam", "steam"], "orbit-files.desktop": ["files", "orbit-files"],
+                "aphelion.desktop": ["aphelion", "web browser", "aphelion", "internet"]}
+        self.assertEqual(assistant.match_app("Files", apps), "orbit-files.desktop")  # sorted: exact matches first
+        self.assertEqual(assistant.match_app("ste", apps), "steam.desktop")
+        self.assertEqual(assistant.match_app("browser", apps), "aphelion.desktop")
+        self.assertIsNone(assistant.match_app("photoshop", apps))
+
+    def test_tools(self):
+        (paths.orbit_home() / "Documents").mkdir(parents=True, exist_ok=True)
+        (paths.orbit_home() / "Documents/Holiday plan.md").write_text("x")
+        out, err = assistant.run_tool("find_files", {"text": "holiday"})
+        self.assertFalse(err)
+        self.assertIn("Holiday plan.md", out)
+        self.assertTrue(assistant.run_tool("find_files", {"text": "h"})[1])
+        self.assertTrue(assistant.run_tool("open_app", {"name": "no such app zz"})[1])
+        self.assertTrue(assistant.run_tool("nope", {})[1])
+        self.assertTrue(assistant.run_tool("open_app", {})[1])          # bad input never raises
+        self.assertTrue(all(t["strict"] and t["input_schema"]["additionalProperties"] is False for t in assistant.TOOLS))
+        self.assertTrue(assistant.key_looks_valid("sk-ant-api03-" + "x" * 40))
+        self.assertFalse(assistant.key_looks_valid("hello"))
 
 
 if __name__ == "__main__":

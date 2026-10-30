@@ -56,6 +56,7 @@ GLYPHS = {
     "vpn": '<path d="M12 3.5l7 2.8v5.2c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6.3z"/><rect x="9" y="11" width="6" height="4.5" rx="1"/><path d="M10.3 11V9.8a1.7 1.7 0 0 1 3.4 0V11"/>',
     "phone": '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/><path d="M9.5 9.5l2 2 3-3.5"/>',
     "focus": '<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M9.5 3h5M12 3v2.5"/>',
+    "assistant": '<path d="M4.5 6.5a2.5 2.5 0 0 1 2.5-2.5h10a2.5 2.5 0 0 1 2.5 2.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.5V16H7a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M12 7.2l.9 1.9 1.9.9-1.9.9-.9 1.9-.9-1.9-1.9-.9 1.9-.9z"/>',
     "control": '<rect x="3" y="5" width="18" height="6" rx="3"/><circle cx="15.5" cy="8" r="1.4"/><rect x="3" y="13" width="18" height="6" rx="3"/><circle cx="8.5" cy="16" r="1.4"/>',
 }
 
@@ -109,6 +110,7 @@ APP_MAP = {
     "sync": ["orbit-sync", "syncthing"],
     "vpn": ["orbit-vpn"],
     "focus": ["orbit-focus"],
+    "assistant": ["orbit-assistant"],
     "phone": ["orbit-phone", "org.gnome.Shell.Extensions.GSConnect"],
     "games": ["orbit-games", "applications-games"],
     "performance": ["orbit-performance"],

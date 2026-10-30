@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Assistant
+GenericName=AI Assistant
+Comment=Ask in plain words; it answers and can do things on this PC
+Exec=orbit-assistant
+Icon=orbit-assistant
+Categories=GTK;Utility;
+StartupNotify=true
+DBusActivatable=false
+Keywords=ai;claude;chat;help;assistant;ask;

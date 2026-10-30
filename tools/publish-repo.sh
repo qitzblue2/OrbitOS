@@ -14,8 +14,19 @@ for t in apt-ftparchive gpg; do command -v "$t" >/dev/null || { echo "missing $t
 
 GNUPGHOME="$(mktemp -d)"; export GNUPGHOME
 trap 'rm -rf "$GNUPGHOME"' EXIT
-printf '%s\n' "$ORBIT_SIGNING_KEY" | gpg --batch --quiet --import
+KEY="$ORBIT_SIGNING_KEY"
+# a key pasted without its first and last line still works
+if ! grep -q -- '-----BEGIN PGP PRIVATE KEY BLOCK-----' <<<"$KEY"; then
+  KEY=$(printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n%s\n-----END PGP PRIVATE KEY BLOCK-----\n' "$(sed '/^[[:space:]]*$/d' <<<"$KEY")")
+fi
+printf '%s\n' "$KEY" | gpg --batch --quiet --import || { echo "ORBIT_SIGNING_KEY is not a valid private key" >&2; exit 1; }
 FPR=$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^fpr/{print $10; exit}')
+# the secret must belong to the public key every Orbit system trusts
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -f "$HERE/config/keys/orbit-archive.asc" ]; then
+  WANT=$(gpg --batch --with-colons --show-keys "$HERE/config/keys/orbit-archive.asc" | awk -F: '/^fpr/{print $10; exit}')
+  [ "$FPR" = "$WANT" ] || { echo "ORBIT_SIGNING_KEY ($FPR) is not the key in config/keys/orbit-archive.asc ($WANT): installed systems would reject these updates" >&2; exit 1; }
+fi
 
 rm -rf "$OUT/apt"; mkdir -p "$OUT/apt/pool"
 cp "$DEBS"/*.deb "$OUT/apt/pool/"

@@ -1,0 +1,82 @@
+# Orbit OS update server: builds the Orbit packages and Aphelion, signs them and publishes
+# them as an APT repository on GitHub Pages (https://qitzblue2.github.io/OrbitOS/apt/).
+# Installed Orbit systems pick them up through Software → Updates, orbit-update, or
+# automatically (unattended-upgrades).
+#
+# One-time setup (see UPDATES.md): run tools/make-signing-key.sh, commit
+# config/keys/orbit-archive.asc, add the secret ORBIT_SIGNING_KEY, and set
+# Settings → Pages → Source to "GitHub Actions".
+name: Orbit updates
+
+on:
+  push:
+    branches: [claude/sleepy-hopper-bb4tau]
+    paths: [packages/**, branding/**, icons/**, config/**, skel/**, tools/**, build.sh]
+  schedule:
+    - cron: "17 3 * * *"        # daily: picks up new Aphelion versions from the Orbit-Apps branch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: orbit-updates
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Signing key present?
+        env:
+          ORBIT_SIGNING_KEY: ${{ secrets.ORBIT_SIGNING_KEY }}
+        run: |
+          if [ -z "$ORBIT_SIGNING_KEY" ] || [ ! -f config/keys/orbit-archive.asc ]; then
+            echo "::error::No signing key yet. Run tools/make-signing-key.sh, commit config/keys/orbit-archive.asc and add the ORBIT_SIGNING_KEY secret (see UPDATES.md)."
+            exit 1
+          fi
+      - name: Build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-pil python3-cairosvg librsvg2-bin libgtk-3-bin dpkg-dev libglib2.0-bin apt-utils gnupg
+      - name: Orbit packages
+        run: ORBIT_PKG_VERSION="2.0.0.${{ github.run_number }}" ./build.sh --debs-only
+      - uses: actions/checkout@v4
+        with:
+          ref: Orbit-Apps
+          path: aphelion-src
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Aphelion
+        working-directory: aphelion-src/Orbit-Web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run lists
+          npm run bundle
+          npx electron-builder --linux deb --x64 --publish never
+          cp dist/aphelion_*_amd64.deb "$GITHUB_WORKSPACE/out/"
+      - name: Check packages
+        run: python3 tests/check_debs.py out
+      - name: Sign and lay out the repository
+        env:
+          ORBIT_SIGNING_KEY: ${{ secrets.ORBIT_SIGNING_KEY }}
+        run: |
+          tools/publish-repo.sh out site
+          printf '<!doctype html><meta charset="utf-8"><title>Orbit OS updates</title><p>Orbit OS update server. Turn updates on: <code>curl -fsSL https://qitzblue2.github.io/OrbitOS/setup.sh | sudo sh</code></p>\n' > site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Orbit OS: install every available update (Orbit apps, installer, desktop, Aphelion,
+# and Debian's security fixes) in one go. Software → Updates does the same with a window.
+set -e
+[ "$(id -u)" = 0 ] || exec pkexec "$0" "$@"
+apt-get update
+apt-get -y full-upgrade
+apt-get -y autoremove
+echo "Orbit OS is up to date."

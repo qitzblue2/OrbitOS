@@ -87,4 +87,4 @@ tests/                    run-checks.sh, test_installer_plan.py, installer_integ
 - Windows programs do not run natively. Anti-cheat games and many DRM apps will not run.
 - Only what is marked ✅ in HARDWARE-TEST.md has been checked on real hardware.
 
-Docs: [APPS](APPS.md) · [DECISIONS](DECISIONS.md) · [INSTALL](INSTALL.md) · [HARDWARE-TEST](HARDWARE-TEST.md) · [PERFORMANCE](PERFORMANCE.md) · [SECURITY](SECURITY.md) · [LICENSES](LICENSES.md)
+Docs: [UPDATES](UPDATES.md) · [APPS](APPS.md) · [DECISIONS](DECISIONS.md) · [INSTALL](INSTALL.md) · [HARDWARE-TEST](HARDWARE-TEST.md) · [PERFORMANCE](PERFORMANCE.md) · [SECURITY](SECURITY.md) · [LICENSES](LICENSES.md)

@@ -21,7 +21,7 @@ need = {
     "orbit-os-desktop": ["./etc/dconf/db/local.d/00-orbit", "./etc/skel/Home/Inbox/.keep",
                          "./etc/skel/.config/user-dirs.dirs", "./etc/apt/apt.conf.d/52orbit-unattended",
                          "./etc/skel/.config/gtk-4.0/gtk.css", "./usr/bin/orbit-hardware-check",
-                         "./usr/share/glib-2.0/schemas/org.orbit-os.desktop.gschema.xml"],
+                         "./usr/share/glib-2.0/schemas/org.orbit-os.desktop.gschema.xml", "./usr/bin/orbit-update"],
     "orbit-installer": ["./usr/bin/orbit-installer", "./usr/lib/orbit-installer/orbit-install-engine",
                         "./usr/lib/orbit-installer/python/orbit_installer/engine.py",
                         "./usr/lib/orbit-installer/python/orbit_installer/plan.py",

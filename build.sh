@@ -20,6 +20,9 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/config/build.conf"
 VARIANT="${ORBIT_VARIANT:-full}"
+# package version: the update server builds with a higher number each time (2.0.0.<run>),
+# so installed systems see every build as an update
+PKGVER="${ORBIT_PKG_VERSION:-$ORBIT_VERSION}"
 WORK="${ORBIT_WORK:-$HERE/work}"
 OUT="$HERE/out"
 log() { printf '\033[1m[orbit] %s\033[0m\n' "$*"; }
@@ -66,10 +69,10 @@ pack() {  # pack <name> <staging dir with files/ and DEBIAN/>
   root="$WORK/debs/$name.root"
   rm -rf "$root"; mkdir -p "$root"
   cp -a "$s/files/." "$root/"; cp -a "$s/DEBIAN" "$root/"
-  sed -i "s/@VERSION@/$ORBIT_VERSION/g; s/@RECOMMENDS@/$REC/" "$root/DEBIAN/control"
-  dpkg-deb --root-owner-group -Zxz --build "$root" "$OUT/${name}_${ORBIT_VERSION}_all.deb" >/dev/null
-  cp "$OUT/${name}_${ORBIT_VERSION}_all.deb" "$PKGS/"
-  log "built $OUT/${name}_${ORBIT_VERSION}_all.deb"
+  sed -i "s/@VERSION@/$PKGVER/g; s/@RECOMMENDS@/$REC/" "$root/DEBIAN/control"
+  dpkg-deb --root-owner-group -Zxz --build "$root" "$OUT/${name}_${PKGVER}_all.deb" >/dev/null
+  cp "$OUT/${name}_${PKGVER}_all.deb" "$PKGS/"
+  log "built $OUT/${name}_${PKGVER}_all.deb"
 }
 
 build_debs() {
@@ -133,6 +136,18 @@ PY
   install -D -m 755 "$HERE/tools/hardware-check.sh" "$d/files/usr/bin/orbit-hardware-check"
   install -D -m 644 "$HERE/config/dconf/db/local.d/00-orbit" "$d/files/etc/dconf/db/local.d/00-orbit"
   install -D -m 644 "$HERE/config/dconf/profile/user" "$d/files/etc/dconf/profile/user"
+  # the Orbit update server: installed systems get Orbit's own updates through apt
+  if [ -f "$HERE/config/keys/orbit-archive.asc" ]; then
+    install -D -m 644 "$HERE/config/keys/orbit-archive.asc" "$d/files/usr/share/keyrings/orbit-archive-keyring.asc"
+    install -D -m 644 /dev/stdin "$d/files/etc/apt/sources.list.d/orbit.sources" <<'SRC'
+Types: deb
+URIs: https://qitzblue2.github.io/OrbitOS/apt/
+Suites: ./
+Signed-By: /usr/share/keyrings/orbit-archive-keyring.asc
+SRC
+  else
+    log "no config/keys/orbit-archive.asc yet: this build does not subscribe to Orbit updates (see tools/make-signing-key.sh)"
+  fi
   # orbit-installer (live session only; removes itself from installed systems)
   local oi="$stage/orbit-installer"
   cp -a "$HERE/packages/orbit-installer" "$oi"

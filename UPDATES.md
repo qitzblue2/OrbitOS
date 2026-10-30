@@ -45,6 +45,12 @@ Run once:
 curl -fsSL https://qitzblue2.github.io/OrbitOS/setup.sh | sudo sh
 ```
 
+## Aphelion on Windows
+- For each new Aphelion version on the `Orbit-Apps` branch, the workflow builds the Windows installer on a Windows runner and publishes it as the GitHub release `aphelion-v<version>` (`Aphelion-Setup-<version>.exe`). It then writes `https://qitzblue2.github.io/OrbitOS/aphelion/windows/latest.json` with that version and the installer's size and SHA-256.
+- Aphelion 1.2.0 and newer read that file. Settings → About → **Check now** shows a new version, and **Update now** downloads the installer, checks its size and SHA-256, installs it silently and starts Aphelion again. Aphelion also checks by itself once a day and sends a notification once per new version. Downloads are only accepted from this repository's releases.
+- Updating from 1.1.1 needs one manual install of 1.2.0. 1.1.1's Check now already finds the release and links to it.
+- A new Orbit-Apps version is picked up by the daily run, or straight away with Actions → Orbit updates → Run workflow.
+
 ## Orbit Core (branch Orbit-Scratch)
 Orbit Core uses opm instead of apt. It will use the same server (an `opm upgrade`
 that downloads signed `.opk` files) once Core boots; see `core/README.md`, stage 8.

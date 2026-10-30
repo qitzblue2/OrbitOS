@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write     # Aphelion's Windows installer is published as a GitHub release asset
   pages: write
   id-token: write
 
@@ -26,7 +26,55 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Aphelion for Windows: built once per version and published as release aphelion-v<version>;
+  # the build job below writes aphelion/windows/latest.json, which Aphelion's Update button reads.
+  aphelion-windows:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      built: ${{ steps.v.outputs.built }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: Orbit-Apps
+      - id: v
+        working-directory: Orbit-Web
+        run: |
+          v=$(node -p "require('./package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if gh release view "aphelion-v$v" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "built=false" >> "$GITHUB_OUTPUT"; echo "Aphelion $v for Windows is already published"
+          else
+            echo "built=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.v.outputs.built == 'true'
+        with:
+          node-version: 22
+      - name: Build the Windows installer
+        if: steps.v.outputs.built == 'true'
+        working-directory: Orbit-Web
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run lists
+          npm run bundle
+          npx electron-builder --win nsis --x64 --publish never
+          mv "dist/Aphelion Setup ${{ steps.v.outputs.version }}.exe" "dist/Aphelion-Setup-${{ steps.v.outputs.version }}.exe"
+      - uses: actions/upload-artifact@v4
+        if: steps.v.outputs.built == 'true'
+        with:
+          name: aphelion-windows
+          path: Orbit-Web/dist/Aphelion-Setup-*.exe
+          retention-days: 3
+
   build:
+    needs: aphelion-windows
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -67,6 +115,31 @@ jobs:
         run: |
           tools/publish-repo.sh out site
           printf '<!doctype html><meta charset="utf-8"><title>Orbit OS updates</title><p>Orbit OS update server. Turn updates on: <code>curl -fsSL https://qitzblue2.github.io/OrbitOS/setup.sh | sudo sh</code></p>\n' > site/index.html
+      - uses: actions/download-artifact@v4
+        if: needs.aphelion-windows.outputs.built == 'true'
+        with:
+          name: aphelion-windows
+          path: win
+      - name: Aphelion for Windows (release and update feed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ needs.aphelion-windows.outputs.version }}
+        run: |
+          tag="aphelion-v$V"; exe="Aphelion-Setup-$V.exe"
+          if [ "${{ needs.aphelion-windows.outputs.built }}" = true ]; then
+            gh release create "$tag" "win/$exe" --repo "$GITHUB_REPOSITORY" --target Orbit-Apps \
+              --title "Aphelion $V for Windows" \
+              --notes "Download $exe and run it. Aphelion updates itself from then on (Settings → About → Update now)."
+          else
+            mkdir -p win
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$exe" --dir win --clobber
+          fi
+          mkdir -p site/aphelion/windows
+          size=$(stat -c %s "win/$exe"); sha=$(sha256sum "win/$exe" | cut -d' ' -f1)
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$exe"
+          printf '{"version":"%s","file":"%s","sha256":"%s","size":%s,"url":"%s"}\n' "$V" "$exe" "$sha" "$size" "$url" \
+            > site/aphelion/windows/latest.json
+          cat site/aphelion/windows/latest.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

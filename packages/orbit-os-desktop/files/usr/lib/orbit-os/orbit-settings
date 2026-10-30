@@ -72,6 +72,7 @@ class Win(Adw.ApplicationWindow):
              ["orbit-optimizer"]),
             ("Performance", "What slows the computer down, power mode", "orbit-performance",
              ["orbit-performance"]),
+            ("Windows Apps", "Install and run Windows programs (.exe, .msi)", "orbit-windows", ["orbit-windows"]),
             ("Games", "Set up Steam, Game Mode and your game library", "orbit-games", ["orbit-games"]),
             ("Store", "Hand-picked apps from Debian and Flathub", "orbit-store", ["orbit-store"]),
             ("Desktop widgets", "Clock, calendar, system, weather", "orbit-widgets",

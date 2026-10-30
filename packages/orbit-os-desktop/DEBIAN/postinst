@@ -3,13 +3,22 @@ set -e
 if [ "$1" = configure ]; then
   dconf update
   glib-compile-schemas /usr/share/glib-2.0/schemas
-  # Firewall: deny incoming, allow outgoing. No ports opened.
+  # Firewall: deny incoming, allow outgoing. No service is reachable from outside.
   ufw --force default deny incoming >/dev/null
   ufw --force default allow outgoing >/dev/null
+  # Windows network discovery: let replies from PCs on the local network in
+  # (WS-Discovery 3702/udp, mDNS 5353/udp, NetBIOS name replies 137/udp). Nothing is shared.
+  for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+    for port in 3702 5353 137; do
+      ufw allow proto udp from "$net" to any port "$port" comment 'Orbit: find Windows PCs' >/dev/null 2>&1 || true
+    done
+  done
   ufw --force enable >/dev/null 2>&1 || true   # fails harmlessly inside a chroot; re-enabled at first boot
   systemctl enable ufw.service >/dev/null 2>&1 || true
   # Fingerprint for login, lock screen and sudo (password stays a fallback).
   pam-auth-update --enable fprintd --package >/dev/null 2>&1 || true
+  # wsdd is only used by Files to find Windows PCs; don't announce this PC (nothing is shared).
+  systemctl disable --now wsdd.service >/dev/null 2>&1 || true
   # SSH stays off unless the user installs and enables it.
   systemctl disable --now ssh.service ssh.socket >/dev/null 2>&1 || true
   # Speed: weekly SSD TRIM, kill runaway memory hogs before the desktop freezes,

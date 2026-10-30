@@ -32,6 +32,16 @@ endeavour
 apostrophe
 zenity
 librsvg2-bin
+# Windows programs: double-click a .exe or .msi (Orbit Windows Apps); i386 is enabled by build.sh
+wine
+wine64
+wine32:i386
+fonts-wine
+
+# Windows networks: find Windows PCs and their shared folders (Files → Windows Network)
+wsdd
+smbclient
+
 # gaming: GameMode, and udev rules so controllers and VR headsets work without root
 gamemode
 steam-devices

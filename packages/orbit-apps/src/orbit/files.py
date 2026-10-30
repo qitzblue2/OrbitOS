@@ -782,9 +782,15 @@ class Sidebar(Gtk.Box):
             self._add("Devices", m.get_name(), None, m.get_root(), extra=ej) \
                 .get_child().get_first_child().set_from_gicon(m.get_symbolic_icon())
         self._add("Other", "Computer", "drive-harddisk-symbolic", Gio.File.new_for_path("/"))
+        self._add("Other", "Windows Network", "network-workgroup-symbolic", Gio.File.new_for_uri("network:///"))
         self._add("Other", "Trash", "user-trash-symbolic", Gio.File.new_for_uri(TRASH))
 
     def _activated(self, _lb, row):
+        if row._location.get_uri_scheme() in ("network", "smb"):
+            # Windows PCs and shared folders: GNOME Files handles the sign-in and mounting
+            ui.spawn(["nautilus", row._location.get_uri()])
+            self.list.unselect_all()
+            return
         self.win.current().open(row._location)
 
     def sync(self, location):

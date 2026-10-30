@@ -18,7 +18,7 @@ os.environ["XDG_CONFIG_HOME"] = str(TMP / "home/.config")
 os.environ["XDG_STATE_HOME"] = str(TMP / "home/.local/state")
 (TMP / "home/Home").mkdir(parents=True)
 
-from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, updater  # noqa: E402
+from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, updater, winapps  # noqa: E402
 
 
 class FileOps(unittest.TestCase):
@@ -467,6 +467,47 @@ End-Date: 2026-10-30  19:00:09
         self.assertIn("Aphelion", ev[0][1])
         ev, _ = updater.background_events([], runs, dict(st, last_end=runs[0]["start"], window_upgrading=True))
         self.assertEqual(ev, [])
+
+
+class WinApps(unittest.TestCase):
+    def setUp(self):
+        self.d = pathlib.Path(tempfile.mkdtemp(dir=TMP))
+
+    def pe(self, name, machine):
+        head = bytearray(512)
+        head[0:2] = b"MZ"
+        head[60:64] = (128).to_bytes(4, "little")
+        head[128:132] = b"PE\0\0"
+        head[132:134] = machine.to_bytes(2, "little")
+        p = self.d / name
+        p.write_bytes(bytes(head))
+        return p
+
+    def test_bitness_and_argv(self):
+        x86, x64 = self.pe("Setup.EXE", 0x14c), self.pe("app.exe", 0x8664)
+        (self.d / "notes.txt").write_text("MZ? no")
+        self.assertTrue(winapps.is_32bit(x86))
+        self.assertFalse(winapps.is_32bit(x64))
+        self.assertIsNone(winapps.is_32bit(self.d / "notes.txt"))
+        self.assertEqual(winapps.run_argv(x86), ["wine", "start", "/unix", str(x86.resolve())])
+        self.assertEqual(winapps.run_argv(self.d / "Office.msi")[:3], ["wine", "msiexec", "/i"])
+        with self.assertRaises(ValueError):
+            winapps.run_argv(self.d / "notes.txt")
+
+    def test_explain_failure(self):
+        x86 = self.pe("setup.exe", 0x14c)
+        self.assertIn("isn’t installed", winapps.explain_failure(x86, {"wine": False, "wine32": False}))
+        self.assertIn("32-bit", winapps.explain_failure(x86, {"wine": True, "wine32": False}))
+        self.assertIsNone(winapps.explain_failure(x86, {"wine": True, "wine32": True}))
+        self.assertIsNone(winapps.explain_failure(self.pe("x.exe", 0x8664), {"wine": True, "wine32": False}))
+
+    def test_library_skips_uninstallers(self):
+        m = self.d / "Programs/Notepad++"
+        m.mkdir(parents=True)
+        (m / "Notepad++.desktop").write_text("[Desktop Entry]\nName=Notepad++\nExec=wine x\nIcon=ABCD_notepad\n")
+        (m / "Uninstall.desktop").write_text("[Desktop Entry]\nName=Uninstall Notepad++\nExec=wine u\n")
+        self.assertEqual([a["name"] for a in winapps.library(self.d / "Programs")], ["Notepad++"])
+        self.assertEqual(winapps.library(self.d / "missing"), [])
 
 
 if __name__ == "__main__":

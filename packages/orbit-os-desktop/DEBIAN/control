@@ -7,7 +7,7 @@ Depends: orbit-os-branding (= @VERSION@), orbit-launcher (= @VERSION@), orbit-ap
  gnome-shell-extension-dashtodock, gnome-shell-extensions,
  librsvg2-bin, python3-gi, gir1.2-adw-1, gir1.2-gtk-4.0, fprintd, libpam-fprintd, power-profiles-daemon, fwupd,
  bluez, thermald, systemd-oomd, ufw, unattended-upgrades, dconf-cli
-Recommends: gnome-shell-extension-blur-my-shell, aphelion, @RECOMMENDS@
+Recommends: gnome-shell-extension-blur-my-shell, aphelion, wine, wine64, fonts-wine, wsdd, @RECOMMENDS@
 Section: metapackages
 Priority: optional
 Description: Orbit OS desktop

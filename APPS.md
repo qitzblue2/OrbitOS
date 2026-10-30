@@ -23,6 +23,11 @@ Every screenshot here is real:
 | Super+Alt+1 / 2 / 3 | Switch to Space 1 / 2 / 3 |
 | Super+A | App grid |
 | Super+M | Notification list (GNOME's own key; Super+V now opens the clipboard) |
+| Super+D | Show the desktop (as on Windows) |
+| Super+I | Settings (as on Windows) |
+| Ctrl+Shift+Esc | Task Manager: Orbit Performance (as on Windows) |
+| Alt+Tab / Super+Tab | Switch windows / switch whole apps |
+| Super+← / → / ↑ | Snap a window left / right / maximize (GNOME's own, same as Windows) |
 
 ---
 
@@ -135,6 +140,20 @@ Every screenshot here is real:
 - **Recently installed** shows the last update runs, including the automatic nightly ones.
 - **Notifications:** `orbit-updater-check.path` fires the moment any update run finishes (this app, `sudo orbit-update` in a terminal, or the automatic updates) and says what was installed, or that it didn't finish. `orbit-updater-check.timer` checks every hour and says when new updates are ready. Each notification is sent once; clicking it opens Orbit Updater.
 
+## Orbit Windows Apps
+![Windows Apps](docs/screenshots/app-windows.png)
+
+- **Double-click any .exe or .msi** (in Files, Downloads, a USB stick) and it runs with Wine, like on Windows. `orbit-windows FILE` is the default app for Windows programs (`/etc/xdg/mimeapps.list`). If something is missing, for example 32-bit support for an older installer, it says so in plain words and offers **Set Up**.
+- **Install a Program…** picks an installer. Installed programs appear in the list with an Open button, and in the Launcher.
+- **Windows drive:** open the C: drive (`~/.wine/drive_c`), uninstall a program (Wine's "Add or remove programs"), or change Windows settings (winecfg).
+- New Orbit images ship Wine for 64- and 32-bit programs (`build.sh` enables Debian's i386 architecture). Systems installed earlier get 64-bit Wine with the next update, and **Set Up** (`pkexec orbit-windows-helper setup`) adds 32-bit support.
+- Most programs work. Games with kernel anti-cheat, and programs that need their own drivers, usually don't.
+
+## Windows networks
+- **Files → Windows Network** shows Windows PCs and shared folders on your network (through GNOME Files, which asks for the Windows user name and password). Windows drives (NTFS) and USB sticks open like any other drive.
+- The firewall lets replies from PCs on the local network in (`3702`, `5353`, `137` udp, from private addresses only), so they can be found. This PC shares nothing and doesn't announce itself.
+- OneDrive: Settings → Online Accounts → Microsoft 365 puts your OneDrive in Files.
+
 ## Orbit Optimizer
 | ![Clean Up](docs/screenshots/app-optimizer-clean.png) | ![Startup](docs/screenshots/app-optimizer-startup.png) |
 |---|---|
@@ -192,7 +211,7 @@ Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
   - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
 
 ## Where the code is
-- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`), so it can be unit-tested.
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`), so it can be unit-tested.
 - `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
 - `packages/orbit-launcher/`: the launcher extension.
 - Tests:

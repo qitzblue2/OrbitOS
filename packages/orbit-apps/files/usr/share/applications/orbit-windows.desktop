@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Windows Apps
+GenericName=Windows Program Runner
+Comment=Install and run Windows programs (.exe and .msi)
+Exec=orbit-windows %f
+Icon=orbit-windows
+Categories=GTK;System;Emulator;
+MimeType=application/x-ms-dos-executable;application/x-msdownload;application/vnd.microsoft.portable-executable;application/x-msi;application/x-ms-shortcut;application/x-bat;
+StartupNotify=true
+DBusActivatable=false
+Keywords=wine;exe;msi;windows;program;installer;

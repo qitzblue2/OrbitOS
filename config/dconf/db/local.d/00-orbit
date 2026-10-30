@@ -62,8 +62,10 @@ experimental-features=['scale-monitor-framebuffer']
 toggle-message-tray=['<Super>m']
 
 [org/gnome/settings-daemon/plugins/media-keys]
-custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-screenshot/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-files/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-1/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-3/']
+custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-screenshot/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-files/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-1/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-space-3/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-task-manager/']
 home=@as []
+# Windows habit: Super+I opens Settings
+control-center=['<Super>i']
 
 [org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-screenshot]
 name='Orbit Screenshot (area)'
@@ -90,9 +92,24 @@ name='Switch to Space 3'
 command='orbit-spaces 3'
 binding='<Super><Alt>3'
 
+[org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/orbit-task-manager]
+name='Task Manager (Orbit Performance)'
+command='orbit-performance'
+binding='<Control><Shift>Escape'
+
 [org/gnome/desktop/wm/keybindings]
 switch-input-source=['<Super><Alt>space']
+# Windows habits: Super+D shows the desktop, Alt+Tab switches windows (not whole apps)
+show-desktop=['<Super>d']
+switch-windows=['<Alt>Tab']
+switch-windows-backward=['<Shift><Alt>Tab']
+switch-applications=['<Super>Tab']
+switch-applications-backward=['<Shift><Super>Tab']
 switch-input-source-backward=@as []
+
+[org/gnome/desktop/wm/preferences]
+# minimize and maximize buttons next to close, as on Windows
+button-layout='appmenu:minimize,maximize,close'
 
 [org/gnome/terminal/legacy/profiles:]
 default='b1dcc9dd-5262-4d8d-a863-c897e6d979b9'

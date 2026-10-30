@@ -211,7 +211,7 @@ else
 log "bootstrapping Debian $DEBIAN_SUITE (snapshot $ORBIT_SNAPSHOT) with the Orbit package set ($VARIANT)"
 if mountpoint -q "$ROOT/proc" 2>/dev/null; then die "$ROOT is still in use by an earlier build; reboot or unmount it"; fi
 rm -rf "$ROOT" "$WORK/rootfs.done"
-mmdebstrap --mode=root --variant=apt --architectures=amd64 \
+mmdebstrap --mode=root --variant=apt --architectures=amd64,i386 \
   --components="$DEBIAN_COMPONENTS" \
   --keyring=/usr/share/keyrings/debian-archive-keyring.gpg \
   --aptopt='Acquire::Check-Valid-Until "false"' \

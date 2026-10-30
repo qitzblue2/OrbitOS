@@ -1,0 +1,14 @@
+# less text pager: the final Orbit build.
+name=less
+version=679
+stage=base
+sources=(https://www.greenwoodsoftware.com/less/less-679.tar.gz)
+sha256=(9b68820c34fa8a0af6b0e01b74f0298bcdd40a0489c61649b47058908a153d78)
+depends=(base-files ncurses)
+description="less text pager"
+
+build() {
+  ./configure --prefix=/usr --sysconfdir=/etc
+  make
+  make DESTDIR="$DESTDIR" install
+}

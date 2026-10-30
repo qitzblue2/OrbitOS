@@ -1,0 +1,14 @@
+# Expat XML parser library: the final Orbit build.
+name=expat
+version=2.7.3
+stage=base
+sources=(https://github.com/libexpat/libexpat/releases/download/R_2_7_3/expat-2.7.3.tar.xz)
+sha256=(71df8f40706a7bb0a80a5367079ea75d91da4f8c65c58ec59bcdfbf7decdab9f)
+depends=(base-files)
+description="Expat XML parser library"
+
+build() {
+  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/expat-2.7.3
+  make
+  make DESTDIR="$DESTDIR" install
+}

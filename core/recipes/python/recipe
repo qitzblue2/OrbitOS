@@ -1,0 +1,16 @@
+# Python 3: the final Orbit build (replaces the temporary one).
+name=python
+version=3.13.18
+stage=base
+sources=(https://www.python.org/ftp/python/3.13.18/Python-3.13.18.tar.xz)
+sha256=(abb0102e6d4ae027509bcb82327d9dd85515b44a3ba8ad538cfc5e9847029f68)
+depends=(base-files libffi openssl expat zlib bzip2 xz readline ncurses)
+replaces=(python-temp)
+description="Python 3"
+
+build() {
+  ./configure --prefix=/usr --enable-shared --with-system-expat --without-static-libpython
+  make
+  make DESTDIR="$DESTDIR" install
+  ln -sf python3 "$DESTDIR/usr/bin/python"
+}

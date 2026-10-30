@@ -1,0 +1,20 @@
+# Perl 5: the final Orbit build (replaces the temporary one).
+name=perl
+version=5.44.0
+stage=base
+sources=(https://www.cpan.org/src/5.0/perl-5.44.0.tar.xz)
+sha256=(505cf43912e9480495c344c70260452e32aa2a73c546a026b3f100053b23ce91)
+depends=(base-files zlib bzip2 less)
+replaces=(perl-temp)
+description="Perl 5"
+
+build() {
+  local lib=/usr/lib/perl5/5.44
+  export BUILD_ZLIB=False BUILD_BZIP2=0          # use Orbit's zlib and bzip2
+  sh Configure -des -D prefix=/usr -D vendorprefix=/usr -D useshrplib -D usethreads \
+    -D privlib=$lib/core_perl -D archlib=$lib/core_perl -D sitelib=$lib/site_perl -D sitearch=$lib/site_perl \
+    -D vendorlib=$lib/vendor_perl -D vendorarch=$lib/vendor_perl \
+    -D man1dir=/usr/share/man/man1 -D man3dir=/usr/share/man/man3 -D pager="/usr/bin/less -isR"
+  make
+  make DESTDIR="$DESTDIR" install
+}

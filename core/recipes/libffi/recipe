@@ -1,0 +1,15 @@
+# foreign function interface library: the final Orbit build.
+name=libffi
+version=3.5.2
+stage=base
+sources=(https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz)
+sha256=(f3a3082a23b37c293a4fcd1053147b371f2ff91fa7ea1b2a52e335676bac82dc)
+depends=(base-files)
+description="foreign function interface library"
+
+build() {
+  # tuned for any x86-64 PC, not just the machine that builds Orbit
+  ./configure --prefix=/usr --disable-static --with-gcc-arch=x86-64
+  make
+  make DESTDIR="$DESTDIR" install
+}

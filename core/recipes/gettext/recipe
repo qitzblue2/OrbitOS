@@ -1,0 +1,19 @@
+# GNU gettext (translations): the final Orbit build (replaces the temporary one).
+name=gettext
+version=0.26
+stage=base
+sources=(https://ftp.gnu.org/gnu/gettext/gettext-0.26.tar.xz)
+sha256=(d1fb86e260cfe7da6031f94d2e44c0da55903dbae0a2fa0fae78c91ae1b56f00)
+depends=(base-files)
+replaces=(gettext-temp)
+description="GNU gettext (translations)"
+
+build() {
+  # glibc 2.44's C23 _Generic macros clash with gnulib's own declarations (see gettext-temp)
+  find . -name '*.in.h' -exec sed -i -E \
+    's/^(_GL_EXTERN_C [a-z_]+ \*)(bsearch|memchr|strchr|strrchr|strpbrk|strstr|wmemchr|wcschr|wcsrchr|wcspbrk|wcsstr) \(/\1(\2) (/' {} +
+  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/gettext-0.26
+  make
+  make DESTDIR="$DESTDIR" install
+  chmod -f 0755 "$DESTDIR"/usr/lib/preloadable_libintl.so || true
+}

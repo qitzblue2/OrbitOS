@@ -1,0 +1,15 @@
+# OpenSSL TLS and crypto library: the final Orbit build.
+name=openssl
+version=3.5.4
+stage=base
+sources=(https://github.com/openssl/openssl/releases/download/openssl-3.5.4/openssl-3.5.4.tar.gz)
+sha256=(967311f84955316969bdb1d8d4b983718ef42338639c621ec4c34fddef355e99)
+depends=(base-files zlib perl)
+description="OpenSSL TLS and crypto library"
+
+build() {
+  ./config --prefix=/usr --openssldir=/etc/ssl --libdir=lib shared zlib-dynamic
+  make
+  sed -i '/INSTALL_LIBS/s/libcrypto.a libssl.a//' Makefile   # no static libraries
+  make DESTDIR="$DESTDIR" MANSUFFIX=ssl install_sw install_ssldirs
+}

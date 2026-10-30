@@ -1,0 +1,15 @@
+# GNU libtool: the final Orbit build.
+name=libtool
+version=2.5.4
+stage=base
+sources=(https://ftp.gnu.org/gnu/libtool/libtool-2.5.4.tar.xz)
+sha256=(f81f5860666b0bc7d84baddefa60d1cb9fa6fceb2398cc3baca6afaa60266675)
+depends=(base-files)
+description="GNU libtool"
+
+build() {
+  ./configure --prefix=/usr
+  make
+  make DESTDIR="$DESTDIR" install
+  rm -f "$DESTDIR/usr/lib/libltdl.a"
+}

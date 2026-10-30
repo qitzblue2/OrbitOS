@@ -1,0 +1,15 @@
+# GNU make: the final Orbit build (replaces the temporary one).
+name=make
+version=4.4.1
+stage=base
+sources=(https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz)
+sha256=(dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3)
+depends=(base-files)
+replaces=(make-temp)
+description="GNU make"
+
+build() {
+  ./configure --prefix=/usr
+  make
+  make DESTDIR="$DESTDIR" install
+}

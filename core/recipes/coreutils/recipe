@@ -1,0 +1,16 @@
+# GNU core utilities: the final Orbit build (replaces the temporary one).
+name=coreutils
+version=9.12
+stage=base
+sources=(https://ftp.gnu.org/gnu/coreutils/coreutils-9.12.tar.xz)
+sha256=(a480198559733e9b3da999e90543ac6f888a2caa544d8d664c5a1f17e528e210)
+depends=(base-files acl attr libcap gmp)
+replaces=(coreutils-temp)
+description="GNU core utilities"
+
+build() {
+  FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix=/usr --enable-no-install-program=kill,uptime
+  make
+  make DESTDIR="$DESTDIR" install
+  mkdir -p "$DESTDIR/usr/sbin" && mv "$DESTDIR/usr/bin/chroot" "$DESTDIR/usr/sbin/"
+}

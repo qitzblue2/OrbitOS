@@ -1,0 +1,15 @@
+# GNU stream editor: the final Orbit build (replaces the temporary one).
+name=sed
+version=4.10
+stage=base
+sources=(https://ftp.gnu.org/gnu/sed/sed-4.10.tar.xz)
+sha256=(b8e72182b2ec96a3574e2998c47b7aaa64cc20ce000d8e9ac313cc07cecf28c7)
+depends=(base-files)
+replaces=(sed-temp)
+description="GNU stream editor"
+
+build() {
+  ./configure --prefix=/usr
+  make
+  make DESTDIR="$DESTDIR" install
+}

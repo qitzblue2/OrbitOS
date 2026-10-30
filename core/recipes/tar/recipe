@@ -1,0 +1,15 @@
+# GNU tar: the final Orbit build (replaces the temporary one).
+name=tar
+version=1.35
+stage=base
+sources=(https://ftp.gnu.org/gnu/tar/tar-1.35.tar.xz)
+sha256=(4d62ff37342ec7aed748535323930c7cf94acf71c3591882b26a7ea50f3edc16)
+depends=(base-files acl attr)
+replaces=(tar-temp)
+description="GNU tar"
+
+build() {
+  FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix=/usr   # forge builds as root inside Orbit
+  make
+  make DESTDIR="$DESTDIR" install
+}

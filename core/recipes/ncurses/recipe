@@ -1,0 +1,24 @@
+# terminal library: the final Orbit build (replaces the temporary one).
+name=ncurses
+version=6.6
+stage=base
+sources=(https://invisible-mirror.net/archives/ncurses/ncurses-6.6.tar.gz)
+sha256=(355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11)
+depends=(base-files)
+replaces=(ncurses-temp)
+description="terminal library"
+
+build() {
+  ./configure --prefix=/usr --mandir=/usr/share/man --with-shared --without-debug --without-normal \
+    --with-cxx-shared --enable-pc-files --with-pkg-config-libdir=/usr/lib/pkgconfig
+  make
+  make DESTDIR="$DESTDIR" install
+  # programs that ask for the non-wide libraries get the wide ones
+  for lib in ncurses form panel menu; do
+    echo "INPUT(-l${lib}w)" > "$DESTDIR/usr/lib/lib${lib}.so"
+    ln -sf ${lib}w.pc "$DESTDIR/usr/lib/pkgconfig/${lib}.pc"
+  done
+  echo "INPUT(-lncursesw)" > "$DESTDIR/usr/lib/libcursesw.so"
+  ln -sf libncurses.so "$DESTDIR/usr/lib/libcurses.so"
+  sed -e 's/^#if.*XOPEN.*$/#if 1/' -i "$DESTDIR/usr/include/curses.h"
+}

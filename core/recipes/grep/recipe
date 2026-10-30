@@ -1,0 +1,16 @@
+# GNU grep: the final Orbit build (replaces the temporary one).
+name=grep
+version=3.12
+stage=base
+sources=(https://ftp.gnu.org/gnu/grep/grep-3.12.tar.xz)
+sha256=(2649b27c0e90e632eadcd757be06c6e9a4f48d941de51e7c0f83ff76408a07b9)
+depends=(base-files)
+replaces=(grep-temp)
+description="GNU grep"
+
+build() {
+  sed -i "s/echo/#echo/" src/egrep.sh   # no "egrep is obsolescent" warning on every call
+  ./configure --prefix=/usr
+  make
+  make DESTDIR="$DESTDIR" install
+}

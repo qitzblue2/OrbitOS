@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Focus
+GenericName=Focus Timer
+Comment=Hold back notifications and distracting sites for a while
+Exec=orbit-focus
+Icon=orbit-focus
+Categories=GTK;Utility;Clock;
+StartupNotify=true
+DBusActivatable=false
+Keywords=focus;pomodoro;timer;distraction;block;study;work;

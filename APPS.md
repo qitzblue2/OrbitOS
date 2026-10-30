@@ -156,6 +156,13 @@ Every screenshot here is real:
 - The firewall lets replies from PCs on the local network in (`3702`, `5353`, `137` udp, from private addresses only), so they can be found. Until you turn on **Sharing**, this PC shares nothing and doesn't announce itself.
 - OneDrive: Settings → Online Accounts → Microsoft 365 puts your OneDrive in Files.
 
+## Orbit Focus
+![Focus](docs/screenshots/app-focus.png)
+
+- Pick 25, 50 or 90 minutes and press **Start Focus**. Until the time is up, notifications wait in the list (Super+M) and Aphelion won't open the sites on your list or their subdomains; it shows a calm "Focus time" page instead. A notification says when the time is over.
+- The site list is yours to edit (YouTube, TikTok, Instagram, Facebook, X, Reddit, Twitch and Netflix to start with).
+- How it works: `~/.config/orbit/focus.json` holds the end time and the sites. Aphelion 1.2.1+ reads it only when it changes. A one-off systemd user timer (`orbit-focus --end`) puts notifications back when the time is up; **End Focus** does the same straight away.
+
 ## Phone Link
 - Pair an Android phone: its notifications on the PC (and you can reply), send files both ways, one shared clipboard, texts, battery level, ring a lost phone, use the phone as a remote.
 - On the phone, install **KDE Connect** (Google Play or F-Droid). On Orbit, open **Phone Link** (or Orbit Settings → Phone), pick the phone and press **Pair**; accept on the phone. Both must be on the same Wi-Fi.
@@ -257,7 +264,7 @@ Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
   - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
 
 ## Where the code is
-- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`, `sync.py`, `snapshots.py`, `vpn.py`), so it can be unit-tested.
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`, `games.py`, `updater.py`, `winapps.py`, `sharing.py`, `sync.py`, `snapshots.py`, `vpn.py`, `focus.py`), so it can be unit-tested.
 - `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
 - `packages/orbit-launcher/`: the launcher extension.
 - Tests:

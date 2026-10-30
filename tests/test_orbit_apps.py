@@ -18,7 +18,7 @@ os.environ["XDG_CONFIG_HOME"] = str(TMP / "home/.config")
 os.environ["XDG_STATE_HOME"] = str(TMP / "home/.local/state")
 (TMP / "home/Home").mkdir(parents=True)
 
-from orbit import backup, catalog, fileops, hardware, games, notes, spaces, tune, sharing, snapshots, sync, updater, vpn, winapps  # noqa: E402
+from orbit import backup, catalog, fileops, focus, hardware, games, notes, spaces, tune, sharing, snapshots, sync, updater, vpn, winapps  # noqa: E402
 
 
 class FileOps(unittest.TestCase):
@@ -649,6 +649,34 @@ class Vpn(unittest.TestCase):
                                                       {"name": "vps", "active": False}])
         self.assertEqual(vpn.public_ip(lambda: "203.0.113.7\n"), "203.0.113.7")
         self.assertIsNone(vpn.public_ip(lambda: "<html>"))
+
+
+class Focus(unittest.TestCase):
+    def test_sites(self):
+        self.assertEqual(focus.clean_sites("YouTube.com, https://www.reddit.com/r/x  bad_host  youtube.com"),
+                         ["youtube.com", "reddit.com"])
+        self.assertTrue(focus.blocked("m.youtube.com", ["youtube.com"]))
+        self.assertTrue(focus.blocked("YOUTUBE.COM.", ["youtube.com"]))
+        self.assertFalse(focus.blocked("notyoutube.com", ["youtube.com"]))
+
+    def test_session(self):
+        calls, scheduled, told = [], [], []
+
+        def gs(*a):
+            calls.append(a)
+            return "true" if a[0] == "get" else ""
+        s = focus.start(25, "youtube.com", gs=gs, schedule=scheduled.append, now=1000)
+        self.assertEqual((s["until"], s["sites"], scheduled), (1000 + 1500, ["youtube.com"], [1500]))
+        self.assertIn(("set", "org.gnome.desktop.notifications", "show-banners", "false"), calls)
+        self.assertIsNotNone(focus.load(now=1100))
+        self.assertEqual(focus.remaining(focus.load(now=1100), now=1100), 1400)
+        self.assertIsNone(focus.load(now=3000))  # ran out
+        with self.assertRaises(ValueError):
+            focus.start(0, "", gs=gs, schedule=scheduled.append)
+        self.assertTrue(focus.end(gs=gs, notify=lambda t, b: told.append(t)))
+        self.assertEqual(told, ["Focus time is over"])
+        self.assertEqual(calls[-1], ("set", "org.gnome.desktop.notifications", "show-banners", "true"))
+        self.assertFalse(focus.end(gs=gs, notify=lambda t, b: told.append(t)))
 
 
 if __name__ == "__main__":

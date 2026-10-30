@@ -1,0 +1,37 @@
+#!/usr/bin/python3 -I
+"""Privileged half of Orbit Optimizer, run through pkexec.
+
+  orbit-tune-helper clean apt|journal|crash|autoremove...
+
+Only these fixed jobs; no paths or package names come from the caller.
+"""
+import os
+import subprocess
+import sys
+
+ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "DEBIAN_FRONTEND": "noninteractive", "LANG": "C.UTF-8"}
+JOBS = {
+    "apt": [["apt-get", "clean"]],
+    "journal": [["journalctl", "--vacuum-size=50M"]],
+    "crash": [["find", "/var/crash", "-mindepth", "1", "-xdev", "-delete"]],
+    "autoremove": [["apt-get", "autoremove", "--purge", "-y", "-q"]],
+}
+
+
+def main(argv):
+    if os.geteuid() != 0:
+        sys.exit("must run as root (via pkexec)")
+    if len(argv) < 3 or argv[1] != "clean" or any(j not in JOBS for j in argv[2:]):
+        sys.exit(f"usage: orbit-tune-helper clean {'|'.join(JOBS)}...")
+    rc = 0
+    for job in dict.fromkeys(argv[2:]):
+        for cmd in JOBS[job]:
+            if job == "crash" and not os.path.isdir("/var/crash"):
+                continue
+            print(f"orbit-tune-helper: {job}", flush=True)
+            rc |= subprocess.run(cmd, env=ENV).returncode
+    sys.exit(1 if rc else 0)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

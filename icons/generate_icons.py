@@ -46,6 +46,8 @@ GLYPHS = {
     "clipboard": '<rect x="5.5" y="5" width="13" height="16" rx="2.5"/><path d="M9 3.5h6v3H9zM9 11h6M9 15h4"/>',
     "spaces": '<circle cx="12" cy="12" r="2.6"/><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(-24 12 12)"/>',
     "widgets": '<rect x="4" y="4" width="7" height="9" rx="2"/><rect x="13" y="4" width="7" height="5" rx="2"/><rect x="13" y="11" width="7" height="9" rx="2"/><rect x="4" y="15" width="7" height="5" rx="2"/>',
+    "optimizer": '<path d="M12 3.5l1.6 4.3 4.4 1.6-4.4 1.6L12 15.3l-1.6-4.3-4.4-1.6 4.4-1.6z"/><path d="M18 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8zM6 15.5l.6 1.4 1.4.6-1.4.6L6 19.5l-.6-1.4-1.4-.6 1.4-.6z"/>',
+    "performance": '<path d="M4.2 17a8.5 8.5 0 1 1 15.6 0"/><path d="M12 13l4-5"/><circle cx="12" cy="13" r="1.4"/><path d="M7 20.5h10"/>',
     "control": '<rect x="3" y="5" width="18" height="6" rx="3"/><circle cx="15.5" cy="8" r="1.4"/><rect x="3" y="13" width="18" height="6" rx="3"/><circle cx="8.5" cy="16" r="1.4"/>',
 }
 
@@ -92,6 +94,8 @@ APP_MAP = {
     "spaces": ["orbit-spaces"],
     "widgets": ["orbit-widgets"],
     "control": ["orbit-control-center"],
+    "optimizer": ["orbit-optimizer"],
+    "performance": ["orbit-performance"],
 }
 FOLDER_MAP = {
     "plain": ["folder"], "music": ["folder-music"], "favorites": ["folder-favorites"],

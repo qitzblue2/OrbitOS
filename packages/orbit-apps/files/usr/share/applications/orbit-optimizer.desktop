@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Optimizer
+GenericName=System Cleanup
+Comment=Free up space and choose which apps start at login
+Exec=orbit-optimizer
+Icon=orbit-optimizer
+Categories=GTK;System;Settings;
+StartupNotify=true
+DBusActivatable=false
+Keywords=clean;cache;trash;storage;startup;autostart;junk;

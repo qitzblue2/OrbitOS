@@ -18,7 +18,7 @@ os.environ["XDG_CONFIG_HOME"] = str(TMP / "home/.config")
 os.environ["XDG_STATE_HOME"] = str(TMP / "home/.local/state")
 (TMP / "home/Home").mkdir(parents=True)
 
-from orbit import backup, catalog, fileops, hardware, notes, spaces  # noqa: E402
+from orbit import backup, catalog, fileops, hardware, notes, spaces, tune  # noqa: E402
 
 
 class FileOps(unittest.TestCase):
@@ -285,6 +285,82 @@ class Hardware(unittest.TestCase):
         self.assertGreater(sum(hardware.summary(secs).values()), 5)
         md = hardware.report_markdown("Test PC", secs, {"Lid close": ("ok", "fine")})
         self.assertIn("| Lid close | ✅ | fine |", md)
+
+
+class Tune(unittest.TestCase):
+    def setUp(self):
+        self.d = pathlib.Path(tempfile.mkdtemp(dir=TMP))
+
+    def test_sizes_and_empty_dir_keep(self):
+        (self.d / "a").mkdir()
+        (self.d / "a/x").write_bytes(b"1" * 100)
+        (self.d / "thumbnails").mkdir()
+        (self.d / "thumbnails/t").write_bytes(b"2" * 50)
+        (self.d / "link").symlink_to("/etc")
+        self.assertEqual(tune.dir_size(self.d), 150)  # links to folders are not followed
+        tune.empty_dir(self.d, keep=("thumbnails",))
+        self.assertEqual(sorted(p.name for p in self.d.iterdir()), ["thumbnails"])
+        self.assertTrue(pathlib.Path("/etc").is_dir())
+
+    def test_system_clean_is_fixed_jobs_only(self):
+        self.assertEqual(tune.clean_system_argv(["apt", "journal"])[1:], [tune.HELPER, "clean", "apt", "journal"])
+        with self.assertRaises(ValueError):
+            tune.clean_system_argv(["apt", "/home"])
+
+    def test_autostart_override(self):
+        sysdir = self.d / "sys"
+        sysdir.mkdir()
+        (sysdir / "chat.desktop").write_text("[Desktop Entry]\nName=Chat\nExec=chat\n")
+        (sysdir / "orbit-welcome.desktop").write_text("[Desktop Entry]\nName=Welcome\nExec=w\n")
+        (sysdir / "kde.desktop").write_text("[Desktop Entry]\nName=K\nExec=k\nOnlyShowIn=KDE;\n")
+        old = tune.SYSTEM_AUTOSTART, tune.USER_AUTOSTART
+        tune.SYSTEM_AUTOSTART, tune.USER_AUTOSTART = [sysdir], self.d / "user"
+        try:
+            apps = tune.autostart_apps()
+            self.assertEqual([a["id"] for a in apps], ["chat.desktop"])
+            self.assertTrue(apps[0]["enabled"])
+            tune.set_autostart("chat.desktop", False)
+            self.assertFalse(tune.autostart_apps()[0]["enabled"])
+            self.assertIn("Name=Chat", (sysdir / "chat.desktop").read_text())  # system copy untouched
+            tune.set_autostart("chat.desktop", True)
+            self.assertTrue(tune.autostart_apps()[0]["enabled"])
+            with self.assertRaises(ValueError):
+                tune.set_autostart("../x.desktop", False)
+        finally:
+            tune.SYSTEM_AUTOSTART, tune.USER_AUTOSTART = old
+
+    def test_cpu_memory_processes(self):
+        stat = self.d / "stat"
+        stat.write_text("cpu  100 0 100 700 100 0 0 0 0 0\n")
+        a = tune.read_cpu(stat)
+        stat.write_text("cpu  200 0 200 800 100 0 0 0 0 0\n")
+        self.assertAlmostEqual(tune.cpu_percent(a, tune.read_cpu(stat)), 200 / 3)
+        mi = self.d / "meminfo"
+        mi.write_text("MemTotal: 1000 kB\nMemFree: 100 kB\nMemAvailable: 400 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n")
+        m = tune.read_memory(mi)
+        self.assertEqual((m["total"], m["used"]), (1024000, 614400))
+        me = tune.read_processes(uid=os.getuid())
+        self.assertIn(os.getpid(), me)
+        prev = {1: {"name": "game", "cpu_ticks": 0, "rss": 1, "uid": 0}}
+        cur = {1: {"name": "game", "cpu_ticks": 200, "rss": 5, "uid": 0},
+               2: {"name": "game", "cpu_ticks": 9, "rss": 5, "uid": 0},
+               3: {"name": "idle", "cpu_ticks": 0, "rss": 99, "uid": 0}}
+        top = tune.top_apps(prev, cur, 2, hz=100)
+        self.assertEqual(top[0]["name"], "game")
+        self.assertAlmostEqual(top[0]["cpu"], 100.0)
+        self.assertEqual(sorted(top[0]["pids"]), [1, 2])
+
+    def test_temperature_and_advice(self):
+        hw = self.d / "class/hwmon/hwmon0"
+        hw.mkdir(parents=True)
+        (hw / "name").write_text("k10temp\n")
+        (hw / "temp1_input").write_text("84000\n")
+        self.assertEqual(tune.read_temperature(self.d), 84.0)
+        mem = {"total": 100, "used": 90, "available": 10, "swap_total": 0, "swap_used": 0}
+        levels = [lvl for lvl, _ in tune.advice(mem, 84.0, 10, "power-saver", 9, 3_000_000_000)]
+        self.assertEqual(levels, ["warn", "warn", "info", "info", "info"])
+        ok = {"total": 100, "used": 10, "available": 90, "swap_total": 0, "swap_used": 0}
+        self.assertEqual(tune.advice(ok, 50, 5, "balanced", 1, 0), [])
 
 
 if __name__ == "__main__":

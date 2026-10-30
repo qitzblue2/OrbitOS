@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Performance
+GenericName=Performance Monitor
+Comment=See what slows your computer down and pick a power mode
+Exec=orbit-performance
+Icon=orbit-performance
+Categories=GTK;System;Monitor;
+StartupNotify=true
+DBusActivatable=false
+Keywords=cpu;ram;memory;temperature;speed;power;battery;boost;

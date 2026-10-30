@@ -128,6 +128,28 @@ Every screenshot here is real:
 - **Restore** a whole snapshot or one folder. Restoring never deletes anything: files it would replace are kept as `name.before-restore`.
 - **Limitation:** change detection uses rsync's normal check (size and modification time). A same-size edit made in the same second as a backup is only picked up at the next change.
 
+## Orbit Optimizer
+| ![Clean Up](docs/screenshots/app-optimizer-clean.png) | ![Startup](docs/screenshots/app-optimizer-startup.png) |
+|---|---|
+
+- **Clean Up:** measures first and deletes nothing until you press Clean Up. Your app caches, thumbnails and Trash are cleaned directly (Trash asks first). System files (downloaded updates, old logs over 50 MB, crash reports, unused packages) go through `pkexec orbit-tune-helper`, which only runs those four fixed jobs.
+- **Startup:** turn apps that start at login on or off. This writes a per-user override in `~/.config/autostart`, so nothing system-wide changes. Orbit's own session parts aren't listed.
+
+## Orbit Performance
+![Performance](docs/screenshots/app-performance.png)
+
+- Live processor, memory, swap and temperature, read every 2 seconds straight from `/proc` and `/sys`.
+- Power mode (Battery Saver / Balanced / Performance) through power-profiles-daemon.
+- Plain-language tips (memory almost full, running hot, too many login apps, lots to clean).
+- Your heaviest apps with a **Quit** button. It asks the app to close normally, and only works on your own apps.
+
+## Built-in speed tuning
+Orbit ships these in `orbit-os-desktop`, so they also arrive as updates:
+- Memory: zram first (`vm.swappiness=150`, `page-cluster=0`), folder metadata kept in cache, small write-back batches so copying to USB sticks doesn't stall the desktop, and `vm.max_map_count` raised for games.
+- systemd-oomd closes a runaway app before the desktop freezes. Programs that hang at shutdown are stopped after 15 s instead of 90 s. The system log is capped at 200 MB.
+- Disks: weekly TRIM for SSDs, and the right I/O scheduler per disk (NVMe `none`, SSD `mq-deadline`, hard disk `bfq`).
+- Network: BBR congestion control with `fq`, TCP Fast Open. Boot doesn't wait for the network.
+
 ## GNOME Shell extensions
 
 | | |
@@ -154,7 +176,7 @@ Every screenshot here is real:
   - Only **pinned** items are saved to disk (`~/.local/share/orbit/clipboard.json`, readable only by you). Unpinned history disappears when you log out unless you turn on *remember across sessions*.
 
 ## Where the code is
-- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`), so it can be unit-tested.
+- `packages/orbit-apps/src/orbit/`: the apps. Each app's logic is kept separate from its window (`fileops.py`, `notes.py`, `spaces.py`, `backup.py`, `catalog.py`, `hardware.py`, `annotate.py`, `tune.py`), so it can be unit-tested.
 - `packages/orbit-shell-extensions/`: Control Center, Widgets, Clipboard.
 - `packages/orbit-launcher/`: the launcher extension.
 - Tests:

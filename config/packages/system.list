@@ -59,6 +59,7 @@ libgl1-mesa-dri
 fwupd
 power-profiles-daemon
 thermald
+systemd-oomd
 fprintd
 libpam-fprintd
 bluez

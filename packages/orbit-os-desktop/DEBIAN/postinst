@@ -12,5 +12,10 @@ if [ "$1" = configure ]; then
   pam-auth-update --enable fprintd --package >/dev/null 2>&1 || true
   # SSH stays off unless the user installs and enables it.
   systemctl disable --now ssh.service ssh.socket >/dev/null 2>&1 || true
+  # Speed: weekly SSD TRIM, kill runaway memory hogs before the desktop freezes,
+  # don't hold up boot waiting for the network.
+  systemctl enable fstrim.timer >/dev/null 2>&1 || true
+  systemctl enable systemd-oomd.service >/dev/null 2>&1 || true
+  systemctl disable NetworkManager-wait-online.service >/dev/null 2>&1 || true
   # New users get the ~/Home layout from /etc/skel (copied by the package).
 fi

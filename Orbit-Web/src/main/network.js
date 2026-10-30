@@ -106,8 +106,20 @@ class Pipeline {
   install() {
     const filter = { urls: ['<all_urls>'] };
     this.ses.webRequest.onBeforeRequest(filter, (details, cb) => cb(this.before(details)));
-    this.ses.webRequest.onBeforeSendHeaders(filter, (details, cb) => cb(this.sendHeaders(details)));
-    this.ses.webRequest.onHeadersReceived(filter, (details, cb) => cb(this.received(details)));
+    this.refresh();
+  }
+
+  // Every registered hook costs a round-trip into JS for every request, so the header
+  // hooks exist only while a setting needs them; Accept-Language is set by Chromium itself.
+  refresh() {
+    const s = this.ctx.settings();
+    const filter = { urls: ['<all_urls>'] };
+    const wr = this.ses.webRequest;
+    if (s.dnt || s.cookies) wr.onBeforeSendHeaders(filter, (d, cb) => cb(this.sendHeaders(d)));
+    else wr.onBeforeSendHeaders(null);
+    if (s.cookies) wr.onHeadersReceived(filter, (d, cb) => cb(this.received(d)));
+    else wr.onHeadersReceived(null);
+    this.ses.setUserAgent(this.ses.getUserAgent(), languageList(s.lang));
   }
 
   before(details) {
@@ -172,7 +184,6 @@ class Pipeline {
       h.DNT = '1';
       h['Sec-GPC'] = '1';
     }
-    h['Accept-Language'] = acceptLanguage(s.lang);
     const { top } = this.topUrlFor(details);
     if (s.cookies && this.isThirdParty(details, top)) {
       delete h.Cookie;
@@ -215,6 +226,11 @@ class Pipeline {
     }
     return parts.join('\n');
   }
+}
+
+// plain list for session.setUserAgent; Chromium adds the q= weights itself
+function languageList(lang) {
+  return [...new Set([lang, lang.split('-')[0], 'en-US', 'en'])].join(',');
 }
 
 function acceptLanguage(lang) {

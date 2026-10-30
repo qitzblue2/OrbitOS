@@ -12,10 +12,10 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 
 /* ---- tab strip ---- */
 #strip { display: flex; align-items: flex-end; gap: 4px; padding: 8px 8px 0; height: 44px; background: var(--strip);
-  backdrop-filter: var(--blur); -webkit-app-region: drag; }
+  backdrop-filter: var(--blur); }
 .compact #strip { height: 38px; }
 #tabs { display: flex; align-items: flex-end; gap: 4px; min-width: 0; flex: 0 1 auto; overflow: hidden; }
-.tab { -webkit-app-region: no-drag; display: flex; align-items: center; gap: 8px; width: 200px; min-width: 64px; flex: 0 1 200px;
+.tab { display: flex; align-items: center; gap: 8px; width: 200px; min-width: 64px; flex: 0 1 200px;
   height: 36px; padding: 0 8px 0 12px; border-radius: 10px 10px 0 0; cursor: pointer; font-size: 12px; color: var(--muted);
   transition: background var(--base), color var(--base); animation: tabIn var(--slow) cubic-bezier(.2, .9, .3, 1); overflow: hidden; }
 .compact .tab { height: 30px; }
@@ -33,13 +33,13 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
   font-size: 14px; flex: none; }
 .tab .x:hover { background: var(--fill-hover); opacity: 1; }
 .tab.dragging { opacity: .5; }
-#newtab { -webkit-app-region: no-drag; width: 28px; height: 28px; margin-bottom: 5px; border-radius: 6px; font-size: 16px; color: var(--ink-2);
+#newtab { width: 28px; height: 28px; margin-bottom: 5px; border-radius: 6px; font-size: 16px; color: var(--ink-2);
   display: flex; align-items: center; justify-content: center; flex: none; }
 #newtab:hover { background: var(--fill-hover); }
 .drag { flex: 1; align-self: stretch; }
-#private-badge { -webkit-app-region: no-drag; align-self: center; margin: 0 8px 8px; padding: 3px 9px; border-radius: 999px;
+#private-badge { align-self: center; margin: 0 8px 8px; padding: 3px 9px; border-radius: 999px;
   background: #3a2a52; color: #e9dcff; font-size: 11px; font-weight: 600; }
-#winbtns { -webkit-app-region: no-drag; display: flex; gap: 8px; padding: 0 10px 12px; }
+#winbtns { display: flex; gap: 8px; padding: 0 10px 12px; }
 .compact #winbtns { padding-bottom: 10px; }
 .light { width: 14px; height: 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   color: rgba(22, 22, 25, .75); transition: transform var(--fast), filter var(--fast); }

@@ -1,7 +1,7 @@
 'use strict';
 // Aphelion: main process. Owns settings, sessions, windows and every IPC handler.
 const { app, protocol, session, ipcMain, Menu, clipboard, dialog, shell, net, nativeTheme, safeStorage,
-        nativeImage, BaseWindow } = require('electron');
+        nativeImage, BaseWindow, powerMonitor } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -12,6 +12,7 @@ const { Engines, Pipeline, siteOf } = require('./network');
 const { BrowserWindowController } = require('./window');
 const { Vault, generatePassword } = require('./vault');
 const totpLib = require('./totp');
+const { AuthVault } = require('./authvault');
 const platform = require('./platform');
 const { toUrl, hostOf } = require('./url');
 
@@ -42,7 +43,7 @@ class Aphelion {
     this.permPrompts = new Map();
     this.orbitStyle = null;
     this.engines = new Engines(path.join(ROOT, 'assets', 'lists'), path.join(dir, 'filter-lists'));
-    this.totpFile = path.join(dir, 'authenticator.bin');
+    this.auth = new AuthVault(path.join(dir, 'authenticator.bin'), safeStorage);
   }
 
   // ---------- settings ----------
@@ -54,6 +55,7 @@ class Aphelion {
     this.store.data[key] = schema.validate(key, value);
     this.store.save();
     if (key === 'spell' || key === 'lang') this.applySpell();
+    if (['dnt', 'cookies', 'lang'].includes(key)) for (const p of this.pipelines.values()) p.refresh();
     this.broadcast();
     for (const w of this.windows) {
       w.layout();
@@ -162,6 +164,7 @@ class Aphelion {
     ses.setSpellCheckerEnabled(this.settings().spell);
     const ua = ses.getUserAgent().replace(/Electron\/\S+\s/, '').replace(/aphelion\/\S+\s/i, '');
     ses.setUserAgent(ua);  // look like plain Chromium: fewer "unsupported browser" pages, less fingerprint
+    pipeline.refresh();     // re-applies the Accept-Language list on top of that user agent
     return pipeline;
   }
 
@@ -353,19 +356,11 @@ class Aphelion {
 
   // ---------- authenticator ----------
   readTotp() {
-    try {
-      const raw = fs.readFileSync(this.totpFile);
-      const json = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
-      return JSON.parse(json);
-    } catch {
-      return [];
-    }
+    return this.auth.list();
   }
 
   writeTotp(list) {
-    const json = JSON.stringify(list);
-    const data = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(json) : Buffer.from(json);
-    fs.writeFileSync(this.totpFile, data, { mode: 0o600 });
+    this.auth.replace(list);
   }
 
   totpCodes() {
@@ -572,6 +567,8 @@ app.whenReady().then(async () => {
   nativeTheme.on('updated', () => A.broadcast());
   if (!A.settings().vaultPath) A.store.data.vaultPath = platform.defaultVault();
   registerIpc(A);
+  // the authenticator locks with the computer
+  for (const ev of ['lock-screen', 'suspend']) powerMonitor.on(ev, () => A.auth.lock());
   const saved = A.settings().restore ? A.sessionStore.data.windows : [];
   const urls = urlsFromArgs(process.argv);
   if (saved.length) for (const r of saved) A.newWindow({ restore: r });
@@ -643,6 +640,29 @@ function registerIpc(a) {
   });
 
   // window + tabs
+  // Window dragging is done by hand instead of with CSS app-region: on Windows a
+  // drag region inside a WebContentsView swallows clicks on the tabs above it.
+  let drag = null;
+  ipcMain.on('ui:drag', (e, phase, x, y) => {
+    const w = fromUi(e);
+    if (!w || w.win.isFullScreen() || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (phase === 'start') {
+      let b = w.win.getBounds();
+      if (w.win.isMaximized()) {
+        // pull a maximized window out from under the cursor, keeping the grab point proportional
+        const ratio = (x - b.x) / b.width;
+        w.win.unmaximize();
+        const nb = w.win.getBounds();
+        w.win.setPosition(Math.round(x - nb.width * ratio), b.y);
+        b = w.win.getBounds();
+      }
+      drag = { w, x, y, bx: b.x, by: b.y };
+    } else if (phase === 'move' && drag?.w === w) {
+      w.win.setPosition(Math.round(drag.bx + x - drag.x), Math.round(drag.by + y - drag.y));
+    } else if (phase === 'end') {
+      drag = null;
+    }
+  });
   ui('win', (w, act) => ({ min: () => w.win.minimize(), max: () => (w.win.isMaximized() ? w.win.unmaximize() : w.win.maximize()),
                            full: () => w.win.setFullScreen(!w.win.isFullScreen()), close: () => w.win.close() }[act]?.()));
   ui('newTab', (w, url) => void w.newTab(url));
@@ -671,9 +691,12 @@ function registerIpc(a) {
   ui('findClose', (w) => w.stopFind());
   ui('bar', (w, id, action, remember) => {
     if (id.startsWith('perm-')) return a.answerPermission(w, id, action === 'allow', remember);
-    if (id === 'translate' && action === 'translate') {
+    if (id === 'translate') {
+      // the answer holds for the rest of this tab's life: yes = translate every page, no = stop asking
       const t = w.active();
-      w.navigate(`https://translate.google.com/translate?sl=auto&tl=${a.settings().lang.split('-')[0]}&u=${encodeURIComponent(t.url)}`);
+      if (t) t.translate = action === 'translate' ? 'yes' : 'no';
+      const to = t && action === 'translate' && translatedUrl(t.url, a.settings().lang);
+      if (to) w.navigate(to);
     }
     if (id.startsWith('http-') && action === 'continue') {
       const host = id.slice(5);
@@ -682,7 +705,9 @@ function registerIpc(a) {
     }
     w.removeBar(id);
   });
-  ui('suggest', async (w, q) => suggestions(a, q));
+  ui('suggestLocal', (w, q) => suggestLocal(a, q));
+  ui('suggestRemote', (w, q) => suggestRemote(a, q));
+  ui('suggestWarm', () => suggestWarm(a));
   ui('state', (w) => w.state());
 
   // shield + ad blocker
@@ -707,6 +732,11 @@ function registerIpc(a) {
   });
 
   // authenticator
+  ui('totpState', () => a.auth.state());
+  ui('totpSetup', (w, pw) => a.auth.setup(pw));
+  ui('totpUnlock', (w, pw) => a.auth.unlock(pw));
+  ui('totpLock', () => a.auth.lock());
+  ui('totpChangePassword', (w, oldPw, newPw) => a.auth.changePassword(oldPw, newPw));
   ui('totp', () => a.totpCodes());
   ui('totpAdd', (w, input, name) => a.addTotp(input, name));
   ui('totpRemove', (w, id) => a.writeTotp(a.readTotp().filter((x) => x.id !== id)));
@@ -893,10 +923,18 @@ function registerIpc(a) {
     const s = a.settings();
     if (!t || e.senderFrame !== e.sender.mainFrame || !s.translate || typeof lang !== 'string') return;
     const pageLang = lang.toLowerCase().split('-')[0];
-    if (pageLang && pageLang !== s.lang.split('-')[0] && /^[a-z]{2,3}$/.test(pageLang) && t.id === t.win.activeId) {
-      t.win.addBar({ id: 'translate', kind: 'translate', text: `This page is in ${langName(pageLang)}. Translate it?`,
-                     actions: [['Translate', 'translate'], ['No thanks', 'dismiss']] });
+    const foreign = pageLang && pageLang !== s.lang.split('-')[0] && /^[a-z]{2,3}$/.test(pageLang);
+    if (!foreign || t.translate === 'no' || hostOf(t.url).endsWith('.translate.goog')) return;
+    if (t.translate === 'yes') {
+      const to = translatedUrl(t.url, s.lang);
+      if (to) t.wc.loadURL(to);
+      return;
     }
+    // ask once per tab; the bar goes away by itself if the user just moves on
+    if (t.translateAsked || t.id !== t.win.activeId) return;
+    t.translateAsked = true;
+    t.win.addBar({ id: 'translate', kind: 'translate', text: `This page is in ${langName(pageLang)}. Translate pages in this tab?`,
+                   actions: [['Translate', 'translate'], ['No thanks', 'dismiss']] });
   });
   ipcMain.on('aph:picked', (e, selector) => {
     const t = fromTab(e);
@@ -947,11 +985,26 @@ function registerIpc(a) {
 const LANG_NAMES = { en: 'English', nl: 'Dutch', de: 'German', fr: 'French', es: 'Spanish', it: 'Italian', pt: 'Portuguese',
                      pl: 'Polish', sv: 'Swedish', tr: 'Turkish', ja: 'Japanese', zh: 'Chinese', ru: 'Russian', ar: 'Arabic',
                      ko: 'Korean', uk: 'Ukrainian', da: 'Danish', no: 'Norwegian', fi: 'Finnish', cs: 'Czech', el: 'Greek' };
+// Google's page proxy: https://www.example.com/a -> https://www-example-com.translate.goog/a?_x_tr_sl=auto&...
+// Links inside a translated page stay on the proxy, so the whole visit stays translated.
+function translatedUrl(url, lang) {
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol) || u.port || u.hostname.endsWith('.translate.goog')) return null;
+  const tl = lang.split('-')[0];
+  const host = u.hostname.replace(/-/g, '--').replace(/\./g, '-');
+  const q = new URLSearchParams(u.search);
+  q.set('_x_tr_sl', 'auto'); q.set('_x_tr_tl', tl); q.set('_x_tr_hl', tl);
+  return `https://${host}.translate.goog${u.pathname}?${q}${u.hash}`;
+}
+
 function langName(code) {
   return LANG_NAMES[code] || code.toUpperCase();
 }
 
-async function suggestions(a, q) {
+// Address-bar suggestions come in two parts so typing never waits on the network:
+// local matches (bookmarks, history) answer at once, engine phrases follow.
+function suggestLocal(a, q) {
   const s = a.settings();
   const query = String(q || '').trim();
   const out = [];
@@ -965,19 +1018,42 @@ async function suggestions(a, q) {
     if (out.length >= 6) break;
     if (!out.some((o) => o.url === h.url)) out.push({ kind: 'history', title: h.title, url: h.url });
   }
+  if (s.preload && out[0]?.url?.startsWith('https:')) a.mainSession.preconnect({ url: out[0].url, numSockets: 1 });
+  return out;
+}
+
+const remoteCache = new Map();  // `${engine}\n${query}` -> phrases; small LRU
+async function suggestRemote(a, q) {
+  const s = a.settings();
+  const query = String(q || '').trim();
   const eng = schema.ENGINES[s.engine];
-  if (s.suggest && eng?.suggest && !/^[a-z]+:\/\//i.test(query)) {
+  if (!query || !s.suggest || !eng?.suggest || /^[a-z]+:\/\//i.test(query)) return [];
+  const key = `${s.engine}\n${query.toLowerCase()}`;
+  let phrases = remoteCache.get(key);
+  if (!phrases) {
     try {
       const res = await net.fetch(eng.suggest.replace('%s', encodeURIComponent(query)), { signal: AbortSignal.timeout(1500) });
       const data = await res.json();
-      const list = Array.isArray(data) ? (Array.isArray(data[1]) ? data[1] : data.map((x) => x.phrase)) : [];
-      for (const phrase of list.filter((x) => typeof x === 'string').slice(0, 5)) out.push({ kind: 'search', title: phrase, url: toUrl(phrase, s.engine) });
+      const list = Array.isArray(data) ? (Array.isArray(data[1]) ? data[1] : data.map((x) => x?.phrase)) : [];
+      phrases = list.filter((x) => typeof x === 'string').slice(0, 5);
     } catch {
-      /* offline or blocked: history/bookmark matches are enough */
+      return [];  // offline or blocked: local matches are enough
     }
+    remoteCache.set(key, phrases);
+    if (remoteCache.size > 300) remoteCache.delete(remoteCache.keys().next().value);
   }
-  if (s.preload && out[0]?.url?.startsWith('https:')) a.mainSession.preconnect({ url: out[0].url, numSockets: 1 });
-  return out;
+  return phrases.map((phrase) => ({ kind: 'search', title: phrase, url: toUrl(phrase, s.engine) }));
+}
+
+// open the connection to the suggestion server when the address bar gets focus,
+// so the first keystroke does not pay for DNS + TLS
+function suggestWarm(a) {
+  const s = a.settings();
+  const eng = schema.ENGINES[s.engine];
+  if (!s.suggest || !eng?.suggest) return;
+  try {
+    a.mainSession.preconnect({ url: new URL(eng.suggest.replace('%s', 'a')).origin, numSockets: 1 });
+  } catch { /* bad engine URL: nothing to warm */ }
 }
 
 module.exports = { Aphelion };

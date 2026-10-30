@@ -117,6 +117,8 @@ class Tab {
       this.crashed = false;
       this.hasArticle = false;
       this.favicon = '';
+      // an unanswered translate offer belongs to the page it was made for
+      if (this.id === this.win.activeId && this.win.bars.some((b) => b.id === 'translate')) this.win.removeBar('translate');
       if (!this.session.isPrivate) app.history.add(url, wc.getTitle());
       this.win.changed();
       this.win.persist();

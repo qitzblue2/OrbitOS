@@ -51,7 +51,7 @@ const SECTIONS = {
   ]],
   languages: ['Languages', 'Translation and spelling.', () => [
     ['v', 'lang', 'Preferred language', S.languages],
-    ['t', 'translate', 'Offer to translate pages', 'Asks first; translation opens Google Translate only when you click'],
+    ['t', 'translate', 'Offer to translate pages', 'Asks once per tab; pages are only sent to Google Translate after you click Translate'],
     ['t', 'spell', 'Spell check', 'Check spelling as you type'],
   ]],
   passwords: ['Passwords', 'Saved logins and autofill, kept in your KeePass database.', () => [
@@ -218,7 +218,7 @@ function permsBlock() {
 }
 
 function totpBlock() {
-  const box = h('div', { class: 'group' }, h('div', { class: 'group-title' }, 'Authenticator accounts', h('span', { text: 'encrypted with your system keychain' })));
+  const box = h('div', { class: 'group' }, h('div', { class: 'group-title' }, 'Authenticator accounts', h('span', { text: 'encrypted with your 2FA password and your system keychain' })));
   call('totpList').then((list) => {
     box.append(list.length ? h('div', { class: 'card' }, ...list.map((a) => h('div', { class: 'list-item' },
       h('span', { class: 'grow', text: a.account ? `${a.name} · ${a.account}` : a.name }),
@@ -226,6 +226,8 @@ function totpBlock() {
         if (confirm(`Remove ${a.name}? Make sure you can still log in another way.`)) call('totpRemove', a.id).then(draw);
       } }))))
       : h('div', { class: 'faint', text: 'Add accounts from the 2FA button in the address bar.' }));
+  }).catch(() => {
+    box.append(h('div', { class: 'faint', text: 'Locked. Unlock it with the 2FA button in the address bar, then reopen this page.' }));
   });
   return box;
 }

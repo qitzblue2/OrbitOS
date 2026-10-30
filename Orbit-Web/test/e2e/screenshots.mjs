@@ -176,13 +176,41 @@ const kpText = await ui.evaluate(() => document.querySelector('#pop')?.innerText
 check(/Matches for example\.com/i.test(kpText) && /demo-user/.test(kpText), 'KeePass shows the matching entry for example.com');
 await closePop();
 
-// 6. Authenticator with a real TOTP secret
+// 6. Authenticator: password first, then real TOTP secrets
+await openPop('Authenticator');
+await shot('07a-authenticator-setup');
+check(await ui.evaluate(() => document.querySelectorAll('#pop input[type=password]').length === 2), '2FA asks to set a password first');
+await ui.fill('#pop input[type=password] >> nth=0', 'orbit-2fa-pass');
+await ui.fill('#pop input[type=password] >> nth=1', 'orbit-2fa-pass');
+await ui.keyboard.press('Enter');
+await sleep(1500);
+await closePop();
 await A(() => global.__aphelion.addTotp('otpauth://totp/GitHub:qitzblue2?secret=JBSWY3DPEHPK3PXP&issuer=GitHub'));
 await A(() => global.__aphelion.addTotp('otpauth://totp/Proton:me%40example.org?secret=KRSXG5CTMVRXEZLUKN2XAZLSOI&issuer=Proton%20Mail'));
 await openPop('Authenticator');
 await shot('07-authenticator');
 const codes = await A(() => global.__aphelion.totpCodes());
 check(codes.length === 2 && codes.every((c) => /^\d{6}$/.test(c.code)), 'authenticator produces 6-digit codes');
+// the add form must survive the once-a-second code refresh
+await ui.click('#pop summary');
+await sleep(2500);
+check(await ui.evaluate(() => document.querySelector('#pop details')?.open === true), '"Add an account" stays open while codes refresh');
+await shot('07b-authenticator-add');
+await closePop();
+// locked: no codes without the password, wrong password refused
+await A(() => global.__aphelion.auth.lock());
+const lockedErr = await A(() => { try { global.__aphelion.totpCodes(); return ''; } catch (e) { return e.message; } });
+check(/locked/.test(lockedErr), 'locked authenticator gives no codes');
+await openPop('Authenticator');
+await ui.fill('#pop input[type=password]', 'wrong-pass');
+await ui.keyboard.press('Enter');
+await sleep(1500);
+check(/wrong password/.test(await ui.evaluate(() => document.querySelector('#pop .err')?.textContent || '')), 'wrong 2FA password is refused');
+await shot('07c-authenticator-locked');
+await ui.fill('#pop input[type=password]', 'orbit-2fa-pass');
+await ui.keyboard.press('Enter');
+await sleep(1500);
+check(await ui.evaluate(() => document.querySelectorAll('#pop .code').length === 2), 'right 2FA password unlocks the codes');
 await closePop();
 
 // 7. quick notes saved to ~/Home/Notes
@@ -234,7 +262,56 @@ st = await state();
 check(st.nav.url.startsWith('aphelion://reader'), 'reader view opened for a Wikipedia article');
 await shot('15-reader');
 
-// 12. history page
+// 12. tab strip: a real mouse click on another tab switches to it
+await A(() => global.__aphelion.current().newTab('aphelion://newtab/'));
+await sleep(1500);
+const before = await A(() => global.__aphelion.current().activeId);
+await ui.click('.tab >> nth=0');
+await sleep(800);
+const after = await A(() => global.__aphelion.current().activeId);
+check(before !== after, 'clicking a tab in the strip switches tabs');
+
+// 13. suggestions: local matches appear without waiting for the search engine
+await ui.click('#addr');
+await ui.keyboard.type('wik', { delay: 30 });
+await sleep(300);
+const t0 = Date.now();
+await ui.keyboard.type('i');
+// measured inside the page: time from the keystroke to options on screen
+const firstMs = await ui.evaluate(() => new Promise((resolve) => {
+  const start = performance.now();
+  const tick = () => {
+    if (document.querySelectorAll('#pop [role=option]').length > 0) resolve(Math.round(performance.now() - start));
+    else if (performance.now() - start > 3000) resolve(-1);
+    else requestAnimationFrame(tick);
+  };
+  tick();
+}));
+void t0;
+console.log(`     first suggestions after ${firstMs} ms`);
+check(firstMs >= 0 && firstMs < 400, 'address-bar suggestions show up at once');
+await shot('16a-suggestions');
+await ui.keyboard.press('Escape');
+
+// 14. translation: asked once per tab, not on every page
+await A(() => global.__aphelion.current().newTab('https://de.wikipedia.org/wiki/Aphel'));
+await sleep(7000);
+const bars1 = (await state()).bars.map((b) => b.id);
+check(bars1.includes('translate'), 'German page offers translation');
+await shot('16b-translate-offer');
+await go('https://de.wikipedia.org/wiki/Perihel', 7000);
+const bars2 = (await state()).bars.map((b) => b.id);
+check(!bars2.includes('translate'), 'the offer is not repeated on the next page in the same tab');
+await A(() => global.__aphelion.current().newTab('https://de.wikipedia.org/wiki/Umlaufbahn'));
+await sleep(7000);
+check((await state()).bars.some((b) => b.id === 'translate'), 'a new tab asks again');
+await ui.evaluate(() => [...document.querySelectorAll('#bars button')].find((b) => b.textContent === 'Translate')?.click());
+await sleep(9000);
+const tr = (await state()).nav.url;
+check(tr.includes('.translate.goog/'), `Translate opens the page through Google Translate (${tr.slice(0, 60)})`);
+await shot('16c-translated');
+
+// 15. history page
 await A(() => global.__aphelion.current().navigate('aphelion://history/'));
 await sleep(2000);
 await shot('16-history');

@@ -194,8 +194,26 @@ for (const b of document.querySelectorAll('[data-win]')) b.onclick = () => call(
 for (const b of document.querySelectorAll('[data-nav]')) {
   b.onclick = () => call('nav', b.dataset.nav === 'reload' && S?.nav.loading ? 'stop' : b.dataset.nav);
 }
+// drag the window by the empty strip area; tabs and buttons stay plain click targets
+const isStripGap = (el) => el === $('#strip') || el === $('#tabs') || el.classList.contains('drag');
+$('#strip').addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !isStripGap(e.target) || e.detail > 1) return;
+  const el = e.currentTarget;
+  el.setPointerCapture(e.pointerId);
+  window.aph.drag('start', e.screenX, e.screenY);
+  const move = (m) => window.aph.drag('move', m.screenX, m.screenY);
+  const end = () => {
+    window.aph.drag('end', 0, 0);
+    el.removeEventListener('pointermove', move);
+    el.removeEventListener('pointerup', end);
+    el.removeEventListener('pointercancel', end);
+  };
+  el.addEventListener('pointermove', move);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+});
 $('#strip').addEventListener('dblclick', (e) => {
-  if (e.target === $('#strip') || e.target.classList.contains('drag')) call('win', 'max');
+  if (isStripGap(e.target)) call('win', 'max');
 });
 $('#star').onclick = () => call('bookmark');
 $('#reader').onclick = () => call('menu', 'reader');
@@ -209,23 +227,40 @@ const addr = $('#addr');
 let sugg = [];
 let suggSel = -1;
 let suggSeq = 0;
-addr.addEventListener('focus', () => setTimeout(() => addr.select(), 0));
+addr.addEventListener('focus', () => {
+  setTimeout(() => addr.select(), 0);
+  call('suggestWarm');
+});
+// local matches render at once; engine phrases are merged in when they arrive. While
+// waiting, the previous phrases that still start with what is typed stay on screen.
+let lastRemote = [];
+const showSugg = (list) => {
+  sugg = list;
+  if (suggSel >= sugg.length) suggSel = -1;
+  if (sugg.length) openPop('suggest');
+  else if (popName === 'suggest') closePop();
+  if (popName === 'suggest') renderPop();
+};
+const merge = (local, remote) => [...local, ...remote.filter((r) => !local.some((l) => l.url === r.url))].slice(0, 10);
 addr.addEventListener('input', async () => {
   addrDirty = true;
   const q = addr.value;
   const seq = ++suggSeq;
   if (!q.trim()) {
     sugg = [];
+    lastRemote = [];
     if (popName === 'suggest') closePop();
     return;
   }
-  const list = await call('suggest', q);
-  if (seq !== suggSeq) return;
-  sugg = list;
   suggSel = -1;
-  if (sugg.length) openPop('suggest');
-  else if (popName === 'suggest') closePop();
-  if (popName === 'suggest') renderPop();
+  const lower = q.trim().toLowerCase();
+  const local = await call('suggestLocal', q);
+  if (seq !== suggSeq) return;
+  showSugg(merge(local, lastRemote.filter((r) => r.title.toLowerCase().startsWith(lower))));
+  const remote = await call('suggestRemote', q);
+  if (seq !== suggSeq) return;
+  lastRemote = remote;
+  showSugg(merge(local, remote));
 });
 addr.addEventListener('keydown', (e) => {
   if (popName === 'suggest' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
@@ -399,18 +434,34 @@ async function popAds() {
 // ---- authenticator
 let authTimer = null;
 let authCopied = null;
+const errText = (e) => e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 async function popAuth() {
   clearInterval(authTimer);
-  authTimer = setInterval(() => (popName === 'auth' ? refreshAuth() : clearInterval(authTimer)), 1000);
-  const codes = await call('totp');
   const root = h('div', { style: { width: '320px' } });
-  const fill = (list) => {
-    const secs = list[0]?.remaining ?? 30;
-    const period = list[0]?.period ?? 30;
-    root.replaceChildren(
-      h('h3', {}, h('span', { text: 'Authenticator' }), h('span', { class: 'sub', text: list.length ? `On this device · ${secs}s` : 'On this device' })),
-      list.length ? h('div', { class: 'bar' }, h('div', { class: secs < 6 ? 'urgent' : '', style: { width: `${(secs / period) * 100}%` } })) : null,
-      ...list.map((c) => h('div', { class: 'card click', style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  const state = await call('totpState');
+  if (state !== 'open') {
+    root.append(authLockScreen(state));
+    return root;
+  }
+  // only the code list redraws every second; the header and the add form are built
+  // once, so a form being filled in is never reset under the user's hands
+  const list = h('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } });
+  const sub = h('span', { class: 'sub' });
+  const hint = h('div', { class: 'hint' });
+  root.append(
+    h('h3', {}, h('span', { text: 'Authenticator' }),
+      h('span', { style: { display: 'flex', gap: '10px', alignItems: 'center' } }, sub,
+        h('span', { class: 'sub click', title: 'Lock the authenticator', text: 'Lock',
+                    onclick: () => call('totpLock').then(() => renderPop()) }))),
+    list, hint, addTotpForm());
+  root._fill = (codes) => {
+    const secs = codes[0]?.remaining ?? 30;
+    const period = codes[0]?.period ?? 30;
+    sub.textContent = codes.length ? `${secs}s` : '';
+    hint.textContent = authCopied ? 'Code copied. It clears from the clipboard in 30 s.' : codes.length ? 'Click a code to copy it.' : '';
+    list.replaceChildren(
+      codes.length ? h('div', { class: 'bar' }, h('div', { class: secs < 6 ? 'urgent' : '', style: { width: `${(secs / period) * 100}%` } })) : '',
+      ...codes.map((c) => h('div', { class: 'card click', style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                                                                     background: authCopied === c.id ? 'var(--row-active)' : '' },
                                     onclick: () => call('totpCopy', c.id).then(() => {
                                       authCopied = c.id;
@@ -418,34 +469,79 @@ async function popAuth() {
                                     }) },
         h('div', { class: 'grow' }, h('span', { style: { fontWeight: 500 }, text: c.name }), h('span', { class: 'sub', text: c.account })),
         h('span', { class: 'code', text: c.code.replace(/(\d{3})(?=\d)/, '$1 ') }))),
-      list.length ? null : h('div', { class: 'empty', text: 'No accounts yet.' }),
-      h('div', { class: 'hint', text: authCopied ? 'Code copied. It clears from the clipboard in 30 s.' : 'Click a code to copy it.' }),
-      addTotpForm());
+      codes.length ? '' : h('div', { class: 'empty', text: 'No accounts yet.' }));
   };
-  root._fill = fill;
-  fill(codes);
+  root._fill(await call('totp'));
+  authTimer = setInterval(() => (popName === 'auth' ? refreshAuth() : clearInterval(authTimer)), 1000);
   return root;
 }
 async function refreshAuth() {
   const root = $('#pop').firstElementChild;
-  if (!root?._fill || root.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
-  root._fill(await call('totp'));
+  if (!root?._fill) return;
+  try {
+    root._fill(await call('totp'));
+  } catch {
+    clearInterval(authTimer);  // locked itself (idle, screen lock, sleep): show the password screen
+    renderPop();
+  }
 }
+// first use: choose a password; afterwards: unlock with it
+function authLockScreen(state) {
+  const setup = state === 'setup';
+  const pw = h('input', { type: 'password', placeholder: setup ? 'New password (6+ characters)' : 'Password', autofocus: true });
+  const pw2 = setup ? h('input', { type: 'password', placeholder: 'Repeat password' }) : null;
+  const err = h('div', { class: 'err' });
+  const btn = h('button', { class: 'btn primary', style: { height: '34px' }, text: setup ? 'Set password' : 'Unlock' });
+  const form = h('form', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } }, pw, pw2, btn);
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    err.textContent = '';
+    if (setup && pw.value !== pw2.value) {
+      err.textContent = 'The passwords are not the same.';
+      return;
+    }
+    btn.disabled = true;
+    call(setup ? 'totpSetup' : 'totpUnlock', pw.value).then(() => renderPop()).catch((x) => {
+      err.textContent = errText(x);
+      btn.disabled = false;
+      pw.select();
+    });
+  };
+  setTimeout(() => pw.focus(), 0);
+  return h('div', {},
+    h('h3', {}, h('span', { text: 'Authenticator' }), h('span', { class: 'sub', text: setup ? 'Set a password' : 'Locked' })),
+    form, err,
+    h('div', { class: 'hint', text: setup
+      ? 'Your 2FA codes are encrypted with this password. There is no way to recover it, so keep it somewhere safe.'
+      : 'Locks again after 5 minutes without use, and when the computer locks or sleeps.' }));
+}
+let authAddOpen = false;
 function addTotpForm() {
   const input = h('input', { placeholder: 'otpauth:// link or setup key' });
   const name = h('input', { placeholder: 'Name (e.g. GitHub)' });
   const err = h('div', { class: 'err' });
-  const add = () => call('totpAdd', input.value, name.value.trim()).then(() => renderPop()).catch((e) => {
-    err.textContent = e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  const done = () => {
+    authAddOpen = false;
+    renderPop();
+  };
+  const add = () => call('totpAdd', input.value, name.value.trim()).then(done).catch((e) => {
+    err.textContent = errText(e);
   });
-  return h('details', {}, h('summary', { class: 'sub', style: { cursor: 'pointer' }, text: 'Add an account' }),
+  const box = h('details', { open: authAddOpen }, h('summary', { class: 'sub', style: { cursor: 'pointer' }, text: 'Add an account' }),
     h('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' } }, input, name,
       h('div', { style: { display: 'flex', gap: '8px' } },
         h('button', { class: 'btn primary', text: 'Add', onclick: add }),
         h('button', { class: 'btn', text: 'Scan QR on this page', onclick: () => call('totpScan').then((id) => {
-          if (id) renderPop();
+          if (id) done();
           else err.textContent = 'No authenticator QR code found on this page.';
+        }).catch((e) => {
+          err.textContent = errText(e);
         }) })), err));
+  box.addEventListener('toggle', () => {
+    authAddOpen = box.open;
+    if (box.open) setTimeout(() => input.focus(), 0);
+  });
+  return box;
 }
 
 // ---- KeePass

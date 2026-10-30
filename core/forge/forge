@@ -187,11 +187,44 @@ def is_built(orbit, rec):
         return False
 
 
+CHROOT_MOUNTS = [  # (source, target inside the tree, type, options)
+    ("/dev", "dev", None, "bind"), ("devpts", "dev/pts", "devpts", "gid=5,mode=0620"),
+    ("proc", "proc", "proc", None), ("sysfs", "sys", "sysfs", None), ("tmpfs", "run", "tmpfs", None),
+]
+
+
+def chroot_mount(orbit):
+    """The kernel file systems a build inside the tree needs (/dev, /proc, /sys, /run)."""
+    for src, rel, fstype, opts in CHROOT_MOUNTS:
+        tgt = os.path.join(orbit, rel)
+        os.makedirs(tgt, exist_ok=True)
+        if os.path.ismount(tgt):
+            continue
+        cmd = ["mount", "--bind", src, tgt] if opts == "bind" else ["mount", "-t", fstype, src, tgt]
+        if opts and opts != "bind":
+            cmd[1:1] = ["-o", opts]
+        subprocess.run(cmd, check=True)
+
+
+def chroot_umount(orbit):
+    for _src, rel, _t, _o in reversed(CHROOT_MOUNTS):
+        tgt = os.path.join(orbit, rel)
+        if os.path.ismount(tgt):
+            subprocess.run(["umount", "-l", tgt], check=False)
+
+
 def build(rec, orbit, sources_dir, pkgs_dir, logs_dir, jobs):
-    if rec["stage"] == "system":
-        raise ForgeError(f"{rec['name']}: the system stage (chroot) is not implemented in forge yet")
+    inside = rec["stage"] == "system"   # build in the new tree, with only Orbit's own tools
     srcs = fetch(rec, sources_dir)
-    work = tempfile.mkdtemp(prefix=f"forge-{rec['name']}-", dir=os.path.join(orbit, "..") if os.path.isdir(orbit) else None)
+    if inside:
+        os.makedirs(os.path.join(orbit, "var/tmp"), exist_ok=True)
+        work = tempfile.mkdtemp(prefix=f"forge-{rec['name']}-", dir=os.path.join(orbit, "var/tmp"))
+        # sources are copied in: nothing outside the tree is visible from the chroot
+        for src in srcs:
+            shutil.copy2(src, work)
+        srcs = [os.path.join(work, os.path.basename(x)) for x in srcs]
+    else:
+        work = tempfile.mkdtemp(prefix=f"forge-{rec['name']}-", dir=os.path.join(orbit, "..") if os.path.isdir(orbit) else None)
     dest = os.path.join(work, "dest")
     os.makedirs(dest)
     os.makedirs(logs_dir, exist_ok=True)
@@ -201,8 +234,27 @@ def build(rec, orbit, sources_dir, pkgs_dir, logs_dir, jobs):
         srcdir = work
         if srcs:
             subprocess.run(["tar", "-xf", srcs[0], "-C", work], check=True)
-            top = [d for d in os.listdir(work) if d != "dest"]
+            names = {os.path.basename(x) for x in srcs}
+            top = [d for d in os.listdir(work) if d != "dest" and d not in names]
             srcdir = os.path.join(work, top[0]) if len(top) == 1 else work
+        if inside:
+            rel = lambda p: "/" + os.path.relpath(p, orbit)   # noqa: E731 - path as seen inside the tree
+            recipe_in = os.path.join(work, "recipe")
+            shutil.copy2(rec["path"], recipe_in)
+            env = {"PATH": "/usr/bin:/usr/sbin", "HOME": "/root", "TERM": os.environ.get("TERM", "dumb"),
+                   "LC_ALL": "POSIX", "DESTDIR": rel(dest), "SRCS": " ".join(rel(x) for x in srcs),
+                   "MAKEFLAGS": f"-j{jobs}", "TESTSUITEFLAGS": f"-j{jobs}"}
+            script = f'set -euo pipefail; source "{rel(recipe_in)}"; cd "{rel(srcdir)}"; build'
+            argv = ["chroot", orbit, "/usr/bin/env", "-i"] + [f"{k}={v}" for k, v in env.items()] + ["/bin/bash", "-c", script]
+            print(f"[forge] building {rec['name']} {rec['version']} inside Orbit (log: {log})", flush=True)
+            with open(log, "w") as lf:
+                r = subprocess.run(argv, stdout=lf, stderr=subprocess.STDOUT)
+            if r.returncode:
+                tail = open(log).read().splitlines()[-25:]
+                raise ForgeError(f"{rec['name']} failed (exit {r.returncode}); last lines of {log}:\n" + "\n".join(tail))
+            pack_and_install(rec, dest, orbit, pkgs_dir)
+            print(f"[forge] {rec['name']} done in {(time.time() - started) / 60:.1f} min", flush=True)
+            return
         env = {
             "PATH": f"{orbit}/tools/bin:/usr/bin:/bin",
             "LC_ALL": "POSIX", "HOME": work, "TERM": os.environ.get("TERM", "dumb"),
@@ -220,18 +272,23 @@ def build(rec, orbit, sources_dir, pkgs_dir, logs_dir, jobs):
         root = os.path.join(dest, orbit.lstrip("/"))
         if not os.path.isdir(root):
             raise ForgeError(f"{rec['name']}: nothing was installed under $DESTDIR$ORBIT")
-        os.makedirs(pkgs_dir, exist_ok=True)
-        opk = os.path.join(pkgs_dir, f"{rec['name']}-{rec['version']}.opk")
-        if subprocess.run([sys.executable, OPM, "pack", root, opk, "--name", rec["name"], "--version", rec["version"],
-                           "--depends", ",".join(rec["depends"]), "--description", rec["description"]]).returncode:
-            raise ForgeError(f"{rec['name']}: packing failed")
-        for old in rec["replaces"]:   # a newer build of the same files (e.g. GCC pass 2 over pass 1's libstdc++)
-            subprocess.run([sys.executable, OPM, "--root", orbit, "--force", "remove", old], check=False)
-        if subprocess.run([sys.executable, OPM, "--root", orbit, "install", opk]).returncode:
-            raise ForgeError(f"{rec['name']}: installing {opk} failed")
+        pack_and_install(rec, root, orbit, pkgs_dir)
         print(f"[forge] {rec['name']} done in {(time.time() - started) / 60:.1f} min", flush=True)
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+def pack_and_install(rec, root, orbit, pkgs_dir):
+    """Pack what a build installed (root = its DESTDIR tree) and install it into Orbit with opm."""
+    os.makedirs(pkgs_dir, exist_ok=True)
+    opk = os.path.join(pkgs_dir, f"{rec['name']}-{rec['version']}.opk")
+    if subprocess.run([sys.executable, OPM, "pack", root, opk, "--name", rec["name"], "--version", rec["version"],
+                       "--depends", ",".join(rec["depends"]), "--description", rec["description"]]).returncode:
+        raise ForgeError(f"{rec['name']}: packing failed")
+    for old in rec["replaces"]:   # a newer build of the same files (e.g. GCC pass 2 over pass 1's libstdc++)
+        subprocess.run([sys.executable, OPM, "--root", orbit, "--force", "remove", old], check=False)
+    if subprocess.run([sys.executable, OPM, "--root", orbit, "install", opk]).returncode:
+        raise ForgeError(f"{rec['name']}: installing {opk} failed")
 
 
 def main(argv=None):
@@ -264,11 +321,19 @@ def main(argv=None):
             return 0
         wanted = a.name if a.cmd == "build" else [n for n, r in recs.items() if r["stage"] == a.stage]
         os.makedirs(orbit, exist_ok=True)
+        todo = [n for n in order(recs, wanted) if not is_built(orbit, recs[n])]
         for n in order(recs, wanted):
-            if is_built(orbit, recs[n]):
+            if n not in todo:
                 print(f"[forge] {n} {recs[n]['version']} already built")
-                continue
-            build(recs[n], orbit, sources_dir, pkgs_dir, logs_dir, jobs)
+        needs_chroot = any(recs[n]["stage"] == "system" for n in todo)
+        try:
+            if needs_chroot:
+                chroot_mount(orbit)
+            for n in todo:
+                build(recs[n], orbit, sources_dir, pkgs_dir, logs_dir, jobs)
+        finally:
+            if needs_chroot:
+                chroot_umount(orbit)
     except ForgeError as e:
         print(f"forge: {e}", file=sys.stderr)
         return 1

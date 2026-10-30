@@ -1,0 +1,17 @@
+# util-linux system utilities. Built inside the new Orbit tree with the temporary tools; replaced by the final build later.
+name=util-linux-temp
+version=2.41.6
+stage=system
+sources=(https://cdn.kernel.org/pub/linux/utils/util-linux/v2.41/util-linux-2.41.6.tar.xz)
+sha256=(e596083744e746be7d2823b62b43f4418dd7bf56303b4dc09e6fe8112fe3d7ed)
+depends=(base-files)
+description="util-linux system utilities (temporary, built in Orbit)"
+
+build() {
+  mkdir -p "$DESTDIR/var/lib/hwclock"
+  ./configure --libdir=/usr/lib --runstatedir=/run --disable-chfn-chsh --disable-login --disable-nologin \
+    --disable-su --disable-setpriv --disable-runuser --disable-pylibmount --disable-static --disable-liblastlog2 \
+    --without-python ADJTIME_PATH=/var/lib/hwclock/adjtime --docdir=/usr/share/doc/util-linux-2.41.6
+  make
+  make DESTDIR="$DESTDIR" install
+}

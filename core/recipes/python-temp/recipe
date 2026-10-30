@@ -1,0 +1,14 @@
+# Python. Built inside the new Orbit tree with the temporary tools; replaced by the final build later.
+name=python-temp
+version=3.13.18
+stage=system
+sources=(https://www.python.org/ftp/python/3.13.18/Python-3.13.18.tar.xz)
+sha256=(abb0102e6d4ae027509bcb82327d9dd85515b44a3ba8ad538cfc5e9847029f68)
+depends=(base-files)
+description="Python (temporary, built in Orbit)"
+
+build() {
+  ./configure --prefix=/usr --enable-shared --without-ensurepip --without-static-libpython
+  make
+  make DESTDIR="$DESTDIR" install
+}

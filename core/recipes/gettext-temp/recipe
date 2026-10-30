@@ -1,0 +1,16 @@
+# GNU gettext message tools. Built inside the new Orbit tree with the temporary tools; replaced by the final build later.
+name=gettext-temp
+version=0.26
+stage=system
+sources=(https://ftp.gnu.org/gnu/gettext/gettext-0.26.tar.xz)
+sha256=(d1fb86e260cfe7da6031f94d2e44c0da55903dbae0a2fa0fae78c91ae1b56f00)
+depends=(base-files)
+description="GNU gettext message tools (temporary, built in Orbit)"
+
+build() {
+  # only the three programs other builds need now
+  ./configure --disable-shared
+  make
+  mkdir -p "$DESTDIR/usr/bin"
+  cp gettext-tools/src/{msgfmt,msgmerge,xgettext} "$DESTDIR/usr/bin"
+}

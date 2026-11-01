@@ -85,7 +85,7 @@ async function startSpeech() {
   worker.on('message', onSpeech);
   worker.on('exit', () => { state.speechReady = false; if (!quitting) setTimeout(startSpeech, 1000); });
   state.modelsDir = dir;
-  const localVoice = state.settings.voice.startsWith('openai:') ? (state.settings.localVoice || 'alan') : state.settings.voice;
+  const localVoice = state.settings.voice.includes(':') && !state.settings.voice.startsWith('kokoro:') ? (state.settings.localVoice || 'alan') : state.settings.voice;
   worker.postMessage({ type: 'boot', modelsDir: dir, sensitivity: state.settings.sensitivity, voice: localVoice, voiceDirs: [path.join(app.getPath('userData'), 'models')] });
 }
 
@@ -122,19 +122,21 @@ const localSpeak = (text, speed) => new Promise((resolve) => {
 
 // ---------- voices ----------
 const { VOICES, voiceInstalled } = require('./speech.js');
-const OPENAI_VOICES = [['ash', 'Ash', 'warm, steady'], ['onyx', 'Onyx', 'deep, authoritative'], ['sage', 'Sage', 'calm, thoughtful'], ['coral', 'Coral', 'bright, friendly'], ['nova', 'Nova', 'energetic'], ['echo', 'Echo', 'smooth'], ['fable', 'Fable', 'British, storyteller'], ['alloy', 'Alloy', 'neutral'], ['shimmer', 'Shimmer', 'gentle']];
-const openaiKey = () => orbit?.keyring.data.keys.find((k) => k.provider === 'openai' && k.enabled);
+let cloudMod = null;
+const cloud = async () => (cloudMod ||= await load('server', 'voice', 'cloud.js'));
 const voiceDirs = () => [state.modelsDir, path.join(app.getPath('userData'), 'models')];
 
-ipcMain.handle('voices', () => {
+ipcMain.handle('voices', async () => {
   const local = Object.entries(VOICES).map(([id, v]) => ({ id, label: v.label, desc: v.desc, kind: v.engine === 'kokoro' ? 'natural' : v.bundled ? 'built-in' : 'download', installed: voiceInstalled(voiceDirs(), id), sizeMB: v.sizeMB || 0 }));
-  const cloud = OPENAI_VOICES.map(([id, label, desc]) => ({ id: `openai:${id}`, label, desc: `${desc} · OpenAI cloud`, kind: 'cloud', installed: !!openaiKey() }));
-  return { current: state.settings.voice, voices: [...local, ...cloud] };
+  const groups = await (await cloud()).cloudVoices(orbit.keyring);
+  return { current: state.settings.voice, voices: local, cloud: groups };
 });
 
 ipcMain.handle('setVoice', async (_e, id) => {
-  if (id.startsWith('openai:')) {
-    if (!openaiKey()) throw new Error('Add an OpenAI key under AI configuration to use cloud voices.');
+  const provider = id.split(':')[0];
+  const { CLOUD } = await cloud();
+  if (CLOUD[provider]) {
+    if (!orbit.keyring.data.keys.some((k) => k.provider === provider && k.enabled)) throw new Error(`Add a ${CLOUD[provider].label} key under AI configuration to use this voice.`);
     state.settings.voice = id; saveSettings(); return { voice: id };
   }
   if (!VOICES[id]) throw new Error('Unknown voice');
@@ -147,28 +149,15 @@ ipcMain.handle('setVoice', async (_e, id) => {
   return { voice: res.voice, rtf: res.rtf, slow: res.rtf != null && res.rtf > 0.6 };
 });
 
-// Cloud voice: OpenAI text-to-speech, raw 24 kHz PCM. Any failure falls back to the on-device voice.
-async function cloudSpeak(text, voice, speed) {
-  const k = openaiKey();
-  if (!k) throw new Error('no OpenAI key');
-  const res = await fetch('https://api.openai.com/v1/audio/speech', {
-    method: 'POST', signal: AbortSignal.timeout(15000),
-    headers: { authorization: `Bearer ${orbit.keyring.secretOf(k)}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ model: 'gpt-4o-mini-tts', voice, input: text, response_format: 'pcm', speed,
-      instructions: 'Speak like a calm, confident, quietly witty personal assistant. Smooth, natural pacing.' }),
-  });
-  if (!res.ok) throw new Error(`OpenAI voice ${res.status}`);
-  const pcm = new Int16Array(await res.arrayBuffer());
-  const samples = new Float32Array(pcm.length);
-  for (let i = 0; i < pcm.length; i++) samples[i] = pcm[i] / 32768;
-  return { samples, sampleRate: 24000 };
-}
-
 ipcMain.handle('speak', async (_e, text, speed) => {
   const v = state.settings.voice;
-  if (v.startsWith('openai:')) {
-    try { return await cloudSpeak(text, v.slice(7), speed); }
-    catch (e) { log('cloud voice failed, using on-device voice:', e.message); }
+  const { CLOUD, cloudSpeak } = await cloud();
+  if (CLOUD[v.split(':')[0]]) {
+    try { return await cloudSpeak(orbit.keyring, v, text, speed); }
+    catch (e) {
+      log('cloud voice failed, using on-device voice:', e.message);
+      if (!state.cloudWarned) { state.cloudWarned = true; broadcast('speech-error', `${e.message}. Using the on-device voice for now.`); setTimeout(() => (state.cloudWarned = false), 600e3); }
+    }
   }
   return localSpeak(text, speed);
 });

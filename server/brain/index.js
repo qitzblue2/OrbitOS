@@ -2,7 +2,7 @@
 import { AnthropicProvider } from './providers/anthropic.js';
 import { OpenAICompatProvider } from './providers/openai.js';
 import { OfflineProvider } from './providers/offline.js';
-import { PROVIDERS, SUGGESTED, NOT_CHAT } from './catalog.js';
+import { PROVIDERS, SUGGESTED, NOT_CHAT, isChat } from './catalog.js';
 
 
 export function personaPrompt({ userName, tone = 'composed', memories = [], devices = [] }) {
@@ -45,11 +45,11 @@ export class Brain {
     const r = this.keyring.data.routes;
     const keys = this.keyring.list();
     const model = (tier) => r[tier].model || PROVIDERS[r[tier].provider]?.models[tier] || '';
-    const live = keys.some((k) => k.enabled);
+    const live = keys.some((k) => k.enabled && isChat(k.provider));
     return {
       provider: live ? (keys.some((k) => k.enabled && k.provider === r.fast.provider) ? r.fast.provider : 'fallback') : 'offline',
       fastModel: model('fast'), reasoningModel: model('reasoning'),
-      routes: r, fallback: this.keyring.data.fallback, keyCount: keys.length, activeKeys: keys.filter((k) => k.enabled && !k.coolingDown).length,
+      routes: r, fallback: this.keyring.data.fallback, keyCount: keys.length, activeKeys: keys.filter((k) => k.enabled && !k.coolingDown && isChat(k.provider)).length,
     };
   }
 
@@ -94,7 +94,7 @@ export class Brain {
   async models() {
     this.modelCache ||= new Map();
     const out = {};
-    const providers = [...new Set(this.keyring.data.keys.filter((k) => k.enabled).map((k) => k.provider))];
+    const providers = [...new Set(this.keyring.data.keys.filter((k) => k.enabled && isChat(k.provider)).map((k) => k.provider))];
     await Promise.all(providers.map(async (pid) => {
       const cached = this.modelCache.get(pid);
       if (cached && cached.at > Date.now() - 600e3) { out[pid] = cached.value; return; }

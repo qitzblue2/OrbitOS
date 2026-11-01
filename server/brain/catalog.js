@@ -19,11 +19,18 @@ export const PROVIDERS = {
                 models: { fast: 'openai/gpt-4o-mini', reasoning: 'anthropic/claude-opus-4' }, keysUrl: 'https://openrouter.ai/keys' },
   ollama:     { label: 'Ollama (local, free)', kind: 'openai', baseUrl: 'http://127.0.0.1:11434/v1', keyHint: 'no key needed', keyOptional: true,
                 models: { fast: 'llama3.2', reasoning: 'llama3.1:70b' }, keysUrl: 'https://ollama.com' },
+  // Voice-only providers (text-to-speech). They never answer questions.
+  azure:      { label: 'Microsoft Azure (voice)', kind: 'voice', keyHint: 'Azure Speech key', keyPattern: /^[A-Za-z0-9]{32,100}$/,
+                extra: { label: 'Region', placeholder: 'eastus', pattern: /^[a-z0-9]{3,30}$/ }, models: {}, keysUrl: 'https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices' },
+  cartesia:   { label: 'Cartesia (voice)', kind: 'voice', keyHint: 'sk_car_…', keyPattern: /^[\w-]{20,}$/, models: {}, keysUrl: 'https://play.cartesia.ai/keys' },
+  hume:       { label: 'Hume (voice)', kind: 'voice', keyHint: 'Hume API key', keyPattern: /^[\w-]{20,}$/, models: {}, keysUrl: 'https://platform.hume.ai/settings/keys' },
   custom:     { label: 'Other OpenAI-compatible', kind: 'openai', baseUrl: '', keyHint: 'key', keyOptional: true, needsBaseUrl: true,
                 models: { fast: '', reasoning: '' } },
 };
 
 // Shown when a provider's live model list can't be fetched, and as the top picks in menus.
+export const isChat = (id) => PROVIDERS[id] && PROVIDERS[id].kind !== 'voice';
+
 export const SUGGESTED = {
   anthropic: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'],
   openai: ['gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini', 'gpt-4.1', 'gpt-4.1-mini'],

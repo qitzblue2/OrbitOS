@@ -12,6 +12,7 @@ import { DeviceRegistry, CAPABILITIES } from './devices.js';
 import { Brain } from './brain/index.js';
 import { Keyring, friendly } from './brain/keyring.js';
 import { PROVIDERS } from './brain/catalog.js';
+import { testVoiceKey } from './voice/cloud.js';
 import { createHome } from './smarthome/index.js';
 import { Automations } from './automations.js';
 import { Engine } from './engine.js';
@@ -81,7 +82,7 @@ export function createOrbit(cfg = config) {
     'GET /api/audit': () => audit.tail(100),
     'GET /api/settings': () => settings.data,
     'PATCH /api/settings': (b) => { const allowed = ['userName', 'tone', 'voice', 'wakeWord', 'proactive', 'retentionDays']; for (const k of allowed) if (k in b) settings.data[k] = b[k]; settingsStore.save(); return settings.data; },
-    'GET /api/ai/providers': () => Object.fromEntries(Object.entries(PROVIDERS).map(([id, p]) => [id, { label: p.label, keyHint: p.keyHint, keyOptional: !!p.keyOptional, needsBaseUrl: !!p.needsBaseUrl, baseUrl: p.baseUrl || '', models: p.models, vision: !!p.vision, keysUrl: p.keysUrl || '' }])),
+    'GET /api/ai/providers': () => Object.fromEntries(Object.entries(PROVIDERS).map(([id, p]) => [id, { kind: p.kind, extra: p.extra ? { label: p.extra.label, placeholder: p.extra.placeholder } : null, label: p.label, keyHint: p.keyHint, keyOptional: !!p.keyOptional, needsBaseUrl: !!p.needsBaseUrl, baseUrl: p.baseUrl || '', models: p.models, vision: !!p.vision, keysUrl: p.keysUrl || '' }])),
     'GET /api/ai/keys': () => keyring.list(),
     'GET /api/ai/models': () => brain.models(),
     'POST /api/ai/keys': (b) => { const k = keyring.add(b); audit.write({ kind: 'security', action: 'ai key added', provider: k.provider, label: k.label }); return k; },
@@ -90,7 +91,10 @@ export function createOrbit(cfg = config) {
     'POST /api/ai/keys/:id/test': async (b, id) => {
       const k = keyring.data.keys.find((x) => x.id === id);
       if (!k) return { ok: false, error: 'Key not found' };
-      try { const r = await brain.test(k); keyring.markSuccess(k); return r; }
+      try {
+        if (PROVIDERS[k.provider].kind === 'voice') { const t0 = performance.now(); await testVoiceKey(k.provider, keyring.secretOf(k), k.baseUrl); keyring.markSuccess(k); return { ok: true, ms: Math.round(performance.now() - t0), model: 'voices' }; }
+        const r = await brain.test(k); keyring.markSuccess(k); return r;
+      }
       catch (e) { keyring.markFailure(k, e); return { ok: false, error: friendly(e) }; }
     },
     'PATCH /api/ai/routes': (b) => (keyring.setRoutes(b), brain.status()),

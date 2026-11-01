@@ -197,8 +197,8 @@ function voicePicker(rate, save) {
   const box = h('div', { class: 'stack' });
   const sample = "Good evening. I've dimmed the lights and your music is playing. Anything else?";
   const draw = async () => {
-    const { current, voices } = await native.voices();
-    const groups = [['built-in', 'Built in'], ['natural', 'Most natural (one 100 MB download for all 11)'], ['download', 'High quality'], ['cloud', 'Cloud (uses your OpenAI key)']];
+    const { current, voices, cloud = [] } = await native.voices();
+    const groups = [['built-in', 'Built in'], ['natural', 'Most natural (one 100 MB download for all 11)'], ['download', 'High quality']];
     const item = (v) => {
       const use = h('button', { class: `btn small ${v.id === current ? 'primary' : ''}`, disabled: v.kind === 'cloud' && !v.installed }, v.id === current ? 'In use' : v.installed || v.kind === 'cloud' ? 'Use' : `Download ${v.sizeMB} MB`);
       use.addEventListener('click', async () => {
@@ -216,8 +216,12 @@ function voicePicker(rate, save) {
       return h('li', {}, h('span', { class: 'grow' }, h('b', {}, v.label), h('div', { class: 'muted' }, v.desc)), v.id === current ? preview : null, use);
     };
     box.replaceChildren(panel('Voice',
-      h('p', { class: 'muted' }, 'Built-in and downloaded voices run entirely on this computer. Cloud voices sound the most human and need an OpenAI key; if the cloud is unreachable ORBIT switches to your last on-device voice.'),
+      h('p', { class: 'muted' }, 'Built-in and downloaded voices run entirely on this computer. Cloud voices (Azure, Cartesia, Hume, OpenAI) sound the most human and need that service\'s key; if a cloud voice fails or its allowance runs out, ORBIT keeps talking with your last on-device voice.'),
       ...groups.map(([kind, title]) => { const vs = voices.filter((v) => v.kind === kind); return vs.length ? h('div', {}, h('div', { class: 'label' }, title), h('ul', { class: 'list' }, vs.map(item))) : null; }),
+      ...cloud.map((g) => h('div', {}, h('div', { class: 'label' }, `${g.label} · cloud`),
+        g.locked ? h('ul', { class: 'list' }, h('li', {}, h('span', { class: 'grow muted' }, `Add ${/^[AEIOU]/.test(g.label) ? "an" : "a"} ${g.label} key to use these voices.`), h('button', { class: 'btn small', onclick: () => go('ai') }, 'Add key')))
+        : g.error ? h('p', { class: 'error-text' }, g.error)
+        : h('ul', { class: 'list' }, g.voices.slice(0, 30).map((v) => item({ ...v, kind: 'cloud', installed: true, desc: v.desc || g.label }))))),
       h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-rate' }, 'Speaking speed'), rate),
       h('div', { class: 'row' }, h('button', { class: 'btn', onclick: async () => { await save(); voice.interrupt('preview'); voice.say(sample); } }, 'Save speed and preview'))));
   };
@@ -365,13 +369,17 @@ const VIEWS = {
     S.modelsReady = api('GET', '/api/ai/models').then((l) => { S.modelLists = l; }).catch(() => {});
     api('GET', '/api/ai/providers').then((P) => {
       const keys = o.aiKeys || [];
-      const prov = h('select', { id: 'k-prov' }, Object.entries(P).map(([id, p]) => h('option', { value: id }, p.label)));
+      const entries = Object.entries(P);
+      const prov = h('select', { id: 'k-prov' },
+        h('optgroup', { label: 'AI models' }, entries.filter(([, p]) => p.kind !== 'voice').map(([id, p]) => h('option', { value: id }, p.label))),
+        h('optgroup', { label: 'Voices' }, entries.filter(([, p]) => p.kind === 'voice').map(([id, p]) => h('option', { value: id }, p.label))));
       const label = h('input', { id: 'k-label', placeholder: 'Work key' });
       const key = h('input', { id: 'k-key', type: 'password', autocomplete: 'off' });
       const base = h('input', { id: 'k-base', placeholder: 'https://example.com/v1' });
-      const baseField = h('div', { class: 'field' }, h('label', { class: 'label', for: 'k-base' }, 'API base URL'), base);
+      const baseLabel = h('label', { class: 'label', for: 'k-base' }, 'API base URL');
+      const baseField = h('div', { class: 'field' }, baseLabel, base);
       const help = h('a', { target: '_blank', rel: 'noopener' }, 'Get a key');
-      const sync = () => { const p = P[prov.value]; key.placeholder = p.keyHint; baseField.hidden = !p.needsBaseUrl; help.hidden = !p.keysUrl; help.href = p.keysUrl || '#'; };
+      const sync = () => { const p = P[prov.value]; key.placeholder = p.keyHint; baseField.hidden = !p.needsBaseUrl && !p.extra; baseLabel.textContent = p.extra ? p.extra.label : 'API base URL'; base.placeholder = p.extra ? p.extra.placeholder : 'https://example.com/v1'; help.hidden = !p.keysUrl; help.href = p.keysUrl || '#'; };
       prov.addEventListener('change', sync); sync();
       const add = async () => {
         try { await api('POST', '/api/ai/keys', { provider: prov.value, label: label.value, key: key.value, baseUrl: base.value }); key.value = label.value = ''; toast('Key added.'); await refresh(); }
@@ -393,7 +401,7 @@ const VIEWS = {
       const routeFields = (tier, title) => {
         const r = o.brain.routes[tier];
         const hasKey = (id) => keys.some((k) => k.enabled && k.provider === id);
-        const sel = h('select', { id: `r-${tier}`, 'aria-label': `${title} provider` }, Object.entries(P).map(([id, p]) => h('option', { value: id, selected: id === r.provider }, hasKey(id) ? p.label : `${p.label} (no key yet)`)));
+        const sel = h('select', { id: `r-${tier}`, 'aria-label': `${title} provider` }, Object.entries(P).filter(([, p]) => p.kind !== 'voice').map(([id, p]) => h('option', { value: id, selected: id === r.provider }, hasKey(id) ? p.label : `${p.label} (no key yet)`)));
         const pickModel = h('select', { id: `ms-${tier}`, 'aria-label': `${title} model` });
         const model = h('input', { id: `m-${tier}`, 'aria-label': `${title} custom model name`, placeholder: 'exact model name' });
         const fill = (keepCurrent) => {
@@ -417,7 +425,7 @@ const VIEWS = {
       wrap.replaceChildren(
         h('div', { class: 'grid2' },
           panel(`API keys (${keys.length})`,
-            h('p', { class: 'muted' }, 'Add as many keys as you like, from any provider. ORBIT rotates through keys of the same provider and, when one is rate-limited or fails, moves to the next key automatically. Keys are encrypted on this computer and only the last 4 characters are ever shown.'),
+            h('p', { class: 'muted' }, 'Add as many keys as you like, for AI models and for voices. ORBIT rotates through keys of the same provider and, when one is rate-limited or fails, moves to the next key automatically. Keys are encrypted on this computer and only the last 4 characters are ever shown.'),
             keys.length ? h('ul', { class: 'list' }, keys.map(row)) : empty('No keys yet. Device control, routines and memory work without one.')),
           panel('Add a key',
             h('div', { class: 'field' }, h('label', { class: 'label', for: 'k-prov' }, 'Provider'), prov),

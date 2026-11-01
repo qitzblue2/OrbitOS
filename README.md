@@ -20,7 +20,13 @@ Choose a voice on the **Voice** screen, then use **Preview** to hear it.
 - **Built in:** Alan (British) and Lessac (American). Both are smooth 22 kHz voices that run on any computer.
 - **Most natural:** 11 Kokoro voices, such as George, Emma and Adam. They share one 100 MB download and need a reasonably fast processor; ORBIT warns you if yours is too slow.
 - **High quality:** Ryan, a 110 MB download.
-- **Cloud:** 9 OpenAI voices. They need an OpenAI key, and if the cloud can't be reached ORBIT falls back to your last on-device voice.
+- **Cloud:** each one needs that service's key, added under **AI configuration** in the **Voices** section of the provider list.
+  - **Microsoft Azure:** 9 neural voices. Also enter your Speech resource's region, such as `eastus`. The free tier covers about 500,000 characters a month.
+  - **Cartesia:** the Sonic voices on your account, which start speaking fastest.
+  - **Hume:** the most expressive voices. ORBIT tells it to sound calm and composed.
+  - **OpenAI:** 9 voices.
+
+  If a cloud voice fails, or its free allowance runs out, ORBIT keeps talking with your last on-device voice and tells you once.
 
 Speech is played gaplessly, with faded joins. Sentences are grouped into longer phrases so the intonation flows, and markdown, code and links are never read aloud.
 

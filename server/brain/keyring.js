@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { JsonStore } from '../store.js';
-import { PROVIDERS } from './catalog.js';
+import { PROVIDERS, isChat } from './catalog.js';
 
 // Turns provider errors into one plain sentence.
 export function friendly(err) {
@@ -60,6 +60,7 @@ export class Keyring {
     if (!key && !p.keyOptional) throw new Error(`${p.label} needs an API key.`);
     if (key && p.keyPattern && !p.keyPattern.test(key)) throw new Error(`That doesn't look like a ${p.label} key (expected ${p.keyHint}).`);
     if (p.needsBaseUrl && !/^https?:\/\/\S+$/.test(baseUrl)) throw new Error('Enter the base URL of the API, for example https://example.com/v1');
+    if (p.extra) { baseUrl = String(baseUrl || '').trim().toLowerCase(); if (!p.extra.pattern.test(baseUrl)) throw new Error(`Enter the ${p.extra.label.toLowerCase()}, for example ${p.extra.placeholder}.`); }
     const fp = key ? this.fingerprint(key) : null;
     if (fp && this.data.keys.some((k) => k.fp === fp)) throw new Error('That key is already saved.');
     const item = {
@@ -68,7 +69,7 @@ export class Keyring {
     };
     this.data.keys.push(item);
     // If the providers ORBIT is set to use have no working key, start using this one.
-    for (const tier of ['fast', 'reasoning']) {
+    if (isChat(provider)) for (const tier of ['fast', 'reasoning']) {
       const r = this.data.routes[tier];
       if (!this.data.keys.some((k) => k.enabled && k.provider === r.provider)) this.data.routes[tier] = { provider, model: '' };
     }
@@ -87,7 +88,7 @@ export class Keyring {
   remove(id) { const n = this.data.keys.length; this.data.keys = this.data.keys.filter((k) => k.id !== id); this.store.flush(); return this.data.keys.length < n; }
   setRoutes({ fast, reasoning, fallback }) {
     for (const [tier, r] of [['fast', fast], ['reasoning', reasoning]]) if (r) {
-      if (!PROVIDERS[r.provider]) throw new Error(`Unknown provider: ${r.provider}`);
+      if (!isChat(r.provider)) throw new Error(`${PROVIDERS[r.provider]?.label || r.provider} can't answer questions.`);
       this.data.routes[tier] = { provider: r.provider, model: String(r.model || '').trim() };
     }
     if (fallback !== undefined) this.data.fallback = !!fallback;
@@ -100,7 +101,7 @@ export class Keyring {
   candidates(tier, { needVision = false } = {}) {
     const route = this.data.routes[tier];
     const now = Date.now();
-    const usable = (k) => k.enabled && (k.cooldownUntil || 0) <= now && (!needVision || PROVIDERS[k.provider]?.vision);
+    const usable = (k) => k.enabled && isChat(k.provider) && (k.cooldownUntil || 0) <= now && (!needVision || PROVIDERS[k.provider]?.vision);
     const rotate = (provider) => {
       const ks = this.data.keys.filter((k) => k.provider === provider && usable(k));
       if (!ks.length) return [];
@@ -109,7 +110,7 @@ export class Keyring {
     };
     const out = rotate(route.provider).map((k) => ({ key: k, model: route.model || PROVIDERS[k.provider].models[tier] }));
     if (this.data.fallback) {
-      const others = [...new Set(this.data.keys.map((k) => k.provider))].filter((p) => p !== route.provider);
+      const others = [...new Set(this.data.keys.map((k) => k.provider))].filter((p) => p !== route.provider && isChat(p));
       for (const p of others) for (const k of rotate(p)) out.push({ key: k, model: PROVIDERS[p].models[tier] || PROVIDERS[p].models.fast });
     }
     return out;

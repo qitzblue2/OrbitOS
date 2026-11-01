@@ -23,7 +23,10 @@
   },
   "main": "app/main.js",
   "productName": "ORBIT",
-  "author": "ORBIT",
+  "author": {
+    "name": "ORBIT",
+    "email": "orbit@users.noreply.github.com"
+  },
   "devDependencies": {
     "electron": "33.2.1",
     "electron-builder": "25.1.8"
@@ -87,7 +90,9 @@
         "deb"
       ],
       "icon": "app/icons/icon@1024.png",
-      "category": "Utility"
+      "category": "Utility",
+      "maintainer": "ORBIT <orbit@users.noreply.github.com>"
     }
-  }
+  },
+  "homepage": "https://github.com/qitzblue2/OrbitOS"
 }

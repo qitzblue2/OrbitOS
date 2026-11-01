@@ -3,12 +3,16 @@
 //  - this computer paired as a device automatically (the built-in Companion)
 //  - on-device wake word, speech-to-text and text-to-speech
 //  - a tray icon, a global shortcut and a floating overlay, so ORBIT works with the window closed
+const ROOT_DIR = require('node:path').resolve(__dirname, '..');
 const { app, BrowserWindow, Tray, Menu, nativeImage, globalShortcut, ipcMain, session, systemPreferences, utilityProcess, screen, dialog } = require('electron');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+// ESM import() needs file:// URLs; plain paths break on Windows (C:\...).
+const load = (...parts) => import(pathToFileURL(path.join(ROOT_DIR, ...parts)).href);
 const fs = require('node:fs');
 const models = require('./models.js');
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = ROOT_DIR;
 const ICON = path.join(__dirname, 'icons', 'icon.png');
 let orbit, port, token, main, overlay, tray, worker, quitting = false;
 const state = { listening: false, speechReady: false, phase: 'idle', settings: {} };
@@ -28,8 +32,8 @@ function saveSettings() { fs.writeFileSync(settingsFile(), JSON.stringify(state.
 // ---------- server + built-in companion ----------
 async function startServer() {
   process.env.ORBIT_DATA_DIR = path.join(app.getPath('userData'), 'data');
-  const { config } = await import(path.join(ROOT, 'server', 'config.js'));
-  const { createOrbit } = await import(path.join(ROOT, 'server', 'index.js'));
+  const { config } = await load('server', 'config.js');
+  const { createOrbit } = await load('server', 'index.js');
   orbit = createOrbit(config);
   token = config.adminToken;
   try { ({ port } = await orbit.listen(config.port, '127.0.0.1')); }
@@ -37,7 +41,7 @@ async function startServer() {
 }
 
 async function startCompanion() {
-  const { execute } = await import(path.join(ROOT, 'companion', 'agent.js'));
+  const { execute } = await load('companion', 'agent.js');
   const WebSocket = require('ws');
   const os = require('node:os');
   const file = path.join(app.getPath('userData'), 'companion.json');
@@ -183,8 +187,21 @@ function createTray() {
   updateTray();
 }
 
+// ---------- failures are shown, never silent ----------
+function logFile() { try { return path.join(app.getPath('userData'), 'orbit.log'); } catch { return null; } }
+function log(...a) { const f = logFile(); if (f) try { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.appendFileSync(f, `[${new Date().toISOString()}] ${a.join(' ')}\n`); } catch {} }
+function fatal(err) {
+  log('FATAL', err?.stack || err);
+  if (process.env.ORBIT_SMOKE) { console.error(err); app.exit(1); return; }
+  dialog.showErrorBox('ORBIT could not start', `${err?.message || err}\n\nDetails were saved to:\n${logFile()}`);
+  app.exit(1);
+}
+process.on('uncaughtException', fatal);
+process.on('unhandledRejection', fatal);
+
 // ---------- lifecycle ----------
 app.whenReady().then(async () => {
+  log('starting', app.getVersion(), process.platform, process.arch);
   loadSettings();
   if (process.platform === 'darwin') { app.dock?.setIcon(ICON); await systemPreferences.askForMediaAccess('microphone').catch(() => false); }
   await startServer();
@@ -199,7 +216,17 @@ app.whenReady().then(async () => {
   // Global push-to-talk: press once to talk, again to send. Works from any app.
   let pttDown = false;
   globalShortcut.register('Alt+Space', () => { pttDown = !pttDown; broadcast('ptt-toggle', pttDown); if (pttDown) showOverlay(); });
-});
+  log('started on port', port);
+  // CI smoke test: prove the packaged app boots its server and dashboard, then exit.
+  if (process.env.ORBIT_SMOKE) {
+    main.webContents.once('did-finish-load', async () => {
+      const health = await fetch(`http://127.0.0.1:${port}/api/health`).then((r) => r.json()).catch((e) => ({ error: e.message }));
+      const page = await main.webContents.executeJavaScript('document.title + " " + !!window.orbitNative');
+      fs.writeFileSync(process.env.ORBIT_SMOKE, JSON.stringify({ health, page, platform: process.platform }));
+      quitting = true; app.exit(health.ok ? 0 : 1);
+    });
+  }
+}).catch(fatal);
 app.on('activate', showMain);
 app.on('before-quit', () => { quitting = true; });
 app.on('will-quit', async () => { globalShortcut.unregisterAll(); worker?.kill(); await orbit?.close(); });

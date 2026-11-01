@@ -38,6 +38,19 @@ jobs:
         env:
           # Unsigned builds. Add signing certificates as secrets to remove OS warnings.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Launch the built app (smoke test)
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Windows) EXE="release/win-unpacked/ORBIT.exe"; RUN="" ;;
+            macOS)   EXE="$(ls -d release/mac*/ORBIT.app)/Contents/MacOS/ORBIT"; RUN="" ;;
+            Linux)   EXE="release/linux-unpacked/orbit"; RUN="xvfb-run -a"; EXTRA="--no-sandbox" ;;
+          esac
+          export ORBIT_SMOKE="$RUNNER_TEMP/smoke.json" ORBIT_USER_DATA="$RUNNER_TEMP/orbit-data"
+          timeout 120 $RUN "$EXE" $EXTRA || true
+          cat "$ORBIT_SMOKE"; echo
+          cat "$ORBIT_USER_DATA/orbit.log" || true
+          grep -q '"ok":true' "$ORBIT_SMOKE"
       - uses: actions/upload-artifact@v4
         with:
           name: ORBIT-${{ runner.os }}

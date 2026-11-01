@@ -2,8 +2,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+// fileURLToPath handles Windows drive letters (C:\...); URL.pathname does not.
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function loadEnv(file) {
   if (!fs.existsSync(file)) return;

@@ -1,0 +1,24 @@
+# GRUB 2: the boot loader, for UEFI PCs (x86_64-efi) and older BIOS PCs (i386-pc).
+name=grub
+version=2.12
+stage=boot
+sources=(https://ftp.gnu.org/gnu/grub/grub-2.12.tar.xz)
+sha256=(f3c97391f7c4eaa677a78e090c7e97e6dc47b16f655f04683ebd37bef7fe0faa)
+depends=(base-files python flex bison gettext xz)
+description="GRUB boot loader (UEFI and BIOS)"
+
+build() {
+  # the 2.12 release tarball lacks this generated file (fixed upstream; as in Linux From Scratch)
+  echo depends bli part_gpt > grub-core/extra_deps.lst
+  unset CFLAGS CXXFLAGS LDFLAGS
+  for platform in efi pc; do
+    mkdir "build-$platform" && cd "build-$platform"
+    target=x86_64; [ "$platform" = pc ] && target=i386
+    ../configure --prefix=/usr --sysconfdir=/etc --disable-efiemu --disable-werror \
+      --with-platform=$platform --target=$target
+    make
+    make DESTDIR="$DESTDIR" install
+    cd ..
+  done
+  mv -v "$DESTDIR/etc/bash_completion.d/grub" "$DESTDIR/usr/share/bash-completion/completions/grub" 2>/dev/null || true
+}

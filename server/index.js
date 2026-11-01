@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
-import { config } from './config.js';
+import { config, saveEnvValue, envFile } from './config.js';
 import { JsonStore } from './store.js';
 import { AuditLog } from './audit.js';
 import { Memory, MEMORY_KINDS } from './memory.js';
@@ -44,7 +44,7 @@ export function createOrbit(cfg = config) {
   });
 
   const overview = () => ({
-    brain: brain.status(), home: { name: home.name, simulated: !!home.simulated },
+    brain: { ...brain.status(), hasKey: !!cfg.ai.anthropicKey, envFile }, home: { name: home.name, simulated: !!home.simulated },
     devices: devices.list(), recent: engine.recent.slice(0, 12), routines: automations.routines(),
     reminders: automations.reminders().filter((r) => !r.done), memoryCount: memory.list().length,
     settings: settings.data, capabilities: CAPABILITIES, memoryKinds: MEMORY_KINDS,
@@ -74,7 +74,18 @@ export function createOrbit(cfg = config) {
     'GET /api/audit': () => audit.tail(100),
     'GET /api/settings': () => settings.data,
     'PATCH /api/settings': (b) => { const allowed = ['userName', 'tone', 'voice', 'wakeWord', 'proactive', 'retentionDays']; for (const k of allowed) if (k in b) settings.data[k] = b[k]; settingsStore.save(); return settings.data; },
-    'PATCH /api/ai': (b) => { for (const k of ['fastModel', 'reasoningModel']) if (b[k]) cfg.ai[k] = String(b[k]); if (b.provider) brain.setProvider(b.provider); return brain.status(); },
+    'PATCH /api/ai': (b) => {
+      for (const k of ['fastModel', 'reasoningModel']) if (b[k]) cfg.ai[k] = String(b[k]);
+      // The key is written to the server's env file and never sent back to any client.
+      if (typeof b.anthropicKey === 'string') {
+        const key = b.anthropicKey.trim();
+        if (key && !/^sk-ant-[\w-]{20,}$/.test(key)) throw new Error("That doesn't look like an Anthropic API key (it starts with sk-ant-).");
+        saveEnvValue('ANTHROPIC_API_KEY', key); cfg.ai.anthropicKey = key;
+        audit.write({ kind: 'security', action: key ? 'api key set' : 'api key removed' });
+        brain.setProvider(key ? 'anthropic' : 'offline');
+      } else if (b.provider) brain.setProvider(b.provider);
+      return brain.status();
+    },
   };
 
   const server = http.createServer(async (req, res) => {

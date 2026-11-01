@@ -32,6 +32,7 @@ function saveSettings() { fs.writeFileSync(settingsFile(), JSON.stringify(state.
 // ---------- server + built-in companion ----------
 async function startServer() {
   process.env.ORBIT_DATA_DIR = path.join(app.getPath('userData'), 'data');
+  process.env.ORBIT_ENV_FILE = path.join(app.getPath('userData'), '.env'); // writable, unlike the install folder
   const { config } = await load('server', 'config.js');
   const { createOrbit } = await load('server', 'index.js');
   orbit = createOrbit(config);

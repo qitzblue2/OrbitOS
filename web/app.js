@@ -300,6 +300,15 @@ const VIEWS = {
         h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-user' }, 'What should ORBIT call you?'), name),
         h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-tone' }, 'Tone'), tone),
         h('button', { class: 'btn primary', onclick: async () => { S.overview.settings = await api('PATCH', '/api/settings', { userName: name.value, tone: tone.value }); toast('Saved.'); } }, 'Save')),
+      (() => {
+        const key = h('input', { id: 'ai-key', type: 'password', autocomplete: 'off', placeholder: o.brain.hasKey ? '•••••••• saved' : 'sk-ant-…' });
+        const setKey = async (value) => { try { S.overview.brain = { ...S.overview.brain, ...(await api('PATCH', '/api/ai', { anthropicKey: value })) }; toast(value ? 'API key saved. ORBIT can now answer questions.' : 'API key removed.'); refresh(); } catch (e) { toast(e.message, 'bad'); } };
+        return panel('API key',
+          h('p', { class: 'muted' }, 'Needed for open questions, writing, code help and screen analysis. Device commands, routines and memory work without it. Get a key at console.anthropic.com.'),
+          h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-key' }, 'Anthropic API key'), key),
+          h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: () => key.value.trim() && setKey(key.value) }, o.brain.hasKey ? 'Replace key' : 'Save key'), o.brain.hasKey ? h('button', { class: 'btn danger', onclick: () => setKey('') }, 'Remove key') : null),
+          h('p', { class: 'muted mono' }, `Stored only in ${o.brain.envFile}. It is never shown again or sent to this page.`));
+      })(),
       panel('Models',
         h('p', { class: 'muted' }, 'Simple requests go to the fast model; analysis, code, planning and screenshots go to the reasoning model. Device commands never reach a model.'),
         h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-prov' }, 'Provider'), prov),

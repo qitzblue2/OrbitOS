@@ -9,6 +9,7 @@ process.env.ORBIT_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-test-'
 process.env.ORBIT_AI_PROVIDER = 'offline';
 process.env.ANTHROPIC_API_KEY = '';
 process.env.ORBIT_DEVICE_TIMEOUT_MS = '400';
+process.env.ORBIT_ENV_FILE = path.join(process.env.ORBIT_DATA_DIR, '.env');
 const { config } = await import('../server/config.js');
 const { createOrbit } = await import('../server/index.js');
 const { looksSensitive } = await import('../server/memory.js');
@@ -112,4 +113,17 @@ test('revoking a device disconnects it and kills its token', async () => {
   const retry = new WebSocket(`ws://127.0.0.1:${port}/ws/device`, { headers: { authorization: `Bearer ${device.token}` } });
   const status = await new Promise((r) => { retry.on('unexpected-response', (_, res) => r(res.statusCode)); retry.on('open', () => r(200)); });
   assert.equal(status, 401);
+});
+
+test('API key is saved server-side and never returned', async () => {
+  const bad = await api('PATCH', '/api/ai', { anthropicKey: 'hello' });
+  assert.equal(bad.status, 400);
+  const fake = 'sk-ant-test-' + 'x'.repeat(30);
+  const ok = await api('PATCH', '/api/ai', { anthropicKey: fake });
+  assert.equal(ok.body.provider, 'anthropic');
+  const overview = JSON.stringify((await api('GET', '/api/overview')).body);
+  assert.ok(!overview.includes(fake), 'key never sent to the dashboard');
+  assert.match(overview, /"hasKey":true/);
+  assert.ok(fs.readFileSync(process.env.ORBIT_ENV_FILE, 'utf8').includes(fake), 'key written to the env file');
+  await api('PATCH', '/api/ai', { anthropicKey: '' });
 });

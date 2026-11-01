@@ -14,7 +14,20 @@ function loadEnv(file) {
     if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
   }
 }
-loadEnv(path.join(root, '.env'));
+// The desktop app points ORBIT_ENV_FILE at a writable file in the user's data folder.
+export const envFile = process.env.ORBIT_ENV_FILE || path.join(root, '.env');
+loadEnv(envFile);
+if (envFile !== path.join(root, '.env')) loadEnv(path.join(root, '.env'));
+
+// Saves one key to the env file (created with owner-only permissions), replacing any old value.
+export function saveEnvValue(name, value) {
+  let text = fs.existsSync(envFile) ? fs.readFileSync(envFile, 'utf8') : '';
+  const line = `${name}=${String(value).replace(/[\r\n]/g, '')}`;
+  text = new RegExp(`^${name}=.*$`, 'm').test(text) ? text.replace(new RegExp(`^${name}=.*$`, 'm'), line) : `${text}${text && !text.endsWith('\n') ? '\n' : ''}${line}\n`;
+  fs.mkdirSync(path.dirname(envFile), { recursive: true });
+  fs.writeFileSync(envFile, text, { mode: 0o600 });
+  process.env[name] = String(value);
+}
 
 const env = process.env;
 export const config = {

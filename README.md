@@ -25,6 +25,17 @@ The builds aren't code-signed yet:
 - **Windows:** SmartScreen asks you to confirm. Choose More info, then Run anyway.
 - **macOS:** right-click the app and choose Open the first time.
 
+### Add your API key
+
+Open **AI configuration**, paste your Anthropic API key (it starts with `sk-ant-`) and select **Save key**. You can get a key at [console.anthropic.com](https://console.anthropic.com).
+
+The key is written to a `.env` file in ORBIT's data folder:
+- **Windows:** `%APPDATA%\ORBIT\.env`
+- **macOS:** `~/Library/Application Support/ORBIT/.env`
+- **Linux:** `~/.config/ORBIT/.env`
+
+It stays on your computer and is never shown in the app again. Without a key, device control, routines, smart home and memory still work.
+
 ### Run it from source
 
 ```bash

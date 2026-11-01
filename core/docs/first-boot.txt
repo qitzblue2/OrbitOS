@@ -1,0 +1,23 @@
+# Orbit Core: first boot (QEMU, 2026-11-01), serial console
+# kernel: Orbit's linux 6.12.115-orbit; init: Orbit's systemd 257.13; every file built from source by forge
+# qemu -kernel /boot/vmlinuz-6.12.115-orbit -append 'root=/dev/vda rw console=ttyS0 init=/usr/lib/systemd/systemd'
+
+c[    0.000000] Linux version 6.12.115-orbit (root@vm) (gcc (GCC) 15.3.0, GNU ld (GNU Binutils) 2.47.20260726) #1 SMP PREEMPT_DYNAMIC Sun Nov  1 20:06:03 UTC 2026
+[    4.134710] Run /usr/lib/systemd/systemd as init process
+[!p]104[    5.006598] systemd[1]: systemd 257.13 running in system mode (-PAM -AUDIT -SELINUX -APPARMOR +IMA +IPE +SMACK -SECCOMP -GCRYPT -GNUTLS +OPENSSL +ACL +BLKID -CURL -ELFUTILS -FIDO2 -IDN2 -IDN -IPTC +KMOD -LIBCRYPTSETUP -LIBCRYPTSETUP_PLUGINS +LIBFDISK -PCRE2 -PWQUALITY -P11KIT -QRENCODE -TPM2 +BZIP2 -LZ4 +XZ +ZLIB +ZSTD -BPF_FRAMEWORK -BTF -XKBCOMMON +UTMP +SYSVINIT -LIBARCHIVE)
+Welcome to Orbit OS Core!
+[  OK  ] Reached target Path Units.
+[  OK  ] Reached target Slice Units.
+[  OK  ] Reached target Swaps.
+[  OK  ] Reached target Preparation for Local File Systems.
+[  OK  ] Reached target Local File Systems.
+[  OK  ] Reached target System Initialization.
+[  OK  ] Reached target Timer Units.
+[  OK  ] Reached target Socket Units.
+[  OK  ] Reached target Basic System.
+[  OK  ] Reached target Login Prompts.
+[  OK  ] Reached target Multi-User System.
+[  OK  ] Reached target Graphical Interface.
+[FAILED] Failed to start Virtual Console Setup.
+Orbit OS Core
+localhost login: qemu-system-x86_64: terminating on signal 15 from pid 4313 ()

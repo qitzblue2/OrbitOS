@@ -1,9 +1,0 @@
-{
-  "uuid": "orbit-clipboard@orbit-os",
-  "name": "Orbit Clipboard",
-  "description": "Clipboard history on Super+V with search and pinned items. Skips anything a password manager copies.",
-  "shell-version": ["48"],
-  "settings-schema": "org.gnome.shell.extensions.orbit-clipboard",
-  "url": "https://github.com/qitzblue2/OrbitOS",
-  "version": 1
-}

@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Install Orbit OS
-Exec=orbit-installer --autostart
-Icon=orbit-installer
-OnlyShowIn=GNOME;
-X-GNOME-Autostart-Delay=3
-X-GNOME-AutoRestart=false
-TryExec=orbit-installer

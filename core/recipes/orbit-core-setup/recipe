@@ -1,0 +1,51 @@
+# Orbit Core first boot: no password ships in the image. On the first start Orbit creates the
+# password database and asks on the console for a root password, before anyone can log in.
+name=orbit-core-setup
+version=2
+stage=base
+sources=()
+sha256=()
+depends=(base-files systemd shadow)
+description="Orbit Core first-boot setup (root password, hostname)"
+
+build() {
+  install -d "$DESTDIR/usr/lib/orbit-core" "$DESTDIR/usr/lib/systemd/system/sysinit.target.wants" "$DESTDIR/etc"
+  echo orbit > "$DESTDIR/etc/hostname"
+  cat > "$DESTDIR/usr/lib/orbit-core/first-boot" <<'SH'
+#!/bin/bash
+# Runs once, on the console, before the login prompt (orbit-first-boot.service).
+set -u
+[ -f /etc/shadow ] || pwconv
+[ -f /etc/gshadow ] || grpconv
+# root has no usable password until its shadow entry holds a real hash ($…); pwconv leaves "x"
+if ! awk -F: '$1 == "root" && $2 ~ /^\$/ {found = 1} END {exit !found}' /etc/shadow; then
+  echo
+  echo "Welcome to Orbit OS Core. Choose a password for the administrator (root)."
+  until passwd root; do echo "Try again."; done
+fi
+touch /var/lib/orbit-core-first-boot.done
+SH
+  chmod 755 "$DESTDIR/usr/lib/orbit-core/first-boot"
+  cat > "$DESTDIR/usr/lib/systemd/system/orbit-first-boot.service" <<'UNIT'
+[Unit]
+Description=Orbit Core first-boot setup (root password)
+ConditionPathExists=!/var/lib/orbit-core-first-boot.done
+After=systemd-remount-fs.service systemd-vconsole-setup.service
+Before=getty@tty1.service serial-getty@ttyS0.service systemd-user-sessions.service
+DefaultDependencies=no
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/orbit-core/first-boot
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/console
+TTYReset=yes
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target
+UNIT
+  ln -sf ../orbit-first-boot.service "$DESTDIR/usr/lib/systemd/system/sysinit.target.wants/orbit-first-boot.service"
+}

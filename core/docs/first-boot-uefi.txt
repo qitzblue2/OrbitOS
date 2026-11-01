@@ -1,0 +1,16 @@
+# Orbit Core: first boot of the disk image (core/tools/make-core-image.sh), QEMU with UEFI firmware (OVMF), 2026-11-01
+# firmware -> Orbit's GRUB (BOOTX64.EFI) -> linux 6.12.115-orbit -> systemd 257 -> first-boot root password -> login
+# (the password typed here was a throwaway test password; no password ships in the image)
+
+BdsDxe: starting Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x4,0x0)
+Welcome to Orbit OS Core. Choose a password for the administrator (root).
+New password: 
+Kernel 6.12.115-orbit on an x86_64 (ttyS0)
+orbit login: root
+Password: 
+-bash-5.3# uname -r; grep PRETTY /etc/os-release; systemctl is-system-running; sy
+6.12.115-orbit
+PRETTY_NAME="Orbit OS Core"
+running
+0
+-bash-5.3# qemu-system-x86_64: terminating on signal 15 from pid 17860 (timeout)

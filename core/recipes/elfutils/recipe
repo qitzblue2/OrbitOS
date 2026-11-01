@@ -9,7 +9,9 @@ description="libelf (ELF object file access)"
 
 build() {
   ./configure --prefix=/usr --disable-debuginfod --enable-libdebuginfod=dummy
-  make
+  # only what libelf needs (the rest, e.g. the RISC-V disassembler, trips glibc 2.44's const warnings)
+  make -C lib
+  make -C libelf
   make -C libelf DESTDIR="$DESTDIR" install
   install -Dm644 config/libelf.pc "$DESTDIR/usr/lib/pkgconfig/libelf.pc"
   rm -f "$DESTDIR/usr/lib/libelf.a"

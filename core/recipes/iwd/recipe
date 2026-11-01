@@ -1,0 +1,32 @@
+# iwd: Wi-Fi. iwd joins networks (iwctl), systemd-networkd gives the address (DHCP), as for wired.
+name=iwd
+version=3.10
+stage=base
+sources=(https://www.kernel.org/pub/linux/network/wireless/iwd-3.10.tar.xz)
+sha256=(640bff22540e1714f71772a83123aff6f810b7eb9d7d6df1e10fb2695beb5115)
+depends=(base-files dbus readline systemd)
+description="iwd Wi-Fi daemon and iwctl"
+
+build() {
+  # man pages need rst2man (docutils), which Orbit doesn't build yet
+  ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --disable-manual-pages
+  make
+  make DESTDIR="$DESTDIR" install
+  install -d "$DESTDIR/usr/lib/systemd/network" "$DESTDIR/usr/lib/systemd/system/multi-user.target.wants"
+  cat > "$DESTDIR/usr/lib/systemd/network/80-orbit-wireless.network" <<'NET'
+[Match]
+Type=wlan
+
+[Network]
+DHCP=yes
+MulticastDNS=yes
+IgnoreCarrierLoss=3s
+
+[DHCPv4]
+RouteMetric=600
+
+[IPv6AcceptRA]
+RouteMetric=600
+NET
+  ln -sf ../iwd.service "$DESTDIR/usr/lib/systemd/system/multi-user.target.wants/iwd.service"
+}

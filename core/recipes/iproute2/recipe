@@ -1,0 +1,16 @@
+# iproute2: the ip, ss and tc network tools.
+name=iproute2
+version=6.17.0
+stage=base
+sources=(https://www.kernel.org/pub/linux/utils/net/iproute2/iproute2-6.17.0.tar.xz)
+sha256=(9781e59410ab7dea8e9f79bb10ff1488e63d10fcbb70503b94426ba27a8e2dec)
+depends=(base-files libcap elfutils)
+description="ip, ss and other network tools"
+
+build() {
+  # arpd needs Berkeley DB, which Orbit doesn't have (as in Linux From Scratch)
+  sed -i /ARPD/d Makefile
+  rm -f man/man8/arpd.8
+  make NETNS_RUN_DIR=/run/netns
+  make SBINDIR=/usr/sbin DESTDIR="$DESTDIR" install
+}

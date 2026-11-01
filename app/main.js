@@ -25,7 +25,7 @@ app.on('second-instance', () => showMain());
 const settingsFile = () => path.join(app.getPath('userData'), 'app-settings.json');
 function loadSettings() {
   try { state.settings = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch { state.settings = {}; }
-  state.settings = { listenOnStart: false, sensitivity: 0.08, ...state.settings };
+  state.settings = { listenOnStart: false, sensitivity: 0.08, voice: 'alan', ...state.settings };
 }
 function saveSettings() { fs.writeFileSync(settingsFile(), JSON.stringify(state.settings, null, 2)); }
 
@@ -84,7 +84,9 @@ async function startSpeech() {
   worker = utilityProcess.fork(path.join(__dirname, 'speech-worker.js'), [], { serviceName: 'ORBIT speech' });
   worker.on('message', onSpeech);
   worker.on('exit', () => { state.speechReady = false; if (!quitting) setTimeout(startSpeech, 1000); });
-  worker.postMessage({ type: 'boot', modelsDir: dir, sensitivity: state.settings.sensitivity });
+  state.modelsDir = dir;
+  const localVoice = state.settings.voice.startsWith('openai:') ? (state.settings.localVoice || 'alan') : state.settings.voice;
+  worker.postMessage({ type: 'boot', modelsDir: dir, sensitivity: state.settings.sensitivity, voice: localVoice, voiceDirs: [path.join(app.getPath('userData'), 'models')] });
 }
 
 const pendingSpeech = new Map();
@@ -99,6 +101,7 @@ function onSpeech(m) {
     case 'listening': broadcast('listening', m.data); break;
     case 'partial': toOverlay({ heard: m.data }); broadcast('partial', m.data); break;
     case 'utterance': toOverlay({ heard: m.data, phase: m.data ? 'processing' : 'idle' }); broadcast('utterance', m.data); break;
+    case 'voice': { const done = state.voiceWait; state.voiceWait = null; done?.(m); break; }
     case 'speech': { const done = pendingSpeech.get(m.id); pendingSpeech.delete(m.id); done?.(m.samples ? { samples: Float32Array.from(m.samples), sampleRate: m.sampleRate } : null); break; }
   }
 }
@@ -110,12 +113,65 @@ ipcMain.on('ptt', (_e, down) => { if (down) showOverlay(); toWorker({ type: 'ptt
 ipcMain.on('followUp', (_e, ms) => toWorker({ type: 'followUp', ms }));
 ipcMain.on('cancel', () => toWorker({ type: 'cancel' }));
 ipcMain.on('sensitivity', (_e, v) => { state.settings.sensitivity = Math.max(0.02, Math.min(0.4, +v)); saveSettings(); if (worker) worker.kill(); });
-ipcMain.handle('speak', (_e, text, speed) => new Promise((resolve) => {
+const localSpeak = (text, speed) => new Promise((resolve) => {
   if (!state.speechReady) return resolve(null);
   const id = Math.random().toString(36).slice(2);
   pendingSpeech.set(id, resolve);
   worker.postMessage({ type: 'speak', id, text, speed });
-}));
+});
+
+// ---------- voices ----------
+const { VOICES, voiceInstalled } = require('./speech.js');
+const OPENAI_VOICES = [['ash', 'Ash', 'warm, steady'], ['onyx', 'Onyx', 'deep, authoritative'], ['sage', 'Sage', 'calm, thoughtful'], ['coral', 'Coral', 'bright, friendly'], ['nova', 'Nova', 'energetic'], ['echo', 'Echo', 'smooth'], ['fable', 'Fable', 'British, storyteller'], ['alloy', 'Alloy', 'neutral'], ['shimmer', 'Shimmer', 'gentle']];
+const openaiKey = () => orbit?.keyring.data.keys.find((k) => k.provider === 'openai' && k.enabled);
+const voiceDirs = () => [state.modelsDir, path.join(app.getPath('userData'), 'models')];
+
+ipcMain.handle('voices', () => {
+  const local = Object.entries(VOICES).map(([id, v]) => ({ id, label: v.label, desc: v.desc, kind: v.engine === 'kokoro' ? 'natural' : v.bundled ? 'built-in' : 'download', installed: voiceInstalled(voiceDirs(), id), sizeMB: v.sizeMB || 0 }));
+  const cloud = OPENAI_VOICES.map(([id, label, desc]) => ({ id: `openai:${id}`, label, desc: `${desc} · OpenAI cloud`, kind: 'cloud', installed: !!openaiKey() }));
+  return { current: state.settings.voice, voices: [...local, ...cloud] };
+});
+
+ipcMain.handle('setVoice', async (_e, id) => {
+  if (id.startsWith('openai:')) {
+    if (!openaiKey()) throw new Error('Add an OpenAI key under AI configuration to use cloud voices.');
+    state.settings.voice = id; saveSettings(); return { voice: id };
+  }
+  if (!VOICES[id]) throw new Error('Unknown voice');
+  if (!voiceInstalled(voiceDirs(), id)) {
+    await models.downloadVoice(path.join(app.getPath('userData'), 'models'), id, (p) => broadcast('voice-download', { id, fraction: p.fraction }));
+    broadcast('voice-download', { id, fraction: 1 });
+  }
+  const res = await new Promise((resolve) => { state.voiceWait = resolve; worker.postMessage({ type: 'setVoice', voice: id, benchmark: true }); });
+  state.settings.voice = res.voice; state.settings.localVoice = res.voice; saveSettings();
+  return { voice: res.voice, rtf: res.rtf, slow: res.rtf != null && res.rtf > 0.6 };
+});
+
+// Cloud voice: OpenAI text-to-speech, raw 24 kHz PCM. Any failure falls back to the on-device voice.
+async function cloudSpeak(text, voice, speed) {
+  const k = openaiKey();
+  if (!k) throw new Error('no OpenAI key');
+  const res = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST', signal: AbortSignal.timeout(15000),
+    headers: { authorization: `Bearer ${orbit.keyring.secretOf(k)}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'gpt-4o-mini-tts', voice, input: text, response_format: 'pcm', speed,
+      instructions: 'Speak like a calm, confident, quietly witty personal assistant. Smooth, natural pacing.' }),
+  });
+  if (!res.ok) throw new Error(`OpenAI voice ${res.status}`);
+  const pcm = new Int16Array(await res.arrayBuffer());
+  const samples = new Float32Array(pcm.length);
+  for (let i = 0; i < pcm.length; i++) samples[i] = pcm[i] / 32768;
+  return { samples, sampleRate: 24000 };
+}
+
+ipcMain.handle('speak', async (_e, text, speed) => {
+  const v = state.settings.voice;
+  if (v.startsWith('openai:')) {
+    try { return await cloudSpeak(text, v.slice(7), speed); }
+    catch (e) { log('cloud voice failed, using on-device voice:', e.message); }
+  }
+  return localSpeak(text, speed);
+});
 ipcMain.handle('info', () => ({ speechReady: state.speechReady, launchAtLogin: app.getLoginItemSettings().openAtLogin, sensitivity: state.settings.sensitivity, listenOnStart: state.settings.listenOnStart, version: app.getVersion() }));
 ipcMain.handle('launchAtLogin', (_e, on) => { app.setLoginItemSettings({ openAtLogin: !!on, openAsHidden: true, args: ['--hidden'] }); return app.getLoginItemSettings().openAtLogin; });
 ipcMain.on('report', (_e, s) => {

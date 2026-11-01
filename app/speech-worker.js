@@ -4,11 +4,11 @@ const { LocalSpeech } = require('./speech.js');
 let engine = null;
 const send = (msg) => process.parentPort.postMessage(msg);
 
-function boot({ modelsDir, sensitivity }) {
+function boot({ modelsDir, sensitivity, voice, voiceDirs }) {
   try {
-    engine = new LocalSpeech(modelsDir, { sensitivity });
+    engine = new LocalSpeech(modelsDir, { sensitivity, voice, voiceDirs });
     for (const ev of ['wake', 'listening', 'partial', 'utterance']) engine.on(ev, (data) => send({ type: ev, data }));
-    send({ type: 'ready', tts: !!engine.tts });
+    send({ type: 'ready', tts: !!engine.tts, voice: engine.voice });
   } catch (e) { send({ type: 'error', message: e.message }); }
 }
 
@@ -20,6 +20,11 @@ process.parentPort.on('message', ({ data: m }) => {
     case 'ptt': m.down ? engine.pttStart() : engine.pttEnd(); break;
     case 'followUp': engine.followUp(m.ms); break;
     case 'cancel': engine.cancel(); break;
+    case 'setVoice': {
+      try { const v = engine.setVoice(m.voice); send({ type: 'voice', voice: v, rtf: m.benchmark ? engine.benchmark() : null }); }
+      catch (e) { send({ type: 'error', message: `Couldn't load that voice: ${e.message}` }); }
+      break;
+    }
     case 'speak': {
       let out = null;
       try { out = engine.synthesize(m.text, { speed: m.speed || 1 }); } catch (e) { send({ type: 'error', message: `Voice output failed: ${e.message}` }); }

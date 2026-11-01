@@ -14,6 +14,22 @@ ORBIT is a desktop app for **Windows, macOS and Linux**. Install it, and:
 - **This computer is set up automatically.** The app pairs itself as a device, so "open Spotify" or "lock my computer" works right away.
 - **It can start when you log in**, so it's always available.
 
+### Voices
+
+Choose a voice on the **Voice** screen, then use **Preview** to hear it.
+- **Built in:** Alan (British) and Lessac (American). Both are smooth 22 kHz voices that run on any computer.
+- **Most natural:** 11 Kokoro voices, such as George, Emma and Adam. They share one 100 MB download and need a reasonably fast processor; ORBIT warns you if yours is too slow.
+- **High quality:** Ryan, a 110 MB download.
+- **Cloud:** 9 OpenAI voices. They need an OpenAI key, and if the cloud can't be reached ORBIT falls back to your last on-device voice.
+
+Speech is played gaplessly, with faded joins. Sentences are grouped into longer phrases so the intonation flows, and markdown, code and links are never read aloud.
+
+### Choosing the AI model
+
+- **Quick switch:** click the model name in the top bar to pick any model your keys can use. The list comes live from each provider.
+- **By voice:** say "Orbit, switch to GPT-4o" or "Orbit, use Claude Sonnet". "Which model are you using?" tells you the current one.
+- **Separate models:** in **AI configuration** you can pick one model for quick answers and another for deep reasoning, or type any model name under **Other…**.
+
 ### Get the installer
 
 Open the repository's **Actions** tab, choose **Build ORBIT app**, and select **Run workflow**. When the run finishes, download your installer from its artifacts:

@@ -67,6 +67,11 @@ export class Keyring {
       enc: key ? this.encrypt(key) : null, fp, last4: key ? key.slice(-4) : '', baseUrl: baseUrl || '', enabled: true, createdAt: new Date().toISOString(),
     };
     this.data.keys.push(item);
+    // If the providers ORBIT is set to use have no working key, start using this one.
+    for (const tier of ['fast', 'reasoning']) {
+      const r = this.data.routes[tier];
+      if (!this.data.keys.some((k) => k.enabled && k.provider === r.provider)) this.data.routes[tier] = { provider, model: '' };
+    }
     this.store.flush();
     return this.public(item);
   }

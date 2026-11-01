@@ -83,6 +83,14 @@ export class Engine {
       case 'mic.off': emit('mic', { enabled: false }); return { ok: true, say: 'Listening is off.' };
       case 'local': return { ok: true, say: intent.answer };
       case 'briefing': return { ok: true, say: this.briefing() };
+      case 'model.which': { const b = this.brain.status(); return { ok: true, say: b.provider === 'offline' ? "I don't have an AI key yet." : `I'm using ${b.fastModel} for quick answers and ${b.reasoningModel} for harder ones.` }; }
+      case 'model.switch': {
+        const hit = await this.brain.findModel(intent.name);
+        if (!hit) return { ok: false, say: `I couldn't find a model called ${intent.name} among your providers.` };
+        this.brain.keyring.setRoutes({ fast: { provider: hit.provider, model: hit.model }, reasoning: { provider: hit.provider, model: hit.model } });
+        emit('model', this.brain.status());
+        return { ok: true, say: `Switched to ${hit.model}.` };
+      }
       case 'memory.add': {
         try { this.memory.add({ text: intent.text, kind: 'fact', source: 'voice' }); emit('memory', {}); return { ok: true, say: "Noted. I'll remember that." }; }
         catch (e) { return { ok: false, say: e.code === 'SENSITIVE' ? "That looks sensitive, so I haven't saved it. You can add it yourself from the Memory screen." : e.message }; }

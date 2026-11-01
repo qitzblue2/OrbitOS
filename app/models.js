@@ -4,23 +4,27 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { execFile } = require('node:child_process');
-const { MODELS } = require('./speech.js');
+const { MODELS, VOICES } = require('./speech.js');
 
 const BASE = 'https://github.com/k2-fsa/sherpa-onnx/releases/download';
+const tts = (dir) => `${BASE}/tts-models/${dir}.tar.bz2`;
+// Required to start, plus the second bundled voice.
 const SOURCES = {
   [MODELS.kws]: `${BASE}/kws-models/${MODELS.kws}.tar.bz2`,
   [MODELS.asr]: `${BASE}/asr-models/${MODELS.asr}.tar.bz2`,
-  [MODELS.tts]: `${BASE}/tts-models/${MODELS.tts}.tar.bz2`,
+  [MODELS.tts]: tts(MODELS.tts),
+  [VOICES.lessac.dir]: tts(VOICES.lessac.dir),
 };
-const has = (dir) => Object.keys(SOURCES).every((m) => fs.existsSync(path.join(dir, m)));
+const REQUIRED = [MODELS.kws, MODELS.asr, MODELS.tts];
+const has = (dir) => REQUIRED.every((m) => fs.existsSync(path.join(dir, m)));
 
 function locate(candidates) { return candidates.find((d) => d && has(d)) || null; }
 
-async function download(dir, onProgress = () => {}) {
+async function download(dir, onProgress = () => {}, sources = SOURCES) {
   fs.mkdirSync(dir, { recursive: true });
-  const names = Object.keys(SOURCES).filter((m) => !fs.existsSync(path.join(dir, m)));
+  const names = Object.keys(sources).filter((m) => !fs.existsSync(path.join(dir, m)));
   for (const [i, name] of names.entries()) {
-    const res = await fetch(SOURCES[name]);
+    const res = await fetch(sources[name]);
     if (!res.ok) throw new Error(`Download failed for ${name}: ${res.status}`);
     const total = Number(res.headers.get('content-length')) || 0;
     const tmp = path.join(os.tmpdir(), `${name}.tar.bz2`);
@@ -35,7 +39,14 @@ async function download(dir, onProgress = () => {}) {
   return dir;
 }
 
-module.exports = { locate, download, has };
+// Downloads one optional voice (Kokoro voices share a single package).
+function downloadVoice(dir, id, onProgress) {
+  const v = VOICES[id];
+  if (!v) throw new Error(`Unknown voice ${id}`);
+  return download(dir, onProgress, { [v.dir]: tts(v.dir) });
+}
+
+module.exports = { locate, download, downloadVoice, has };
 
 // `npm run models` downloads into ./models for development and for bundling into installers.
 if (require.main === module) {

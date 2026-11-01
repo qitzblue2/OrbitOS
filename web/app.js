@@ -81,6 +81,7 @@ function onEvent(m) {
     case 'notify': S.notes.unshift({ ...m, at: new Date().toISOString() }); toast(m.text, m.level === 'warn' ? 'warn' : ''); if (m.speak) voice.say(m.text); if (S.view === 'dashboard') render(); break;
     case 'mic': if (!m.enabled) voice.killAll(); break;
     case 'error': toast(m.message, 'bad'); break;
+    case 'model': S.overview.brain = { ...S.overview.brain, ...m }; S.lastModel = ''; updateChip(); if (S.view === 'ai') render(); break;
   }
 }
 
@@ -92,7 +93,7 @@ function setState(s) {
   const label = $('#core-state'); if (label) label.textContent = stateLabel(shown);
   clearTimeout(S.errTimer); if (s === 'error') S.errTimer = setTimeout(() => S.state === 'error' && setState('idle'), 4000);
 }
-function updateChip() { const b = S.overview?.brain; $('#model-chip').textContent = S.lastModel || (b ? (b.provider === 'offline' ? 'no AI key' : `${b.provider} · ${b.fastModel} · ${b.activeKeys} key${b.activeKeys === 1 ? '' : 's'}`) : '—'); }
+function updateChip() { const b = S.overview?.brain; $('#model-chip').textContent = S.lastModel || (b ? (b.provider === 'offline' ? 'no AI key · choose model' : `${b.fastModel}${b.reasoningModel !== b.fastModel ? ` + ${b.reasoningModel}` : ''} ▾`) : '—'); }
 
 function utter(text, source = 'text') {
   text = text.trim(); if (!text) return;
@@ -135,6 +136,38 @@ $('#ask').addEventListener('submit', (e) => { e.preventDefault(); const i = $('#
 function applySettings() { const s = S.overview?.settings; if (s?.voice) voice.voice = { ...voice.voice, ...s.voice }; S.speakReplies = !!s?.voice?.speakTyped; updateChip(); }
 async function refresh() { try { S.overview = await api('GET', '/api/overview'); updateChip(); if (S.view !== 'conversations' || !S.live) render(); } catch {} }
 
+// ---- model switcher (top bar) ----
+const chip = $('#model-chip'), menu = $('#model-menu');
+async function openModelMenu() {
+  menu.hidden = false; chip.setAttribute('aria-expanded', 'true');
+  menu.replaceChildren(h('div', { class: 'group' }, 'Loading models…'));
+  let lists = {};
+  try { lists = await api('GET', '/api/ai/models'); } catch {}
+  const r = S.overview.brain.routes;
+  const pick = async (provider, model) => {
+    S.overview.brain = await api('PATCH', '/api/ai/routes', { fast: { provider, model }, reasoning: { provider, model } });
+    S.lastModel = ''; updateChip(); closeModelMenu(); toast(`ORBIT now uses ${model}.`);
+    if (S.view === 'ai') render();
+  };
+  const groups = Object.entries(lists);
+  menu.replaceChildren(
+    ...(groups.length ? groups.flatMap(([provider, g]) => [
+      h('div', { class: 'group' }, g.label),
+      ...g.models.slice(0, 40).map((m) => h('button', { type: 'button', role: 'option', 'aria-selected': String(r.fast.provider === provider && (r.fast.model || '') === m), onclick: () => pick(provider, m) }, m)),
+    ]) : [h('div', { class: 'group' }, 'Add an AI key to choose a model')]),
+    h('div', { class: 'foot' }, h('button', { type: 'button', onclick: () => { closeModelMenu(); go('ai'); } }, 'Separate models for quick and deep answers…')));
+  menu.querySelector('button')?.focus();
+}
+function closeModelMenu() { menu.hidden = true; chip.setAttribute('aria-expanded', 'false'); }
+chip.addEventListener('click', () => (menu.hidden ? openModelMenu() : closeModelMenu()));
+document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.model-switch')) closeModelMenu(); });
+menu.addEventListener('keydown', (e) => {
+  const items = [...menu.querySelectorAll('button')], i = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length]?.focus(); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus(); }
+  if (e.key === 'Escape') { e.stopPropagation(); closeModelMenu(); chip.focus(); }
+});
+
 // ---- toasts ----
 function toast(text, kind = '', actions = []) {
   const t = h('div', { class: `toast glass ${kind}`, role: kind === 'bad' ? 'alert' : 'status' }, h('div', {}, text), actions.length ? h('div', { class: 'row' }, actions) : null);
@@ -157,6 +190,40 @@ const empty = (t) => h('div', { class: 'empty' }, t);
 function renderLive() {
   const el = $('#transcript'); if (el) el.replaceChildren(...[S.heard ? h('span', { class: 'you' }, `“${S.heard}”`) : null, S.live || (S.chat.at(-1)?.role === 'orbit' ? S.chat.at(-1).text : '')].filter(Boolean));
   if (S.view === 'conversations') renderChat();
+}
+
+// Voice gallery for the desktop app: built-in voices, downloadable natural voices, and cloud voices.
+function voicePicker(rate, save) {
+  const box = h('div', { class: 'stack' });
+  const sample = "Good evening. I've dimmed the lights and your music is playing. Anything else?";
+  const draw = async () => {
+    const { current, voices } = await native.voices();
+    const groups = [['built-in', 'Built in'], ['natural', 'Most natural (one 100 MB download for all 11)'], ['download', 'High quality'], ['cloud', 'Cloud (uses your OpenAI key)']];
+    const item = (v) => {
+      const use = h('button', { class: `btn small ${v.id === current ? 'primary' : ''}`, disabled: v.kind === 'cloud' && !v.installed }, v.id === current ? 'In use' : v.installed || v.kind === 'cloud' ? 'Use' : `Download ${v.sizeMB} MB`);
+      use.addEventListener('click', async () => {
+        use.disabled = true; use.textContent = v.installed ? 'Loading…' : 'Downloading…';
+        S.voiceDownload = v.id;
+        try {
+          const r = await native.setVoice(v.id);
+          toast(r.slow ? `${v.label} is set, but this computer generates it slowly, so replies may pause. A built-in voice will be smoother here.` : `ORBIT now speaks as ${v.label}.`, r.slow ? 'warn' : '');
+          voice.say(sample);
+        } catch (e) { toast(e.message.replace(/^Error invoking remote method '\w+': (Error: )?/, ''), 'bad'); }
+        S.voiceDownload = null; draw();
+      });
+      const preview = h('button', { class: 'btn small ghost', 'aria-label': `Preview ${v.label}`, disabled: !(v.installed && v.id === current) }, 'Preview');
+      preview.addEventListener('click', () => { voice.interrupt('preview'); voice.say(sample); });
+      return h('li', {}, h('span', { class: 'grow' }, h('b', {}, v.label), h('div', { class: 'muted' }, v.desc)), v.id === current ? preview : null, use);
+    };
+    box.replaceChildren(panel('Voice',
+      h('p', { class: 'muted' }, 'Built-in and downloaded voices run entirely on this computer. Cloud voices sound the most human and need an OpenAI key; if the cloud is unreachable ORBIT switches to your last on-device voice.'),
+      ...groups.map(([kind, title]) => { const vs = voices.filter((v) => v.kind === kind); return vs.length ? h('div', {}, h('div', { class: 'label' }, title), h('ul', { class: 'list' }, vs.map(item))) : null; }),
+      h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-rate' }, 'Speaking speed'), rate),
+      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: async () => { await save(); voice.interrupt('preview'); voice.say(sample); } }, 'Save speed and preview'))));
+  };
+  native.on('voice-download', ({ fraction }) => { const b = [...box.querySelectorAll('button')].find((x) => x.textContent.startsWith('Downloading')); if (b) b.textContent = `Downloading ${Math.round(fraction * 100)}%`; });
+  draw();
+  return box;
 }
 
 const VIEWS = {
@@ -282,8 +349,9 @@ const VIEWS = {
           h('li', {}, h('span', { class: 'grow' }, 'Stop everything instantly', h('div', { class: 'muted' }, 'Press Esc or say "stop listening".'))),
           h('li', {}, h('span', { class: 'grow' }, 'Speak replies to typed commands'), h('button', { class: 'switch', role: 'switch', 'aria-checked': String(!!s.voice.speakTyped), 'aria-label': 'Speak replies to typed commands', onclick: async (e) => { s.voice.speakTyped = !s.voice.speakTyped; S.speakReplies = s.voice.speakTyped; e.currentTarget.setAttribute('aria-checked', String(s.voice.speakTyped)); await save(); } }))),
         !voice.supported.stt ? h('p', { class: 'error-text' }, 'This browser has no speech recognition. Use Chrome or Edge.') : null),
-      panel('Voice',
-        native ? null : h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-name' }, 'Voice'), vSel),
+      native ? voicePicker(rate, save) : null,
+      native ? null : panel('Voice',
+        h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-name' }, 'Voice'), vSel),
         h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-rate' }, 'Speaking speed'), rate),
         h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-pitch' }, 'Pitch'), pitch),
         h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: save }, 'Save'), h('button', { class: 'btn', onclick: async () => { await save(); voice.say("Good evening. I'm here. What can I do for you?"); } }, 'Preview'))));
@@ -294,6 +362,7 @@ const VIEWS = {
     const wrap = h('div', { class: 'stack' });
     const name = h('input', { id: 'ai-user', value: st.userName, placeholder: 'Alex' });
     const tone = h('select', { id: 'ai-tone' }, ['composed', 'concise', 'warm', 'witty', 'formal'].map((t) => h('option', { value: t, selected: t === st.tone }, t)));
+    S.modelsReady = api('GET', '/api/ai/models').then((l) => { S.modelLists = l; }).catch(() => {});
     api('GET', '/api/ai/providers').then((P) => {
       const keys = o.aiKeys || [];
       const prov = h('select', { id: 'k-prov' }, Object.entries(P).map(([id, p]) => h('option', { value: id }, p.label)));
@@ -323,10 +392,24 @@ const VIEWS = {
       };
       const routeFields = (tier, title) => {
         const r = o.brain.routes[tier];
-        const sel = h('select', { id: `r-${tier}`, 'aria-label': `${title} provider` }, Object.entries(P).map(([id, p]) => h('option', { value: id, selected: id === r.provider }, p.label)));
-        const model = h('input', { id: `m-${tier}`, 'aria-label': `${title} model`, value: r.model, placeholder: P[r.provider]?.models[tier] || 'model name' });
-        sel.addEventListener('change', () => { model.value = ''; model.placeholder = P[sel.value].models[tier] || 'model name'; });
-        return { sel, model, el: h('div', { class: 'field' }, h('span', { class: 'label' }, title), h('div', { class: 'row' }, sel, model)) };
+        const hasKey = (id) => keys.some((k) => k.enabled && k.provider === id);
+        const sel = h('select', { id: `r-${tier}`, 'aria-label': `${title} provider` }, Object.entries(P).map(([id, p]) => h('option', { value: id, selected: id === r.provider }, hasKey(id) ? p.label : `${p.label} (no key yet)`)));
+        const pickModel = h('select', { id: `ms-${tier}`, 'aria-label': `${title} model` });
+        const model = h('input', { id: `m-${tier}`, 'aria-label': `${title} custom model name`, placeholder: 'exact model name' });
+        const fill = (keepCurrent) => {
+          const live = S.modelLists?.[sel.value]?.models || [];
+          const def = P[sel.value].models[tier];
+          const ids = [...new Set([def, ...live].filter(Boolean))];
+          const cur = keepCurrent ? (r.model || def) : def;
+          if (cur && !ids.includes(cur)) ids.unshift(cur);
+          pickModel.replaceChildren(...ids.map((m) => h('option', { value: m, selected: m === cur }, m === def ? `${m} (recommended)` : m)), h('option', { value: '__custom' }, 'Other…'));
+          model.hidden = true;
+        };
+        sel.addEventListener('change', () => fill(false));
+        pickModel.addEventListener('change', () => { model.hidden = pickModel.value !== '__custom'; if (!model.hidden) model.focus(); });
+        fill(true);
+        S.modelsReady.then(() => fill(true));
+        return { sel, get model() { return { value: pickModel.value === '__custom' ? model.value : pickModel.value }; }, el: h('div', { class: 'field' }, h('span', { class: 'label' }, title), h('div', { class: 'row' }, sel, pickModel), model) };
       };
       const fast = routeFields('fast', 'Fast answers'), deep = routeFields('reasoning', 'Deep reasoning, code, screenshots');
       const fb = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Fall back to other providers', 'aria-checked': String(o.brain.fallback) });

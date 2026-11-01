@@ -83,6 +83,7 @@ export function createOrbit(cfg = config) {
     'PATCH /api/settings': (b) => { const allowed = ['userName', 'tone', 'voice', 'wakeWord', 'proactive', 'retentionDays']; for (const k of allowed) if (k in b) settings.data[k] = b[k]; settingsStore.save(); return settings.data; },
     'GET /api/ai/providers': () => Object.fromEntries(Object.entries(PROVIDERS).map(([id, p]) => [id, { label: p.label, keyHint: p.keyHint, keyOptional: !!p.keyOptional, needsBaseUrl: !!p.needsBaseUrl, baseUrl: p.baseUrl || '', models: p.models, vision: !!p.vision, keysUrl: p.keysUrl || '' }])),
     'GET /api/ai/keys': () => keyring.list(),
+    'GET /api/ai/models': () => brain.models(),
     'POST /api/ai/keys': (b) => { const k = keyring.add(b); audit.write({ kind: 'security', action: 'ai key added', provider: k.provider, label: k.label }); return k; },
     'PATCH /api/ai/keys/:id': (b, id) => keyring.update(id, b),
     'DELETE /api/ai/keys/:id': (b, id) => { audit.write({ kind: 'security', action: 'ai key removed', id }); return { ok: keyring.remove(id) }; },

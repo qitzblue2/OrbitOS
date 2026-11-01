@@ -242,50 +242,89 @@ export class NativeVoice extends EventTarget {
     if (this.mode === 'off') setTimeout(() => { this.n.setListening(false); this.closeMic(); }, 400);
   }
 
-  // Streaming speech: synthesize and play sentence by sentence, in order, as text arrives.
+  // ---- Smooth streaming speech ----
+  // Text arrives token by token. The first phrase is spoken as soon as it is complete (low latency);
+  // after that, sentences are grouped into longer phrases so intonation flows across them.
   feed(delta) {
     this.buffer += delta;
-    const parts = this.buffer.split(/(?<=[.!?;:])\s+(?=[A-Z0-9"'])/);
-    this.buffer = parts.pop();
-    for (const p of parts) this.say(p);
-  }
-  flush() { if (this.buffer.trim()) this.say(this.buffer); this.buffer = ''; }
-  say(text) {
-    text = String(text).replace(/[*_`#>]/g, '').trim();
-    if (!text) return;
-    const gen = this.gen;
-    const pending = this.n.speak(text, this.voice.rate); // synthesis starts now, in parallel with playback
-    this.queue = this.queue.then(async () => {
-      const audio = await pending;
-      if (!audio || gen !== this.gen) return;
-      await this.play(audio, gen);
-    });
-    this.queue.then(() => this.drained(gen));
-  }
-  async play({ samples, sampleRate }, gen) {
-    if (!this.out) this.out = new AudioContext();
-    const buf = this.out.createBuffer(1, samples.length, sampleRate);
-    buf.copyToChannel(samples, 0);
-    const src = this.out.createBufferSource();
-    src.buffer = buf; src.connect(this.out.destination);
-    this.sources.add(src);
-    if (!this.speaking) { this.speaking = true; this.emit('state', 'speaking'); }
-    await new Promise((r) => { src.onended = r; src.start(); });
-    this.sources.delete(src);
-  }
-  drained(gen) {
-    if (gen !== this.gen || this.sources.size) return;
-    if (this.speaking) {
-      this.speaking = false;
-      this.emit('state', 'listening-ready');
-      if (this.mode !== 'off') this.n.followUp(8000); // continue the conversation without the wake word
+    for (;;) {
+      const first = !this.spokeAny;
+      const min = first ? 20 : 140;
+      const re = first ? /[.!?;:,](?=\s)|\n/g : /[.!?](?=\s)|\n\n/g;
+      let cut = -1, m;
+      while ((m = re.exec(this.buffer))) { if (m.index + 1 >= min) { cut = m.index + 1; break; } }
+      if (cut < 0) break;
+      this.say(this.buffer.slice(0, cut));
+      this.buffer = this.buffer.slice(cut).replace(/^\s+/, '');
     }
   }
+  flush() { if (this.buffer.trim()) this.say(this.buffer); this.buffer = ''; }
+
+  static clean(text) {
+    return String(text)
+      .replace(/```[\s\S]*?(```|$)/g, ' I have put the code on screen. ')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/https?:\/\/\S+/g, 'a link')
+      .replace(/^\s*[-*•]\s+/gm, '')
+      .replace(/^\s*#+\s*/gm, '')
+      .replace(/[*_~>|]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  say(text) {
+    text = NativeVoice.clean(text);
+    if (!text || !/[a-z0-9]/i.test(text)) return;
+    this.spokeAny = true;
+    const gen = this.gen;
+    const pending = this.n.speak(text, this.voice.rate); // synthesis runs ahead, in parallel with playback
+    const pause = /[?!]$/.test(text) ? 0.22 : /[.:]$/.test(text) ? 0.18 : 0.06;
+    this.queue = this.queue.then(async () => {
+      const audio = await pending.catch(() => null);
+      if (!audio || gen !== this.gen) return;
+      this.schedule(audio, pause);
+    });
+  }
+
+  // Gapless playback: each phrase is placed on the audio clock right after the previous one,
+  // with 8 ms fades so the joins never click.
+  schedule({ samples, sampleRate }, pause) {
+    if (!this.out) { this.out = new AudioContext({ latencyHint: 'playback' }); this.playHead = 0; }
+    const ctx = this.out;
+    const fade = Math.min(Math.floor(sampleRate * 0.008), samples.length >> 2);
+    const data = Float32Array.from(samples);
+    for (let i = 0; i < fade; i++) { const g = i / fade; data[i] *= g; data[data.length - 1 - i] *= g; }
+    const buf = ctx.createBuffer(1, data.length, sampleRate);
+    buf.copyToChannel(data, 0);
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.connect(ctx.destination);
+    const at = Math.max(ctx.currentTime + 0.03, this.playHead || 0);
+    src.start(at);
+    this.playHead = at + buf.duration + pause;
+    this.sources.add(src);
+    if (!this.speaking) { this.speaking = true; this.emit('state', 'speaking'); }
+    const gen = this.gen;
+    src.onended = () => { this.sources.delete(src); this.drained(gen); };
+  }
+  drained(gen) {
+    if (gen !== this.gen || this.sources.size || this.buffer.trim()) return;
+    // Wait a beat in case the next phrase is still being synthesized.
+    clearTimeout(this.drainTimer);
+    this.drainTimer = setTimeout(() => {
+      if (gen !== this.gen || this.sources.size) return;
+      if (this.speaking) {
+        this.speaking = false; this.spokeAny = false; this.playHead = 0;
+        this.emit('state', 'listening-ready');
+        if (this.mode !== 'off') this.n.followUp(8000); // continue the conversation without the wake word
+      }
+    }, 350);
+  }
   interrupt(by) {
-    if (!this.speaking && !this.sources.size) { this.buffer = ''; return; }
+    if (!this.speaking && !this.sources.size) { this.buffer = ''; this.spokeAny = false; return; }
     this.gen++; this.buffer = '';
     for (const s of this.sources) try { s.stop(); } catch {}
-    this.sources.clear(); this.speaking = false; this.queue = Promise.resolve();
+    this.sources.clear(); this.speaking = false; this.spokeAny = false; this.playHead = 0; this.queue = Promise.resolve();
     this.emit('interrupt', by);
     if (by === 'voice' && this.mode !== 'off') this.n.followUp(8000);
   }

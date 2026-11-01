@@ -66,6 +66,11 @@ export function parseIntent(raw, now = new Date()) {
   if ((m = t.match(/^remember (?:that )?(.+)$/))) return { type: 'memory.add', text: text.slice(text.toLowerCase().indexOf(m[1])) };
   if ((m = t.match(/^forget (?:that )?(.+)$/))) return { type: 'memory.forget', text: m[1] };
 
+  // AI model switching ("switch to GPT-4o", "use Claude Sonnet", "change the model to Llama 70b")
+  if ((m = t.match(/^(?:switch|change|set) (?:the |your )?(?:ai |brain )?(?:model )?to (.+)$/)) || (m = t.match(/^use (.+?)(?: model| for everything)?$/)))
+    if (!/\b(lights?|volume|thermostat|computer|pc|laptop|mode|routine)\b/.test(m[1])) return { type: 'model.switch', name: m[1] };
+  if (/^(?:which|what) (?:ai )?model (?:are you|is this|am i)(?: using| on)?$/.test(t)) return { type: 'model.which' };
+
   // Briefing
   if (/^(good morning|morning briefing|daily briefing|brief me|what's my day( look like)?)$/.test(t)) return { type: 'briefing' };
 

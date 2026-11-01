@@ -80,6 +80,9 @@ textarea{resize:vertical;line-height:1.5}
 .list li{display:flex;align-items:center;gap:10px;padding:10px 2px;border-top:1px solid var(--line);font-size:14px;min-width:0}
 .list li:first-child{border-top:0}
 .list .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list li:has(input[type=range]){flex-wrap:wrap}
+.list li input[type=range]{flex:1 1 100%;min-height:28px}
+.list .grow .muted{white-space:normal}
 .list .meta{font-size:12px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
 .tag{font:500 11px var(--mono);padding:2px 6px;border-radius:5px;background:rgba(56,232,255,.1);color:var(--cyan)}
 .tag.bad{background:rgba(255,95,109,.12);color:#ff9aa3} .tag.ok{background:rgba(62,230,160,.12);color:var(--ok)}
@@ -129,3 +132,16 @@ pre.cmd{margin:0;padding:12px;border-radius:var(--r1);background:#020610;border:
   .banner{margin:0 16px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+
+/* model switcher */
+.model-switch{position:relative}
+#model-chip{cursor:pointer;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#model-chip:hover{border-color:var(--cyan);color:var(--text)}
+.menu{position:absolute;right:0;top:36px;z-index:20;width:min(360px,calc(100vw - 32px));max-height:min(480px,70vh);overflow-y:auto;border-radius:var(--r2);padding:6px;animation:fade .15s var(--ease)}
+.menu .group{font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:10px 10px 4px}
+.menu button{width:100%;min-height:36px;border:0;border-radius:var(--r1);background:transparent;color:var(--text);font:400 14px var(--mono);text-align:left;padding:0 10px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.menu button:hover,.menu button:focus-visible{background:rgba(56,232,255,.1)}
+.menu button[aria-selected="true"]{color:var(--cyan)}
+.menu button[aria-selected="true"]::after{content:"✓";margin-left:auto}
+.menu .foot{border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
+.menu .foot button{font-family:var(--font)}

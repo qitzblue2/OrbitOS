@@ -36,3 +36,12 @@ test('wake word and local speech recognition', { skip: !ready && 'models not dow
   for (const t of ['The satellite stays in a low orbit.', 'Hey Robert, are you coming?', 'A bit of rain is expected.']) { feed(z(0.6)); feed(say(t)); feed(z(1.2)); s.cancel(); }
   assert.equal(wakes, before, 'no false wakes on near-miss phrases');
 });
+
+test('voices: switch, fall back when missing, and speak smoothly', { skip: !ready && 'models not downloaded' }, () => {
+  const s = new LocalSpeech(modelsDir, { voice: 'lessac' });
+  assert.equal(s.voice, 'lessac');
+  const a = s.synthesize('Good evening.');
+  assert.ok(a.sampleRate >= 22050, `smooth voices run at 22 kHz or more (got ${a.sampleRate})`);
+  assert.equal(s.setVoice('kokoro:not-downloaded'), 'alan', 'missing voice falls back to the built-in one');
+  assert.ok(s.benchmark() < 1, 'built-in voice is faster than real time');
+});

@@ -22,3 +22,20 @@ export const PROVIDERS = {
   custom:     { label: 'Other OpenAI-compatible', kind: 'openai', baseUrl: '', keyHint: 'key', keyOptional: true, needsBaseUrl: true,
                 models: { fast: '', reasoning: '' } },
 };
+
+// Shown when a provider's live model list can't be fetched, and as the top picks in menus.
+export const SUGGESTED = {
+  anthropic: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'],
+  openai: ['gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini', 'gpt-4.1', 'gpt-4.1-mini'],
+  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
+  groq: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'deepseek-r1-distill-llama-70b'],
+  mistral: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'],
+  xai: ['grok-3', 'grok-3-mini'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  openrouter: ['anthropic/claude-opus-4', 'openai/gpt-4o', 'google/gemini-2.5-pro', 'meta-llama/llama-3.3-70b-instruct'],
+  ollama: ['llama3.2', 'llama3.1', 'qwen2.5', 'mistral'],
+  custom: [],
+};
+
+// Model IDs that are not chat models (embeddings, speech, images, moderation…).
+export const NOT_CHAT = /embed|whisper|tts|transcri|dall-e|image|audio|realtime|moderation|search|similarity|edit|babbage|davinci|instruct-?0|guard|rerank|vision-preview$/i;

@@ -27,17 +27,34 @@ function stripWake(raw) {
 const MODELS = {
   kws: 'sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01',
   asr: 'sherpa-onnx-streaming-zipformer-en-20M-2023-02-17',
-  tts: 'vits-piper-en_GB-alan-low',
+  tts: 'vits-piper-en_GB-alan-medium', // default voice, bundled
+};
+
+// On-device voices. "bundled" ship with the installer; the rest download on demand from the Voice screen.
+const KOKORO = 'kokoro-int8-en-v0_19';
+const VOICES = {
+  alan:   { label: 'Alan', desc: 'British, calm', engine: 'piper', dir: 'vits-piper-en_GB-alan-medium', file: 'en_GB-alan-medium.onnx', bundled: true },
+  lessac: { label: 'Lessac', desc: 'American, clear', engine: 'piper', dir: 'vits-piper-en_US-lessac-medium', file: 'en_US-lessac-medium.onnx', bundled: true },
+  ryan:   { label: 'Ryan', desc: 'American, rich (high quality)', engine: 'piper', dir: 'vits-piper-en_US-ryan-high', file: 'en_US-ryan-high.onnx', sizeMB: 110 },
+  ...Object.fromEntries([
+    ['bm_george', 'George', 'British, deep'], ['bm_lewis', 'Lewis', 'British, warm'], ['bf_emma', 'Emma', 'British, bright'], ['bf_isabella', 'Isabella', 'British, soft'],
+    ['am_adam', 'Adam', 'American, confident'], ['am_michael', 'Michael', 'American, relaxed'], ['af_bella', 'Bella', 'American, expressive'],
+    ['af_nicole', 'Nicole', 'American, whispery'], ['af_sarah', 'Sarah', 'American, friendly'], ['af_sky', 'Sky', 'American, airy'], ['af', 'Aria', 'American, balanced'],
+  ].map(([id, label, desc], i) => [`kokoro:${id}`, { label, desc: `${desc} · most natural`, engine: 'kokoro', dir: KOKORO, sid: ['af', 'af_bella', 'af_nicole', 'af_sarah', 'af_sky', 'am_adam', 'am_michael', 'bf_emma', 'bf_isabella', 'bm_george', 'bm_lewis'].indexOf(id), sizeMB: 100 }])),
 };
 
 function modelsPresent(dir) {
-  return Object.values(MODELS).every((m) => fs.existsSync(path.join(dir, m)));
+  return [MODELS.kws, MODELS.asr, MODELS.tts].every((m) => fs.existsSync(path.join(dir, m)));
 }
+// A voice can live in the bundled models folder or in the user's download folder.
+function voiceDir(dirs, id) { const v = VOICES[id]; if (!v) return null; for (const d of [].concat(dirs)) if (d && fs.existsSync(path.join(d, v.dir))) return path.join(d, v.dir); return null; }
+function voiceInstalled(dirs, id) { return !!voiceDir(dirs, id); }
 
 class LocalSpeech extends EventEmitter {
-  constructor(modelsDir, { sensitivity = 0.08, threads = 1 } = {}) {
+  constructor(modelsDir, { sensitivity = 0.08, threads = 1, voice = 'alan', voiceDirs = [] } = {}) {
     super();
-    const kd = path.join(modelsDir, MODELS.kws), ad = path.join(modelsDir, MODELS.asr), td = path.join(modelsDir, MODELS.tts);
+    this.voiceDirs = [modelsDir, ...voiceDirs]; this.ttsCache = new Map();
+    const kd = path.join(modelsDir, MODELS.kws), ad = path.join(modelsDir, MODELS.asr);
     const keywords = WAKE_KEYWORDS.replace(/#[\d.]+/g, `#${sensitivity}`);
     const kwsFile = path.join(require('node:os').tmpdir(), 'orbit-keywords.txt');
     fs.writeFileSync(kwsFile, keywords);
@@ -69,10 +86,7 @@ class LocalSpeech extends EventEmitter {
       rule2MinTrailingSilence: 0.7,  // end of turn after 0.7 s of silence following speech
       rule3MinUtteranceLength: 15,   // hard cap per utterance
     });
-    this.tts = fs.existsSync(td) ? new sherpa.OfflineTts({
-      model: { vits: { model: path.join(td, 'en_GB-alan-low.onnx'), tokens: path.join(td, 'tokens.txt'), dataDir: path.join(td, 'espeak-ng-data') }, numThreads: threads, provider: 'cpu', debug: 0 },
-      maxNumSentences: 1,
-    }) : null;
+    this.setVoice(voice);
     this.kwsStream = this.kws.createStream();
     this.mode = 'wake';       // wake | command
     this.asrStream = null;
@@ -134,12 +148,34 @@ class LocalSpeech extends EventEmitter {
   pttEnd() { this.finishCommand(); }
   cancel() { if (this.mode === 'command') { this.asrStream = null; this.mode = 'wake'; this.ptt = false; } }
 
-  // Local text-to-speech. Returns 16-bit-free float samples the renderer can play directly.
+  // Loads a voice once and keeps it ready. Unknown or missing voices fall back to the bundled default.
+  setVoice(id) {
+    if (!voiceInstalled(this.voiceDirs, id)) id = 'alan';
+    const v = VOICES[id], d = voiceDir(this.voiceDirs, id);
+    const key = v.engine === 'kokoro' ? KOKORO : id;
+    if (!this.ttsCache.has(key)) {
+      const threads = Math.max(1, Math.min(4, require('node:os').cpus().length - 1));
+      const model = v.engine === 'kokoro'
+        ? { kokoro: { model: path.join(d, 'model.int8.onnx'), voices: path.join(d, 'voices.bin'), tokens: path.join(d, 'tokens.txt'), dataDir: path.join(d, 'espeak-ng-data') } }
+        : { vits: { model: path.join(d, v.file), tokens: path.join(d, 'tokens.txt'), dataDir: path.join(d, 'espeak-ng-data') } };
+      this.ttsCache.set(key, new sherpa.OfflineTts({ model: { ...model, numThreads: threads, provider: 'cpu', debug: 0 }, maxNumSentences: 1 }));
+    }
+    this.tts = this.ttsCache.get(key); this.voice = id; this.sid = v.sid || 0;
+    return id;
+  }
+
+  // Local text-to-speech for one sentence or phrase.
   synthesize(text, { speed = 1.0 } = {}) {
     if (!this.tts) return null;
-    const audio = this.tts.generate({ text, sid: 0, speed, enableExternalBuffer: false }); // Electron forbids external buffers
+    const audio = this.tts.generate({ text, sid: this.sid, speed, enableExternalBuffer: false }); // Electron forbids external buffers
     return { samples: audio.samples, sampleRate: audio.sampleRate };
+  }
+
+  // Seconds of compute per second of speech on this machine (under ~0.5 streams smoothly).
+  benchmark() {
+    const t0 = Date.now(); const a = this.synthesize('Good evening. Everything is ready when you are.');
+    return a ? (Date.now() - t0) / 1000 / (a.samples.length / a.sampleRate) : null;
   }
 }
 
-module.exports = { LocalSpeech, modelsPresent, stripWake, MODELS, SAMPLE_RATE };
+module.exports = { LocalSpeech, modelsPresent, voiceInstalled, stripWake, MODELS, VOICES, SAMPLE_RATE };

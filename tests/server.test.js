@@ -126,6 +126,7 @@ test('unlimited keys: encrypted, never returned, validated', async () => {
   const everything = JSON.stringify((await api('GET', '/api/overview')).body) + JSON.stringify(listed) + fs.readFileSync(path.join(config.dataDir, 'keys.json'), 'utf8');
   for (const k of [k1, k2, k3]) assert.ok(!everything.includes(k), 'raw key never exposed or stored in plain text');
   assert.equal(listed[0].last4, 'aaaa');
+  assert.equal((await api('GET', '/api/overview')).body.brain.routes.fast.provider, 'anthropic', 'first key decides the active provider');
 });
 
 test('failover: a dead key hands over to the next key and provider', async () => {
@@ -150,4 +151,22 @@ test('failover: a dead key hands over to the next key and provider', async () =>
   // Routes are changeable per tier.
   const st = (await api('PATCH', '/api/ai/routes', { reasoning: { provider: 'groq', model: 'llama-3.3-70b-versatile' } })).body;
   assert.equal(st.reasoningModel, 'llama-3.3-70b-versatile');
+});
+
+test('choose the AI model: live lists, menu switch and voice command', async () => {
+  const { brain } = orbit;
+  brain.models = async () => ({ openai: { label: 'OpenAI', source: 'live', models: ['gpt-4o', 'gpt-4o-mini', 'o3'] }, groq: { label: 'Groq', source: 'live', models: ['llama-3.3-70b-versatile'] } });
+  const lists = (await api('GET', '/api/ai/models')).body;
+  assert.deepEqual(lists.openai.models, ['gpt-4o', 'gpt-4o-mini', 'o3']);
+  // Voice command switches both tiers
+  const r = await say('Orbit, switch to gpt four o mini');
+  assert.equal(r.reply, 'Switched to gpt-4o-mini.');
+  assert.ok(r.events.some((e) => e.type === 'model'), 'dashboard told about the change');
+  let st = (await api('GET', '/api/overview')).body.brain;
+  assert.equal(st.fastModel, 'gpt-4o-mini'); assert.equal(st.reasoningModel, 'gpt-4o-mini');
+  assert.match((await say('which model are you using')).reply, /gpt-4o-mini/);
+  assert.match((await say('use banana phone')).reply, /couldn't find a model/);
+  // Per-tier choice from the menu
+  st = (await api('PATCH', '/api/ai/routes', { fast: { provider: 'groq', model: 'llama-3.3-70b-versatile' }, reasoning: { provider: 'openai', model: 'o3' } })).body;
+  assert.equal(st.fastModel, 'llama-3.3-70b-versatile'); assert.equal(st.reasoningModel, 'o3');
 });

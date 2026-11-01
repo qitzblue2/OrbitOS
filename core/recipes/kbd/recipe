@@ -1,0 +1,17 @@
+# kbd: console keyboard layouts and fonts (loadkeys, setfont); systemd-vconsole-setup needs it.
+name=kbd
+version=2.9.0
+stage=base
+sources=(https://www.kernel.org/pub/linux/utils/kbd/kbd-2.9.0.tar.xz)
+sha256=(fb3197f17a99eb44d22a3a1a71f755f9622dd963e66acfdea1a45120951b02ed)
+depends=(base-files)
+description="console keymaps and fonts"
+
+build() {
+  # the backspace key sends the same code on every layout (as in Linux From Scratch)
+  sed -i '/RESIZECONS_PROGS=/s/yes/no/' configure
+  sed -i 's/resizecons.8 //' docs/man/man8/Makefile.in
+  ./configure --prefix=/usr --disable-vlock
+  make
+  make DESTDIR="$DESTDIR" install
+}

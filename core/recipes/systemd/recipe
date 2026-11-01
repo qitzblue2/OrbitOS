@@ -1,0 +1,22 @@
+# systemd: Orbit's init system, device manager (udev), logging, network time …
+# Source: the upstream release tarball, as mirrored unchanged by Debian.
+name=systemd
+version=257.13
+stage=base
+sources=(https://deb.debian.org/debian/pool/main/s/systemd/systemd_257.13.orig.tar.gz)
+sha256=(1eb7d5f9ff8a426ff880a3cded9ce819613ba8003ac5ddde9eca162f14ddabe7)
+depends=(base-files meson ninja gperf jinja2 libcap libxcrypt util-linux acl kmod openssl zstd xz zlib)
+description="systemd init, udev, journal and system services"
+
+build() {
+  # Orbit has no render or sgx groups: use video for GPU nodes
+  sed -e 's/GROUP="render"/GROUP="video"/' -e 's/GROUP="sgx", //' -i rules.d/50-udev-default.rules.in
+  mkdir -p build && cd build
+  meson setup .. --prefix=/usr --buildtype=release -D mode=release \
+    -D default-dnssec=no -D firstboot=false -D install-tests=false -D ldconfig=false -D sysusers=false \
+    -D rpmmacrosdir=no -D homed=disabled -D userdb=false -D man=disabled -D pamconf=false \
+    -D dev-kvm-mode=0660 -D nobody-group=nogroup -D sysupdate=disabled -D ukify=disabled \
+    -D docdir=/usr/share/doc/systemd-257.13
+  ninja
+  DESTDIR="$DESTDIR" ninja install
+}

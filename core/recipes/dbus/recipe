@@ -1,0 +1,17 @@
+# D-Bus: the message bus desktop programs talk over.
+# Source: the upstream release tarball, as mirrored unchanged by Debian.
+name=dbus
+version=1.16.2
+stage=base
+sources=(https://deb.debian.org/debian/pool/main/d/dbus/dbus_1.16.2.orig.tar.xz)
+sha256=(0ba2a1a4b16afe7bceb2c07e9ce99a8c2c3508e5dec290dbb643384bd6beb7e2)
+depends=(base-files meson ninja expat systemd)
+description="D-Bus message bus"
+
+build() {
+  mkdir -p build && cd build
+  meson setup --prefix=/usr --buildtype=release --wrap-mode=nofallback ..
+  ninja
+  DESTDIR="$DESTDIR" ninja install
+  ln -sf /etc/machine-id "$DESTDIR/var/lib/dbus/machine-id" 2>/dev/null || true
+}

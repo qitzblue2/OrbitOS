@@ -1,0 +1,15 @@
+# Ninja: the small, fast build runner Meson drives.
+# Source: the upstream release tarball, as mirrored unchanged by Debian (GitHub's archive links are
+# blocked from the build machine).
+name=ninja
+version=1.13.2
+stage=base
+sources=(https://deb.debian.org/debian/pool/main/n/ninja-build/ninja-build_1.13.2.orig.tar.gz)
+sha256=(974d6b2f4eeefa25625d34da3cb36bdcebe7fbce40f4c16ac0835fd1c0cbae17)
+depends=(base-files python)
+description="Ninja build system"
+
+build() {
+  python3 configure.py --bootstrap --verbose
+  install -Dm755 ninja "$DESTDIR/usr/bin/ninja"
+}

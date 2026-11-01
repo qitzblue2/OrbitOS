@@ -1,0 +1,13 @@
+# setuptools: builds Python packages (Meson and later Python tools need it).
+name=setuptools
+version=80.9.0
+stage=base
+sources=(https://files.pythonhosted.org/packages/source/s/setuptools/setuptools-80.9.0.tar.gz)
+sha256=(f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c)
+depends=(base-files python)
+description="Python package build tool"
+
+build() {
+  # setuptools builds itself (its build backend lives in the source tree): no download, no isolation
+  python3 -m pip install --no-index --no-build-isolation --no-deps --no-cache-dir --root="$DESTDIR" .
+}

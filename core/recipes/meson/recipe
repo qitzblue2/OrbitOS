@@ -1,0 +1,12 @@
+# Meson: the build system systemd, kmod and most of the desktop use.
+name=meson
+version=1.9.1
+stage=base
+sources=(https://github.com/mesonbuild/meson/releases/download/1.9.1/meson-1.9.1.tar.gz)
+sha256=(4e076606f2afff7881d195574bddcd8d89286f35a17b4977a216f535dc0c74ac)
+depends=(base-files python setuptools ninja)
+description="Meson build system"
+
+build() {
+  python3 -m pip install --no-index --no-build-isolation --no-deps --no-cache-dir --root="$DESTDIR" .
+}

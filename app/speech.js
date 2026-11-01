@@ -178,4 +178,12 @@ class LocalSpeech extends EventEmitter {
   }
 }
 
-module.exports = { LocalSpeech, modelsPresent, voiceInstalled, stripWake, MODELS, VOICES, SAMPLE_RATE };
+// Linear resampler, used when audio from a voice (22–24 kHz) has to be fed back to the 16 kHz recognizer.
+function resample(x, from, to = SAMPLE_RATE) {
+  if (from === to) return x;
+  const r = from / to, n = Math.floor(x.length / r), y = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const p = i * r, j = Math.floor(p); y[i] = x[j] + ((x[j + 1] ?? x[j]) - x[j]) * (p - j); }
+  return y;
+}
+
+module.exports = { resample, LocalSpeech, modelsPresent, voiceInstalled, stripWake, MODELS, VOICES, SAMPLE_RATE };

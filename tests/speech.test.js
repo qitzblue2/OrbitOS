@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const modelsDir = path.resolve('models');
-const { LocalSpeech, modelsPresent, stripWake } = require('../app/speech.js');
+const { LocalSpeech, modelsPresent, stripWake, resample } = require('../app/speech.js');
 const ready = fs.existsSync(modelsDir) && modelsPresent(modelsDir);
 
 test('wake phrase is removed from the transcript', () => {
@@ -21,7 +21,8 @@ test('wake word and local speech recognition', { skip: !ready && 'models not dow
   const s = new LocalSpeech(modelsDir);
   const z = (sec) => new Float32Array(16000 * sec);
   const feed = (x) => { for (let i = 0; i < x.length; i += 1600) s.accept(x.subarray(i, i + 1600)); };
-  const say = (t) => s.synthesize(t).samples;
+  // Voices speak at 22–24 kHz; the recognizer listens at 16 kHz, like a real microphone stream.
+  const say = (t) => { const a = s.synthesize(t); return resample(a.samples, a.sampleRate); };
   let wakes = 0, heard = [];
   s.on('wake', () => wakes++);
   s.on('utterance', (t) => heard.push(t));

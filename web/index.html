@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#03060d">
+<title>ORBIT</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="app.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<div class="stars" aria-hidden="true"></div>
+
+<div id="login" class="login" hidden>
+  <form id="login-form" class="glass login-card">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span>ORBIT</div>
+    <p class="muted">Enter the dashboard token printed when the ORBIT server started.</p>
+    <label for="token" class="label">Access token</label>
+    <input id="token" type="password" autocomplete="current-password" required>
+    <button class="btn primary" type="submit">Connect</button>
+    <p id="login-error" class="error-text" role="alert"></p>
+  </form>
+</div>
+
+<div id="app" class="shell" hidden>
+  <nav class="rail" aria-label="Sections">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>ORBIT</span></div>
+    <ul id="nav"></ul>
+    <div class="rail-foot"><span id="link-dot" class="dot"></span><span id="link-text">Linking…</span></div>
+  </nav>
+
+  <main class="main">
+    <header class="topbar">
+      <h1 id="view-title">Dashboard</h1>
+      <div class="topbar-right">
+        <span id="model-chip" class="chip mono">—</span>
+        <button id="mic-toggle" class="btn ghost mic" type="button" aria-pressed="false" title="Listening on/off (Esc turns it off)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>
+          <span id="mic-label">Mic off</span>
+        </button>
+      </div>
+    </header>
+    <div id="offline" class="banner warn" role="status" hidden>Connection to ORBIT lost. Reconnecting…</div>
+    <section id="view" class="view" tabindex="-1"></section>
+  </main>
+
+  <aside class="dock glass" aria-label="Talk to ORBIT">
+    <canvas id="core-mini" class="core-mini" width="96" height="96" aria-hidden="true"></canvas>
+    <form id="ask" class="ask">
+      <label for="ask-input" class="sr">Command ORBIT</label>
+      <input id="ask-input" autocomplete="off" placeholder="Type a command, or hold Space to talk">
+      <button id="ptt" class="btn round ptt" type="button" aria-label="Hold to talk">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>
+      </button>
+      <button class="btn round send" type="submit" aria-label="Send">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </button>
+    </form>
+  </aside>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+</div>
+</body>
+</html>

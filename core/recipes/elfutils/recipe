@@ -1,0 +1,16 @@
+# elfutils: only libelf, which the kernel build needs (objtool, BTF).
+name=elfutils
+version=0.193
+stage=base
+sources=(https://sourceware.org/elfutils/ftp/0.193/elfutils-0.193.tar.bz2)
+sha256=(7857f44b624f4d8d421df851aaae7b1402cfe6bcdd2d8049f15fc07d3dde7635)
+depends=(base-files zlib bzip2 xz zstd)
+description="libelf (ELF object file access)"
+
+build() {
+  ./configure --prefix=/usr --disable-debuginfod --enable-libdebuginfod=dummy
+  make
+  make -C libelf DESTDIR="$DESTDIR" install
+  install -Dm644 config/libelf.pc "$DESTDIR/usr/lib/pkgconfig/libelf.pc"
+  rm -f "$DESTDIR/usr/lib/libelf.a"
+}

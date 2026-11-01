@@ -1,0 +1,41 @@
+# The Linux kernel: Orbit's own build of the 6.12 long-term-support series.
+# Configuration: the kernel's x86-64 defaults plus what systemd and a desktop PC need; drivers that
+# need firmware (Wi-Fi, AMD/Intel graphics) are modules, loaded when the hardware is found.
+name=linux
+version=6.12.115
+stage=boot
+sources=(https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.115.tar.xz)
+sha256=(0ec90fe4b20422b1b664b77e6d2dde22b40bd41e7eb2cad8ac8739a4749cb1bb)
+depends=(base-files bc flex bison openssl elfutils kmod)
+description="Linux kernel and modules"
+
+build() {
+  make mrproper
+  make x86_64_defconfig
+  # name, and what systemd needs
+  scripts/config --set-str LOCALVERSION "-orbit" -d LOCALVERSION_AUTO \
+    -e DEVTMPFS -e DEVTMPFS_MOUNT -e CGROUPS -e MEMCG -e CGROUP_BPF -e BPF_SYSCALL -e FHANDLE \
+    -e INOTIFY_USER -e SIGNALFD -e TIMERFD -e EPOLL -e AUTOFS_FS -e TMPFS_POSIX_ACL -e TMPFS_XATTR \
+    -e SECCOMP -e SECCOMP_FILTER -e PSI -e DMIID -d SYSFS_DEPRECATED -d UEVENT_HELPER -e IPV6
+  # booting: UEFI with the kernel as an EFI program, NVMe/SATA disks, ext4, vfat (EFI partition)
+  scripts/config -e EFI -e EFI_STUB -e EFI_PARTITION -e EFIVAR_FS -e BLK_DEV_NVME -e SATA_AHCI \
+    -e EXT4_FS -e EXT4_FS_POSIX_ACL -e VFAT_FS -e FAT_DEFAULT_UTF8 -e NLS_CP437 -e NLS_ISO8859_1 \
+    -e BLK_DEV_INITRD -e RD_ZSTD -e RD_XZ -e DM_CRYPT -e BLK_DEV_DM
+  # live system and memory: squashfs + overlay (live USB), zram swap
+  scripts/config -e SQUASHFS -e SQUASHFS_XZ -e SQUASHFS_ZSTD -e OVERLAY_FS -m ZRAM -e ZSMALLOC \
+    -e CRYPTO_ZSTD -e CRYPTO_LZ4
+  # desktop hardware: USB, input, sound, graphics, Wi-Fi, Bluetooth (modules where firmware is needed)
+  scripts/config -e USB_XHCI_HCD -e USB_HID -e HID_GENERIC -e HID_MULTITOUCH -e INPUT_EVDEV \
+    -e SND_HDA_INTEL -m SND_SOF_PCI_INTEL_TGL -e DRM -e DRM_SIMPLEDRM -e DRM_FBDEV_EMULATION \
+    -m DRM_I915 -m DRM_AMDGPU -m DRM_NOUVEAU -m DRM_VIRTIO_GPU -m DRM_BOCHS \
+    -e CFG80211 -m MAC80211 -m IWLWIFI -m IWLMVM -m RTW88 -m RTW89 -m ATH11K -m MT7921E \
+    -m BT -m BT_HCIBTUSB -e FW_LOADER -e FW_LOADER_COMPRESS -e FW_LOADER_COMPRESS_ZSTD \
+    -e VIRTIO_PCI -e VIRTIO_BLK -e VIRTIO_NET -e HW_RANDOM_VIRTIO
+  make olddefconfig
+  make
+  make INSTALL_MOD_PATH="$DESTDIR/usr" INSTALL_MOD_STRIP=1 modules_install
+  rm -f "$DESTDIR/usr/lib/modules/6.12.115-orbit/build"
+  install -Dm644 arch/x86/boot/bzImage "$DESTDIR/boot/vmlinuz-6.12.115-orbit"
+  install -Dm644 System.map "$DESTDIR/boot/System.map-6.12.115-orbit"
+  install -Dm644 .config "$DESTDIR/boot/config-6.12.115-orbit"
+}

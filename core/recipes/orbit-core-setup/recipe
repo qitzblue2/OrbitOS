@@ -1,12 +1,12 @@
 # Orbit Core first boot: no password ships in the image. On the first start Orbit creates the
 # password database and asks on the console for a root password, before anyone can log in.
 name=orbit-core-setup
-version=2
+version=3
 stage=base
 sources=()
 sha256=()
 depends=(base-files systemd shadow)
-description="Orbit Core first-boot setup (root password, hostname)"
+description="Orbit Core first-boot setup (root password, hostname, wired network)"
 
 build() {
   install -d "$DESTDIR/usr/lib/orbit-core" "$DESTDIR/usr/lib/systemd/system/sysinit.target.wants" "$DESTDIR/etc"
@@ -48,4 +48,30 @@ RemainAfterExit=yes
 WantedBy=sysinit.target
 UNIT
   ln -sf ../orbit-first-boot.service "$DESTDIR/usr/lib/systemd/system/sysinit.target.wants/orbit-first-boot.service"
+
+  # wired network out of the box: systemd-networkd with DHCP (IPv4 and IPv6), systemd-resolved for
+  # DNS, systemd-timesyncd for the clock. Wi-Fi comes with iwd later.
+  install -d "$DESTDIR/usr/lib/systemd/network" "$DESTDIR/usr/lib/systemd/system/multi-user.target.wants" \
+    "$DESTDIR/usr/lib/systemd/system/sysinit.target.wants" "$DESTDIR/usr/lib/systemd/system/sockets.target.wants"
+  cat > "$DESTDIR/usr/lib/systemd/network/80-orbit-wired.network" <<'NET'
+[Match]
+Type=ether
+Kind=!*
+
+[Network]
+DHCP=yes
+MulticastDNS=yes
+
+[DHCPv4]
+RouteMetric=100
+
+[IPv6AcceptRA]
+RouteMetric=100
+NET
+  for u in systemd-networkd.service systemd-resolved.service; do
+    ln -sf ../$u "$DESTDIR/usr/lib/systemd/system/multi-user.target.wants/$u"
+  done
+  ln -sf ../systemd-networkd.socket "$DESTDIR/usr/lib/systemd/system/sockets.target.wants/systemd-networkd.socket"
+  ln -sf ../systemd-timesyncd.service "$DESTDIR/usr/lib/systemd/system/sysinit.target.wants/systemd-timesyncd.service"
+  ln -sf ../run/systemd/resolve/stub-resolv.conf "$DESTDIR/etc/resolv.conf"
 }

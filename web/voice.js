@@ -167,3 +167,130 @@ export class Voice extends EventTarget {
     } catch {}
   }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Native mode (ORBIT desktop app): wake word, speech-to-text and text-to-speech all run on this
+// computer through the app's speech engine. Audio never leaves the device for these steps.
+export class NativeVoice extends EventTarget {
+  constructor(native) {
+    super();
+    this.n = native;
+    this.native = true;
+    this.supported = { stt: true, tts: true };
+    this.mode = 'off'; this.speaking = false; this.ready = false;
+    this.voice = { name: '', rate: 1.0, pitch: 1.0 };
+    this.buffer = ''; this.queue = Promise.resolve(); this.sources = new Set(); this.gen = 0;
+    native.on('speech-ready', () => { this.ready = true; this.emit('ready', true); });
+    native.on('speech-error', (m) => this.emit('error', m));
+    native.on('models', (m) => this.emit('models', m));
+    native.on('wake', () => { this.cue('wake'); this.interrupt('wake'); this.emit('state', 'listening'); });
+    native.on('listening', () => this.emit('state', 'listening'));
+    native.on('partial', (t) => this.emit('interim', t));
+    native.on('utterance', (t) => { if (t) this.emit('utterance', { text: t, source: 'voice' }); else this.emit('state', 'idle'); });
+    native.on('mic', ({ enabled }) => this.setMode(enabled ? 'wake' : 'off'));
+    native.on('ptt-toggle', (down) => (down ? this.pttStart() : this.pttEnd()));
+    native.getInfo().then((i) => { this.ready = i.speechReady; this.info = i; this.emit('ready', this.ready); });
+  }
+  emit(type, detail) { this.dispatchEvent(new CustomEvent(type, { detail })); }
+  // The engine may have become ready before this page subscribed; ask it directly.
+  // Waits up to 30 s while the models load, instead of failing a click made during startup.
+  async ensureReady() {
+    for (let i = 0; i < 120 && !this.ready; i++) {
+      this.info = await this.n.getInfo(); this.ready = this.info.speechReady;
+      if (!this.ready) { if (i === 0) this.emit('mode', 'starting'); await new Promise((r) => setTimeout(r, 250)); }
+    }
+    return this.ready;
+  }
+
+  async openMic() {
+    if (this.stream) return;
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+    this.ctx = new AudioContext({ sampleRate: 16000 });
+    await this.ctx.audioWorklet.addModule('pcm-worklet.js');
+    const src = this.ctx.createMediaStreamSource(this.stream);
+    this.node = new AudioWorkletNode(this.ctx, 'pcm-collector');
+    this.node.port.onmessage = (e) => {
+      const x = e.data;
+      let sum = 0; for (let i = 0; i < x.length; i++) sum += x[i] * x[i];
+      const level = Math.min(1, Math.sqrt(sum / x.length) * 14);
+      this.emit('level', level);
+      if (this.speaking) { if (level > 0.45) this.interrupt('voice'); return; } // don't feed ORBIT's own voice to the wake detector
+      this.n.audio(x);
+    };
+    src.connect(this.node);
+  }
+  closeMic() {
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.node?.disconnect(); this.stream = this.node = null;
+    this.emit('level', 0);
+  }
+  async setMode(mode) {
+    if (mode === 'off') { this.mode = 'off'; this.n.setListening(false); this.closeMic(); this.emit('mode', 'off'); return; }
+    if (!(await this.ensureReady())) { this.emit('error', 'The on-device voice engine is still starting.'); return; }
+    try { await this.openMic(); } catch { this.emit('error', 'Microphone access was denied.'); return; }
+    this.mode = 'wake'; this.n.setListening(true); this.emit('mode', 'wake');
+  }
+  async pttStart() {
+    if (!(await this.ensureReady())) { this.emit('error', 'The on-device voice engine is still starting.'); return; }
+    this.interrupt('ptt');
+    await this.openMic();
+    this.n.setListening(true); this.n.ptt(true);
+    this.cue('wake'); this.emit('state', 'listening');
+  }
+  pttEnd() {
+    this.n.ptt(false);
+    if (this.mode === 'off') setTimeout(() => { this.n.setListening(false); this.closeMic(); }, 400);
+  }
+
+  // Streaming speech: synthesize and play sentence by sentence, in order, as text arrives.
+  feed(delta) {
+    this.buffer += delta;
+    const parts = this.buffer.split(/(?<=[.!?;:])\s+(?=[A-Z0-9"'])/);
+    this.buffer = parts.pop();
+    for (const p of parts) this.say(p);
+  }
+  flush() { if (this.buffer.trim()) this.say(this.buffer); this.buffer = ''; }
+  say(text) {
+    text = String(text).replace(/[*_`#>]/g, '').trim();
+    if (!text) return;
+    const gen = this.gen;
+    const pending = this.n.speak(text, this.voice.rate); // synthesis starts now, in parallel with playback
+    this.queue = this.queue.then(async () => {
+      const audio = await pending;
+      if (!audio || gen !== this.gen) return;
+      await this.play(audio, gen);
+    });
+    this.queue.then(() => this.drained(gen));
+  }
+  async play({ samples, sampleRate }, gen) {
+    if (!this.out) this.out = new AudioContext();
+    const buf = this.out.createBuffer(1, samples.length, sampleRate);
+    buf.copyToChannel(samples, 0);
+    const src = this.out.createBufferSource();
+    src.buffer = buf; src.connect(this.out.destination);
+    this.sources.add(src);
+    if (!this.speaking) { this.speaking = true; this.emit('state', 'speaking'); }
+    await new Promise((r) => { src.onended = r; src.start(); });
+    this.sources.delete(src);
+  }
+  drained(gen) {
+    if (gen !== this.gen || this.sources.size) return;
+    if (this.speaking) {
+      this.speaking = false;
+      this.emit('state', 'listening-ready');
+      if (this.mode !== 'off') this.n.followUp(8000); // continue the conversation without the wake word
+    }
+  }
+  interrupt(by) {
+    if (!this.speaking && !this.sources.size) { this.buffer = ''; return; }
+    this.gen++; this.buffer = '';
+    for (const s of this.sources) try { s.stop(); } catch {}
+    this.sources.clear(); this.speaking = false; this.queue = Promise.resolve();
+    this.emit('interrupt', by);
+    if (by === 'voice' && this.mode !== 'off') this.n.followUp(8000);
+  }
+  killAll() { this.interrupt('kill'); this.n.cancel(); this.setMode('off'); }
+  cue(kind) { Voice.prototype.cue.call(this, kind); }
+}
+
+export const createVoice = () => (window.orbitNative ? new NativeVoice(window.orbitNative) : new Voice());

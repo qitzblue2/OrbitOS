@@ -13,8 +13,40 @@ function target(text) {
 
 const num = (s) => { const n = parseInt(s, 10); return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : null; };
 
+// Speech recognizers misspell names they rarely hear ("spotti", "computere"). Snap words that are
+// close to ORBIT's command vocabulary back to the right spelling. Short words are left alone.
+const VOCAB = ['spotify', 'chrome', 'discord', 'steam', 'netflix', 'firefox', 'safari', 'slack', 'terminal', 'computer', 'laptop', 'screenshot', 'volume', 'lights', 'lighting', 'thermostat', 'temperature', 'bedroom', 'kitchen', 'living', 'office', 'routine', 'remember', 'percent', 'desktop', 'music', 'unmute'];
+function distance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+const MISHEARD = { spotty: 'spotify', spotti: 'spotify', spottie: 'spotify', spottify: 'spotify', 'spot if i': 'spotify', 'crome': 'chrome', 'nets flix': 'netflix' };
+const ONES = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19 };
+const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+// "thirty five per cent" -> "35 percent", "a hundred" -> "100"
+export function wordsToNumbers(text) {
+  return text
+    .replace(/\bper ?cent\b/gi, 'percent')
+    .replace(/\b(?:a |one )?hundred\b/gi, '100')
+    .replace(new RegExp(`\\b(${Object.keys(TENS).join('|')})(?:[ -](${Object.keys(ONES).filter((k) => ONES[k] > 0 && ONES[k] < 10).join('|')}))?\\b`, 'gi'), (_, t, o) => String(TENS[t.toLowerCase()] + (o ? ONES[o.toLowerCase()] : 0)))
+    .replace(new RegExp(`\\b(${Object.keys(ONES).join('|')})\\b(?=\\s*(?:percent|degrees|%))`, 'gi'), (w) => String(ONES[w.toLowerCase()]));
+}
+export function normalizeSpeech(text) {
+  for (const [k, v] of Object.entries(MISHEARD)) text = text.replace(new RegExp(`\\b${k}\\b`, 'gi'), v);
+  text = wordsToNumbers(text);
+  return text.replace(/[A-Za-z]{5,}/g, (w) => {
+    const lw = w.toLowerCase();
+    if (VOCAB.includes(lw)) return w;
+    let best = null, bd = 3;
+    for (const v of VOCAB) { const dd = distance(lw, v); if (dd < bd && dd <= Math.max(1, Math.floor(v.length / 4))) { best = v; bd = dd; } }
+    return best || w;
+  });
+}
+
 export function parseIntent(raw, now = new Date()) {
-  const clean = stripWake(raw).replace(/[.!?]+$/, '');
+  const clean = normalizeSpeech(stripWake(raw)).replace(/[.!?]+$/, '');
   if (!clean) return { type: 'greeting' };
   const { hint, text } = target(clean);
   const t = text.toLowerCase();
@@ -61,7 +93,7 @@ export function parseIntent(raw, now = new Date()) {
   if ((m = t.match(/^(?:open|play) (spotify|music)(?: and play(?: my)? music)?$/)) && /play/.test(t)) return { type: 'chain', steps: [act('app.open', { app: 'spotify' }), act('media.control', { action: 'play' })], speak: 'Spotify is playing.' };
   if ((m = t.match(/^(?:open|launch|start|run) (?:the )?(.+?)(?: app)?$/)) && !/\b(mode|setup|routine|environment)\b/.test(t)) return act('app.open', { app: m[1] }, `Opening ${m[1]}.`);
   if ((m = t.match(/^(?:close|quit|exit|kill) (?:the )?(.+?)(?: app)?$/))) return act('app.close', { app: m[1] }, `Closing ${m[1]}.`);
-  if ((m = t.match(/^(?:set )?(?:the )?volume (?:to )?(\d{1,3}) ?(?:%|percent)?$/))) return act('volume.set', { level: num(m[1]) }, `Volume at ${num(m[1])} percent.`);
+  if ((m = t.match(/^(?:set |turn )?(?:the |my )?volume (?:to |at )?(\d{1,3}) ?(?:%|percent)?$/))) return act('volume.set', { level: num(m[1]) }, `Volume at ${num(m[1])} percent.`);
   if (/^(?:turn|put) (?:my |the )?volume down$|^(?:lower|decrease) (?:the )?volume$|^quieter$/.test(t)) return act('volume.set', { delta: -15 }, 'Volume down.');
   if (/^(?:turn|put) (?:my |the )?volume up$|^(?:raise|increase) (?:the )?volume$|^louder$/.test(t)) return act('volume.set', { delta: 15 }, 'Volume up.');
   if (/^mute$|^mute (?:the )?(?:sound|volume|audio)$/.test(t)) return act('volume.set', { mute: true }, 'Muted.');

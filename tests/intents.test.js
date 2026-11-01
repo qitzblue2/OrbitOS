@@ -41,3 +41,12 @@ test('open-ended questions go to the AI', () => {
   assert.equal(chooseTier('what is 2 plus 2'), 'fast');
   assert.equal(chooseTier('explain the tradeoffs of CRDTs vs OT'), 'reasoning');
 });
+
+test('speech misspellings snap to command words', async () => {
+  const { normalizeSpeech } = await import('../server/intents.js');
+  assert.equal(normalizeSpeech('open spotti'), 'open spotify');
+  assert.equal(normalizeSpeech('lock my computere'), 'lock my computer');
+  assert.equal(normalizeSpeech('open spottify'), 'open spotify');
+  assert.equal(normalizeSpeech('tell me a story'), 'tell me a story', 'ordinary words are untouched');
+  assert.equal(p('lock my computere').capability, 'system.lock');
+});

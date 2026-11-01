@@ -15,6 +15,22 @@
 
 Every module sits behind a small interface, so each can be replaced on its own. For example, the brain's providers share one `stream()` generator, and memory exposes `recall(query)`.
 
+## Desktop app (`app/`)
+
+```
+renderer (dashboard)              main process                         speech process (utilityProcess)
+ mic ─► AudioWorklet 16 kHz ─IPC─► forwards audio while listening ─► KeywordSpotter "hey orbit"
+                                                                       └ wake ─► streaming STT ─► text
+ plays on-device voice ◄────IPC── synthesize sentence by sentence ◄── Piper TTS
+ sends text ─► embedded ORBIT server ─► engine ─► built-in Companion (this computer)
+ tray · Alt+Space push-to-talk · overlay window · start at login
+```
+
+- **Process isolation:** the speech engine runs in a separate process and restarts by itself if it ever stops.
+- **No self-wake:** while ORBIT is speaking, its own voice isn't fed to the wake detector. Talking over it interrupts it (barge-in), and ORBIT listens for 8 seconds after each reply without needing the wake word.
+- **Microphone permission:** only ORBIT's own local pages may use the microphone. On macOS the app asks for microphone access on first launch.
+- **Models:** bundled inside the installers. When running from source, `npm run models` fetches them.
+
 ## Security model
 
 - **Secrets:** API keys live only in the server's `.env` and never reach the dashboard. The dashboard uses its own access token.
@@ -30,9 +46,9 @@ Every module sits behind a small interface, so each can be replaced on its own. 
 
 | Area | Built now | Next step |
 |---|---|---|
-| Wake word | "Hey Orbit" through browser speech recognition. It is opt-in and labelled, because Chrome's recognizer is cloud-based. | A native, fully local wake word (openWakeWord or Porcupine) in the Companion. Only the audio after the wake word leaves the device. |
+| Wake word | **Built, in the app:** "Hey Orbit" and "OK Orbit" are detected on-device by an open-vocabulary keyword spotter (sherpa-onnx, 3.3M parameters). It runs in its own process, with adjustable sensitivity. In the browser-only dashboard it still uses the browser's recognizer. | Test against more real voices and accents; offer a custom wake phrase in settings. |
 | Voice activity, end of speech, barge-in | Local VAD with an adaptive noise floor, silence-based end of turn, and interrupt on speech. | Move to WebRTC VAD or Silero inside the native app. |
-| Speech to text / text to speech | Browser engines. Text-to-speech streams sentence by sentence while the model is still writing. | Pluggable streaming providers (for example Deepgram STT, ElevenLabs or Cartesia TTS) behind a `speech/` interface. |
+| Speech to text / text to speech | **App:** on-device streaming recognition (zipformer, 20M parameters) with automatic end of turn, and an on-device neural voice (Piper). A 1.2 s audio buffer keeps the first words after the wake phrase. Common misspellings and spoken numbers are corrected before parsing. The browser falls back to browser engines. | Optional cloud voices (for example ElevenLabs) for people who prefer them; more voice choices. |
 | AI | Anthropic streaming, fast and reasoning tiers, web search for current-events questions, vision for screenshots, and an honest offline mode. The provider can be switched at runtime. | More providers (OpenAI-compatible or local Ollama), using the same `stream()` signature. |
 | Memory | JSON store with keyword-plus-recency recall, plus a CRUD UI. | Embeddings and SQLite/pgvector behind the same `recall()` call. |
 | Companion | Windows, macOS and Linux: apps, volume, media, screenshots, lock, shutdown, status, notifications, approved folders, commands and workflows. Wake-on-LAN through the MAC address the Companion reports. | Packaged tray apps with auto-start. |

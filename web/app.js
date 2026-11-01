@@ -1,5 +1,5 @@
 import { Core, stateLabel } from './core.js';
-import { Voice } from './voice.js';
+import { createVoice } from './voice.js';
 
 // ---- tiny DOM helper (no innerHTML with user data) ----
 function h(tag, attrs = {}, ...kids) {
@@ -30,7 +30,9 @@ const NAV = [
 ];
 
 const S = { token: '', ws: null, overview: null, view: 'dashboard', state: 'idle', chat: [], live: '', heard: '', notes: [], memRecalled: [], actions: [] };
-const voice = new Voice();
+const voice = createVoice();
+const native = window.orbitNative || null;
+const report = (d) => native?.report(d);
 let core, mini;
 
 // ---- auth ----
@@ -68,6 +70,7 @@ function onEvent(m) {
       const text = m.text ?? S.live;
       if (!S.live && text && (voice.mode !== 'off' || S.speakReplies)) voice.say(text); else voice.flush();
       if (text) S.chat.push({ role: 'orbit', text, ok: m.ok, ms: m.ms, route: m.route });
+      report({ reply: text || '', phase: m.ok === false ? 'error' : 'idle' });
       S.live = ''; renderLive(); refresh(); break;
     }
     case 'action': S.actions.unshift({ ...m, at: new Date().toISOString() }); S.actions.length = Math.min(S.actions.length, 20); if (S.view === 'dashboard') render(); break;
@@ -84,6 +87,7 @@ function onEvent(m) {
 function setState(s) {
   if (s === 'listening-ready') s = voice.mode === 'wake' ? 'idle' : 'idle';
   S.state = s; const shown = voice.mode === 'off' && s === 'idle' ? 'idle' : s;
+  report({ phase: shown });
   core?.setState(shown); mini?.setState(shown);
   const label = $('#core-state'); if (label) label.textContent = stateLabel(shown);
   clearTimeout(S.errTimer); if (s === 'error') S.errTimer = setTimeout(() => S.state === 'error' && setState('idle'), 4000);
@@ -99,16 +103,21 @@ function utter(text, source = 'text') {
 }
 
 // ---- voice wiring ----
-voice.addEventListener('level', (e) => { core?.setLevel(e.detail); mini?.setLevel(e.detail); });
+let lastLevel = 0;
+voice.addEventListener('level', (e) => { core?.setLevel(e.detail); mini?.setLevel(e.detail); if (native && performance.now() - lastLevel > 80) { lastLevel = performance.now(); report({ level: e.detail }); } });
+voice.addEventListener('ready', () => { if (S.view === 'voice') render(); });
+voice.addEventListener('models', (e) => { const m = e.detail; if (m.status === 'downloading') { S.models = `Downloading voice models… ${Math.round(m.fraction * 100)}%`; } else S.models = ''; if (S.view === 'voice') render(); });
 voice.addEventListener('state', (e) => setState(e.detail));
-voice.addEventListener('interim', (e) => { S.heard = e.detail; renderLive(); });
+voice.addEventListener('interim', (e) => { S.heard = e.detail; renderLive(); report({ heard: e.detail }); });
 voice.addEventListener('utterance', (e) => utter(e.detail.text, 'voice'));
 voice.addEventListener('interrupt', () => send({ type: 'interrupt' }));
 voice.addEventListener('error', (e) => toast(e.detail, 'bad'));
 voice.addEventListener('mode', (e) => {
   const on = e.detail !== 'off';
+  report({ listening: on });
   $('#mic-toggle').setAttribute('aria-pressed', String(on));
-  $('#mic-label').textContent = e.detail === 'wake' ? 'Listening for "Hey Orbit"' : on ? 'Mic on' : 'Mic off';
+  $('#mic-label').textContent = e.detail === 'starting' ? 'Starting voice engine…' : e.detail === 'wake' ? 'Listening for "Hey Orbit"' : on ? 'Mic on' : 'Mic off';
+  if (e.detail === 'starting') return;
   setState(on ? 'idle' : 'idle');
 });
 $('#mic-toggle').addEventListener('click', () => voice.setMode(voice.mode === 'off' ? 'wake' : 'off'));
@@ -256,16 +265,25 @@ const VIEWS = {
     const rate = h('input', { id: 'v-rate', type: 'range', min: '0.7', max: '1.5', step: '0.05', value: s.voice.rate });
     const pitch = h('input', { id: 'v-pitch', type: 'range', min: '0.6', max: '1.4', step: '0.05', value: s.voice.pitch });
     const save = async () => { const v = { name: vSel.value, rate: +rate.value, pitch: +pitch.value, speakTyped: s.voice.speakTyped }; voice.voice = v; S.overview.settings = await api('PATCH', '/api/settings', { voice: v }); };
+    const nativePanel = native ? panel('On-device voice engine',
+      h('ul', { class: 'list' },
+        h('li', {}, h('span', { class: `dot ${voice.ready ? 'on' : ''}` }), h('span', { class: 'grow' }, voice.ready ? 'Ready' : (S.models || 'Starting…'), h('div', { class: 'muted' }, 'Wake word, speech recognition and the voice all run on this computer. Audio is not sent anywhere for them.'))),
+        h('li', {}, h('span', { class: 'grow' }, 'Wake word sensitivity', h('div', { class: 'muted' }, 'Higher hears you from further away but may wake by mistake more often.')),
+          (() => { const r = h('input', { type: 'range', min: '0.02', max: '0.3', step: '0.02', 'aria-label': 'Wake word sensitivity', value: String(0.32 - (voice.info?.sensitivity ?? 0.08)) }); r.addEventListener('change', () => { native.setSensitivity(0.32 - +r.value); toast('Sensitivity updated. The voice engine is restarting.'); }); return r; })()),
+        h('li', {}, h('span', { class: 'grow' }, 'Start ORBIT when I log in', h('div', { class: 'muted' }, 'Runs in the tray so "Hey Orbit" works without opening the app.')),
+          (() => { const b = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Start ORBIT when I log in', 'aria-checked': String(!!voice.info?.launchAtLogin) }); b.addEventListener('click', async () => { const on = await native.setLaunchAtLogin(b.getAttribute('aria-checked') !== 'true'); b.setAttribute('aria-checked', String(on)); if (voice.info) voice.info.launchAtLogin = on; }); return b; })()),
+        h('li', {}, h('span', { class: 'grow' }, 'Global push to talk', h('div', { class: 'muted' }, `Press ${native.platform === 'darwin' ? '⌥ Space' : 'Alt+Space'} in any app, speak, press again to send.`))))) : null;
     return h('div', { class: 'grid2' },
+      nativePanel,
       panel('Listening',
         h('ul', { class: 'list' },
-          h('li', {}, h('span', { class: 'grow' }, 'Wake phrase "Hey Orbit"', h('div', { class: 'muted' }, 'Uses the browser\'s speech service. Local voice-activity detection runs on this device.')), h('button', { class: 'btn small', onclick: () => voice.setMode(voice.mode === 'wake' ? 'off' : 'wake') }, voice.mode === 'wake' ? 'Turn off' : 'Turn on')),
+          h('li', {}, h('span', { class: 'grow' }, 'Wake phrase "Hey Orbit"', h('div', { class: 'muted' }, native ? 'Detected on this computer.' : 'In a browser this uses the browser\'s speech service. Install the ORBIT app for fully on-device listening.')), h('button', { class: 'btn small', onclick: () => voice.setMode(voice.mode === 'wake' ? 'off' : 'wake') }, voice.mode === 'wake' ? 'Turn off' : 'Turn on')),
           h('li', {}, h('span', { class: 'grow' }, 'Push to talk', h('div', { class: 'muted' }, 'Hold Space, or hold the mic button in the dock.'))),
           h('li', {}, h('span', { class: 'grow' }, 'Stop everything instantly', h('div', { class: 'muted' }, 'Press Esc or say "stop listening".'))),
           h('li', {}, h('span', { class: 'grow' }, 'Speak replies to typed commands'), h('button', { class: 'switch', role: 'switch', 'aria-checked': String(!!s.voice.speakTyped), 'aria-label': 'Speak replies to typed commands', onclick: async (e) => { s.voice.speakTyped = !s.voice.speakTyped; S.speakReplies = s.voice.speakTyped; e.currentTarget.setAttribute('aria-checked', String(s.voice.speakTyped)); await save(); } }))),
         !voice.supported.stt ? h('p', { class: 'error-text' }, 'This browser has no speech recognition. Use Chrome or Edge.') : null),
       panel('Voice',
-        h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-name' }, 'Voice'), vSel),
+        native ? null : h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-name' }, 'Voice'), vSel),
         h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-rate' }, 'Speaking speed'), rate),
         h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-pitch' }, 'Pitch'), pitch),
         h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: save }, 'Save'), h('button', { class: 'btn', onclick: async () => { await save(); voice.say("Good evening. I'm here. What can I do for you?"); } }, 'Preview'))));

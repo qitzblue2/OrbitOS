@@ -4,17 +4,57 @@ A voice-first personal AI system. You talk to it ("Hey Orbit, start my gaming se
 
 ![ORBIT dashboard](docs/screenshots/dashboard.png)
 
+## The ORBIT app
+
+ORBIT is a desktop app for **Windows, macOS and Linux**. Install it, and:
+
+- **"Hey Orbit" is detected on your computer.** The wake word, speech recognition and ORBIT's voice all run on-device (sherpa-onnx). No audio is sent anywhere for them.
+- **It works with the window closed.** ORBIT lives in the tray. Say "Hey Orbit" from any app and a small overlay appears at the top of the screen with what it heard and its reply.
+- **Global push-to-talk:** press Alt+Space (⌥ Space on a Mac) anywhere, speak, then press it again.
+- **This computer is set up automatically.** The app pairs itself as a device, so "open Spotify" or "lock my computer" works right away.
+- **It can start when you log in**, so it's always available.
+
+### Get the installer
+
+Open the repository's **Actions** tab, choose **Build ORBIT app**, and select **Run workflow**. When the run finishes, download your installer from its artifacts:
+- `.exe` for Windows
+- `.dmg` for macOS
+- `.AppImage` or `.deb` for Linux
+
+The builds aren't code-signed yet:
+- **Windows:** SmartScreen asks you to confirm. Choose More info, then Run anyway.
+- **macOS:** right-click the app and choose Open the first time.
+
+### Run it from source
+
+```bash
+npm install
+```
+
+```bash
+npm run models
+```
+
+This downloads the on-device speech models, about 150 MB, once.
+
+```bash
+npm run app
+```
+
+## Parts
+
 ORBIT has three parts:
 
 | Part | Folder | What it does |
 |---|---|---|
 | **Server** | `server/` | The intent router, the execution engine, the AI brain, memory, the device hub, smart home, automations and security. |
+| **App** | `app/` | The desktop app: the embedded server, the on-device speech engine, the tray, the overlay, the global shortcut and the built-in Companion. |
 | **Dashboard** | `web/` | The animated ORBIT core, the voice engine and nine control screens. It works on desktop and phone widths. |
 | **ORBIT Companion** | `companion/` | A small agent you install on each computer. ORBIT acts on a machine only through its Companion, within the permissions you grant. |
 
-## Quick start
+## Server-only setup (advanced)
 
-You need Node 20 or newer.
+Use this to run ORBIT on a home server and control other machines with the standalone Companion. You need Node 20 or newer.
 
 ```bash
 npm install
@@ -71,7 +111,7 @@ Measured on the dev box: greeting 1 ms, smart home 1 ms, a device status round t
 npm test
 ```
 
-15 tests cover the intent parser and the full server path:
+18 tests cover the intent parser, the on-device wake word and speech recognition, and the full server path:
 - pairing
 - authentication
 - device commands over WebSocket

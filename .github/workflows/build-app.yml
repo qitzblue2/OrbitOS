@@ -1,0 +1,48 @@
+# Builds the ORBIT desktop app installers for Windows, macOS and Linux.
+# Run it from the Actions tab ("Run workflow"), or push a tag like v0.2.0.
+# The installers appear as downloadable artifacts on the workflow run.
+name: Build ORBIT app
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win
+          - os: macos-latest
+            target: --mac
+          - os: ubuntu-latest
+            target: --linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Download on-device speech models
+        run: npm run models
+      - name: Test
+        run: npm test
+      - name: Build installer
+        run: npx electron-builder ${{ matrix.target }} --publish never
+        env:
+          # Unsigned builds. Add signing certificates as secrets to remove OS warnings.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ORBIT-${{ runner.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: error

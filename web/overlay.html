@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ORBIT overlay</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="overlay.css">
+<script type="module" src="overlay.js"></script>
+</head>
+<body>
+<div class="pill" id="pill">
+  <canvas id="orb" width="88" height="88" aria-hidden="true"></canvas>
+  <div class="text">
+    <div class="phase" id="phase">Listening</div>
+    <div class="line" id="line" aria-live="polite"></div>
+  </div>
+  <button id="open" type="button" aria-label="Open ORBIT">Open</button>
+  <button id="stop" type="button" aria-label="Stop listening">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+</div>
+</body>
+</html>

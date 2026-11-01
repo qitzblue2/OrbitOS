@@ -10,7 +10,7 @@ export class AnthropicProvider {
       body: JSON.stringify(body),
       signal,
     });
-    if (!res.ok) throw new Error(`AI provider error ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) { const e = new Error(`Anthropic error ${res.status}: ${(await res.text()).slice(0, 300)}`); e.status = res.status; throw e; }
     const decoder = new TextDecoder();
     let buf = '';
     for await (const chunk of res.body) {

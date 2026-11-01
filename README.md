@@ -25,16 +25,26 @@ The builds aren't code-signed yet:
 - **Windows:** SmartScreen asks you to confirm. Choose More info, then Run anyway.
 - **macOS:** right-click the app and choose Open the first time.
 
-### Add your API key
+### Add your AI keys
 
-Open **AI configuration**, paste your Anthropic API key (it starts with `sk-ant-`) and select **Save key**. You can get a key at [console.anthropic.com](https://console.anthropic.com).
+Open **AI configuration** and add as many keys as you like, from any of these:
+- Anthropic (Claude)
+- OpenAI
+- Google Gemini
+- Groq
+- Mistral
+- xAI (Grok)
+- DeepSeek
+- OpenRouter
+- Ollama (local and free, no key needed)
+- any other OpenAI-compatible service
 
-The key is written to a `.env` file in ORBIT's data folder:
-- **Windows:** `%APPDATA%\ORBIT\.env`
-- **macOS:** `~/Library/Application Support/ORBIT/.env`
-- **Linux:** `~/.config/ORBIT/.env`
-
-It stays on your computer and is never shown in the app again. Without a key, device control, routines, smart home and memory still work.
+How ORBIT uses them:
+- **Several keys for one provider:** ORBIT takes turns between them, which spreads out usage and rate limits.
+- **Automatic failover:** when a key is rate-limited, out of credit or rejected, ORBIT pauses it and continues with your next key. If all of that provider's keys fail, it moves on to your other providers. This happens before any of the answer is spoken, so you won't hear two half-answers.
+- **You choose which AI answers:** one provider and model for quick answers, and another for deep reasoning, code and screenshots.
+- **Test button:** each key has one, which sends a tiny real request and reports back in plain words.
+- **Privacy:** keys are encrypted on your computer (AES-256-GCM) and never shown again; the app only shows their last 4 characters. Device control, routines, smart home and memory work without any key.
 
 ### Run it from source
 

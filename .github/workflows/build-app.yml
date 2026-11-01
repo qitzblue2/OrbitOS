@@ -47,7 +47,8 @@ jobs:
             Linux)   EXE="release/linux-unpacked/orbit"; RUN="xvfb-run -a"; EXTRA="--no-sandbox" ;;
           esac
           export ORBIT_SMOKE="$RUNNER_TEMP/smoke.json" ORBIT_USER_DATA="$RUNNER_TEMP/orbit-data"
-          timeout 120 $RUN "$EXE" $EXTRA || true
+          # perl alarm works as a timeout on Windows (Git Bash), macOS and Linux alike
+          perl -e 'alarm shift; exec @ARGV' 120 $RUN "$EXE" $EXTRA || true
           cat "$ORBIT_SMOKE"; echo
           cat "$ORBIT_USER_DATA/orbit.log" || true
           grep -q '"ok":true' "$ORBIT_SMOKE"

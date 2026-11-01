@@ -4,12 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
-import { config, saveEnvValue, envFile } from './config.js';
+import { config } from './config.js';
 import { JsonStore } from './store.js';
 import { AuditLog } from './audit.js';
 import { Memory, MEMORY_KINDS } from './memory.js';
 import { DeviceRegistry, CAPABILITIES } from './devices.js';
 import { Brain } from './brain/index.js';
+import { Keyring, friendly } from './brain/keyring.js';
+import { PROVIDERS } from './brain/catalog.js';
 import { createHome } from './smarthome/index.js';
 import { Automations } from './automations.js';
 import { Engine } from './engine.js';
@@ -23,7 +25,12 @@ export function createOrbit(cfg = config) {
   const audit = new AuditLog(cfg.dataDir);
   const memory = new Memory(cfg.dataDir);
   const devices = new DeviceRegistry(cfg.dataDir);
-  const brain = new Brain(cfg.ai);
+  const keyring = new Keyring(cfg.dataDir);
+  // One-time migration: a key from .env becomes the first keyring entry.
+  if (cfg.ai.anthropicKey && !keyring.data.keys.some((k) => k.fp === keyring.fingerprint(cfg.ai.anthropicKey))) {
+    try { keyring.add({ provider: 'anthropic', key: cfg.ai.anthropicKey, label: 'Anthropic (from .env)' }); } catch {}
+  }
+  const brain = new Brain(cfg.ai, keyring);
   const home = createHome(cfg);
   const automations = new Automations(cfg.dataDir);
   const engine = new Engine({ brain, memory, devices, home, automations, audit, settings });
@@ -44,7 +51,7 @@ export function createOrbit(cfg = config) {
   });
 
   const overview = () => ({
-    brain: { ...brain.status(), hasKey: !!cfg.ai.anthropicKey, envFile }, home: { name: home.name, simulated: !!home.simulated },
+    brain: brain.status(), aiKeys: keyring.list(), home: { name: home.name, simulated: !!home.simulated },
     devices: devices.list(), recent: engine.recent.slice(0, 12), routines: automations.routines(),
     reminders: automations.reminders().filter((r) => !r.done), memoryCount: memory.list().length,
     settings: settings.data, capabilities: CAPABILITIES, memoryKinds: MEMORY_KINDS,
@@ -74,18 +81,18 @@ export function createOrbit(cfg = config) {
     'GET /api/audit': () => audit.tail(100),
     'GET /api/settings': () => settings.data,
     'PATCH /api/settings': (b) => { const allowed = ['userName', 'tone', 'voice', 'wakeWord', 'proactive', 'retentionDays']; for (const k of allowed) if (k in b) settings.data[k] = b[k]; settingsStore.save(); return settings.data; },
-    'PATCH /api/ai': (b) => {
-      for (const k of ['fastModel', 'reasoningModel']) if (b[k]) cfg.ai[k] = String(b[k]);
-      // The key is written to the server's env file and never sent back to any client.
-      if (typeof b.anthropicKey === 'string') {
-        const key = b.anthropicKey.trim();
-        if (key && !/^sk-ant-[\w-]{20,}$/.test(key)) throw new Error("That doesn't look like an Anthropic API key (it starts with sk-ant-).");
-        saveEnvValue('ANTHROPIC_API_KEY', key); cfg.ai.anthropicKey = key;
-        audit.write({ kind: 'security', action: key ? 'api key set' : 'api key removed' });
-        brain.setProvider(key ? 'anthropic' : 'offline');
-      } else if (b.provider) brain.setProvider(b.provider);
-      return brain.status();
+    'GET /api/ai/providers': () => Object.fromEntries(Object.entries(PROVIDERS).map(([id, p]) => [id, { label: p.label, keyHint: p.keyHint, keyOptional: !!p.keyOptional, needsBaseUrl: !!p.needsBaseUrl, baseUrl: p.baseUrl || '', models: p.models, vision: !!p.vision, keysUrl: p.keysUrl || '' }])),
+    'GET /api/ai/keys': () => keyring.list(),
+    'POST /api/ai/keys': (b) => { const k = keyring.add(b); audit.write({ kind: 'security', action: 'ai key added', provider: k.provider, label: k.label }); return k; },
+    'PATCH /api/ai/keys/:id': (b, id) => keyring.update(id, b),
+    'DELETE /api/ai/keys/:id': (b, id) => { audit.write({ kind: 'security', action: 'ai key removed', id }); return { ok: keyring.remove(id) }; },
+    'POST /api/ai/keys/:id/test': async (b, id) => {
+      const k = keyring.data.keys.find((x) => x.id === id);
+      if (!k) return { ok: false, error: 'Key not found' };
+      try { const r = await brain.test(k); keyring.markSuccess(k); return r; }
+      catch (e) { keyring.markFailure(k, e); return { ok: false, error: friendly(e) }; }
     },
+    'PATCH /api/ai/routes': (b) => (keyring.setRoutes(b), brain.status()),
   };
 
   const server = http.createServer(async (req, res) => {
@@ -102,11 +109,13 @@ export function createOrbit(cfg = config) {
       if (url.pathname === '/api/health') return json(res, 200, { ok: true });
       if (url.pathname.startsWith('/api/')) {
         if (!isAdmin(req, url)) return json(res, 401, { error: 'Unauthorized' });
-        const parts = url.pathname.split('/');
-        const id = parts.length > 3 ? parts[3] : null;
-        let key = `${req.method} ${url.pathname}`;
-        if (!routes[key] && id) key = `${req.method} /${parts[1]}/${parts[2]}/:id${parts[4] ? '/' + parts[4] : ''}`;
-        const fn = routes[key];
+        let fn = routes[`${req.method} ${url.pathname}`], id = null;
+        if (!fn) for (const [pattern, handler] of Object.entries(routes)) {
+          const [method, p] = pattern.split(' ');
+          if (method !== req.method || !p.includes(':id')) continue;
+          const m = url.pathname.match(new RegExp(`^${p.replace(':id', '([\\w-]+)')}$`));
+          if (m) { fn = handler; id = m[1]; break; }
+        }
         if (!fn) return json(res, 404, { error: 'Not found' });
         const body = ['POST', 'PATCH', 'PUT'].includes(req.method) ? await readBody(req) : {};
         try { return json(res, 200, (await fn(body, id)) ?? { ok: false }); }
@@ -184,7 +193,7 @@ export function createOrbit(cfg = config) {
   }, 15000);
 
   return {
-    server, engine, devices, memory, automations, brain,
+    server, engine, devices, memory, automations, brain, keyring,
     listen: (port = cfg.port, host = cfg.host) => new Promise((r) => server.listen(port, host, () => r(server.address()))),
     close: () => { clearInterval(heartbeat); clearInterval(reminderTimer); for (const c of wss.clients) c.terminate(); return new Promise((r) => server.close(r)); },
   };

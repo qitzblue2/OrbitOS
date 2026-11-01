@@ -64,7 +64,7 @@ const send = (m) => S.ws?.readyState === 1 && S.ws.send(JSON.stringify(m));
 function onEvent(m) {
   switch (m.type) {
     case 'hello': S.overview = m.overview; applySettings(); if (!S.greeted) { S.greeted = true; } render(); break;
-    case 'state': setState(m.state === 'speaking' && !voice.supported.tts ? 'processing' : m.state); if (m.model) S.lastModel = `${m.tier} · ${m.model}`; updateChip(); break;
+    case 'state': setState(m.state === 'speaking' && !voice.supported.tts ? 'processing' : m.state); if (m.model) S.lastModel = `${m.provider} · ${m.model}${m.failovers ? ` · switched ${m.failovers}×` : ''}`; updateChip(); break;
     case 'delta': S.live += m.text; if (voice.mode !== 'off' || S.speakReplies) voice.feed(m.text); renderLive(); break;
     case 'done': {
       const text = m.text ?? S.live;
@@ -92,7 +92,7 @@ function setState(s) {
   const label = $('#core-state'); if (label) label.textContent = stateLabel(shown);
   clearTimeout(S.errTimer); if (s === 'error') S.errTimer = setTimeout(() => S.state === 'error' && setState('idle'), 4000);
 }
-function updateChip() { const b = S.overview?.brain; $('#model-chip').textContent = S.lastModel || (b ? `${b.provider} · ${b.fastModel}` : '—'); }
+function updateChip() { const b = S.overview?.brain; $('#model-chip').textContent = S.lastModel || (b ? (b.provider === 'offline' ? 'no AI key' : `${b.provider} · ${b.fastModel} · ${b.activeKeys} key${b.activeKeys === 1 ? '' : 's'}`) : '—'); }
 
 function utter(text, source = 'text') {
   text = text.trim(); if (!text) return;
@@ -290,31 +290,72 @@ const VIEWS = {
   },
 
   ai() {
-    const o = S.overview, s = o.settings;
-    const name = h('input', { id: 'ai-user', value: s.userName, placeholder: 'Alex' });
-    const tone = h('select', { id: 'ai-tone' }, ['composed', 'concise', 'warm', 'witty', 'formal'].map((t) => h('option', { value: t, selected: t === s.tone }, t)));
-    const fast = h('input', { id: 'ai-fast', value: o.brain.fastModel }), deep = h('input', { id: 'ai-deep', value: o.brain.reasoningModel });
-    const prov = h('select', { id: 'ai-prov' }, ['anthropic', 'offline'].map((p) => h('option', { value: p, selected: p === o.brain.provider }, p)));
-    return h('div', { class: 'grid2' },
-      panel('Personality',
-        h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-user' }, 'What should ORBIT call you?'), name),
-        h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-tone' }, 'Tone'), tone),
-        h('button', { class: 'btn primary', onclick: async () => { S.overview.settings = await api('PATCH', '/api/settings', { userName: name.value, tone: tone.value }); toast('Saved.'); } }, 'Save')),
-      (() => {
-        const key = h('input', { id: 'ai-key', type: 'password', autocomplete: 'off', placeholder: o.brain.hasKey ? '•••••••• saved' : 'sk-ant-…' });
-        const setKey = async (value) => { try { S.overview.brain = { ...S.overview.brain, ...(await api('PATCH', '/api/ai', { anthropicKey: value })) }; toast(value ? 'API key saved. ORBIT can now answer questions.' : 'API key removed.'); refresh(); } catch (e) { toast(e.message, 'bad'); } };
-        return panel('API key',
-          h('p', { class: 'muted' }, 'Needed for open questions, writing, code help and screen analysis. Device commands, routines and memory work without it. Get a key at console.anthropic.com.'),
-          h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-key' }, 'Anthropic API key'), key),
-          h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: () => key.value.trim() && setKey(key.value) }, o.brain.hasKey ? 'Replace key' : 'Save key'), o.brain.hasKey ? h('button', { class: 'btn danger', onclick: () => setKey('') }, 'Remove key') : null),
-          h('p', { class: 'muted mono' }, `Stored only in ${o.brain.envFile}. It is never shown again or sent to this page.`));
-      })(),
-      panel('Models',
-        h('p', { class: 'muted' }, 'Simple requests go to the fast model; analysis, code, planning and screenshots go to the reasoning model. Device commands never reach a model.'),
-        h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-prov' }, 'Provider'), prov),
-        h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-fast' }, 'Fast model'), fast),
-        h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-deep' }, 'Reasoning model'), deep),
-        h('button', { class: 'btn primary', onclick: async () => { S.overview.brain = await api('PATCH', '/api/ai', { provider: prov.value, fastModel: fast.value, reasoningModel: deep.value }); updateChip(); toast(`Using ${S.overview.brain.provider}.`); render(); } }, 'Apply')));
+    const o = S.overview, st = o.settings;
+    const wrap = h('div', { class: 'stack' });
+    const name = h('input', { id: 'ai-user', value: st.userName, placeholder: 'Alex' });
+    const tone = h('select', { id: 'ai-tone' }, ['composed', 'concise', 'warm', 'witty', 'formal'].map((t) => h('option', { value: t, selected: t === st.tone }, t)));
+    api('GET', '/api/ai/providers').then((P) => {
+      const keys = o.aiKeys || [];
+      const prov = h('select', { id: 'k-prov' }, Object.entries(P).map(([id, p]) => h('option', { value: id }, p.label)));
+      const label = h('input', { id: 'k-label', placeholder: 'Work key' });
+      const key = h('input', { id: 'k-key', type: 'password', autocomplete: 'off' });
+      const base = h('input', { id: 'k-base', placeholder: 'https://example.com/v1' });
+      const baseField = h('div', { class: 'field' }, h('label', { class: 'label', for: 'k-base' }, 'API base URL'), base);
+      const help = h('a', { target: '_blank', rel: 'noopener' }, 'Get a key');
+      const sync = () => { const p = P[prov.value]; key.placeholder = p.keyHint; baseField.hidden = !p.needsBaseUrl; help.hidden = !p.keysUrl; help.href = p.keysUrl || '#'; };
+      prov.addEventListener('change', sync); sync();
+      const add = async () => {
+        try { await api('POST', '/api/ai/keys', { provider: prov.value, label: label.value, key: key.value, baseUrl: base.value }); key.value = label.value = ''; toast('Key added.'); await refresh(); }
+        catch (e) { toast(e.message, 'bad'); }
+      };
+      const row = (k) => {
+        const status = !k.enabled ? h('span', { class: 'tag' }, 'off') : k.coolingDown ? h('span', { class: 'tag bad', title: k.lastError || '' }, 'paused') : k.lastError ? h('span', { class: 'tag bad', title: k.lastError }, 'error') : h('span', { class: 'tag ok' }, k.uses ? 'working' : 'ready');
+        const test = h('button', { class: 'btn small', onclick: async () => {
+          test.disabled = true; test.textContent = 'Testing…';
+          const r = await api('POST', `/api/ai/keys/${k.id}/test`).catch((e) => ({ ok: false, error: e.message }));
+          toast(r.ok ? `${k.label}: works (${r.model}, ${r.ms} ms)` : `${k.label}: ${r.error}`, r.ok ? '' : 'bad'); refresh();
+        } }, 'Test');
+        return h('li', {}, status,
+          h('span', { class: 'grow' }, h('b', {}, k.label), h('div', { class: 'muted mono' }, `${k.providerLabel} · ${k.last4 ? `••••${k.last4}` : 'no key needed'} · used ${k.uses}×${k.failures ? ` · ${k.failures} failed` : ''}`)),
+          test,
+          h('button', { class: 'switch', role: 'switch', 'aria-label': `Use ${k.label}`, 'aria-checked': String(k.enabled), onclick: async () => { await api('PATCH', `/api/ai/keys/${k.id}`, { enabled: !k.enabled }); refresh(); } }),
+          h('button', { class: 'btn small danger', 'aria-label': `Remove ${k.label}`, onclick: async () => { if (confirm(`Remove ${k.label}?`)) { await api('DELETE', `/api/ai/keys/${k.id}`); refresh(); } } }, 'Remove'));
+      };
+      const routeFields = (tier, title) => {
+        const r = o.brain.routes[tier];
+        const sel = h('select', { id: `r-${tier}`, 'aria-label': `${title} provider` }, Object.entries(P).map(([id, p]) => h('option', { value: id, selected: id === r.provider }, p.label)));
+        const model = h('input', { id: `m-${tier}`, 'aria-label': `${title} model`, value: r.model, placeholder: P[r.provider]?.models[tier] || 'model name' });
+        sel.addEventListener('change', () => { model.value = ''; model.placeholder = P[sel.value].models[tier] || 'model name'; });
+        return { sel, model, el: h('div', { class: 'field' }, h('span', { class: 'label' }, title), h('div', { class: 'row' }, sel, model)) };
+      };
+      const fast = routeFields('fast', 'Fast answers'), deep = routeFields('reasoning', 'Deep reasoning, code, screenshots');
+      const fb = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Fall back to other providers', 'aria-checked': String(o.brain.fallback) });
+      fb.addEventListener('click', () => fb.setAttribute('aria-checked', String(fb.getAttribute('aria-checked') !== 'true')));
+      wrap.replaceChildren(
+        h('div', { class: 'grid2' },
+          panel(`API keys (${keys.length})`,
+            h('p', { class: 'muted' }, 'Add as many keys as you like, from any provider. ORBIT rotates through keys of the same provider and, when one is rate-limited or fails, moves to the next key automatically. Keys are encrypted on this computer and only the last 4 characters are ever shown.'),
+            keys.length ? h('ul', { class: 'list' }, keys.map(row)) : empty('No keys yet. Device control, routines and memory work without one.')),
+          panel('Add a key',
+            h('div', { class: 'field' }, h('label', { class: 'label', for: 'k-prov' }, 'Provider'), prov),
+            h('div', { class: 'field' }, h('label', { class: 'label', for: 'k-key' }, 'API key'), key),
+            baseField,
+            h('div', { class: 'field' }, h('label', { class: 'label', for: 'k-label' }, 'Name (optional)'), label),
+            h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: add }, 'Add key'), help))),
+        h('div', { class: 'grid2' },
+          panel('Which AI answers',
+            fast.el, deep.el,
+            h('div', { class: 'perm' }, h('span', {}, 'If those keys fail, use my other providers'), fb),
+            h('button', { class: 'btn primary', onclick: async () => {
+              try { S.overview.brain = await api('PATCH', '/api/ai/routes', { fast: { provider: fast.sel.value, model: fast.model.value }, reasoning: { provider: deep.sel.value, model: deep.model.value }, fallback: fb.getAttribute('aria-checked') === 'true' }); updateChip(); toast('Saved.'); }
+              catch (e) { toast(e.message, 'bad'); }
+            } }, 'Save')),
+          panel('Personality',
+            h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-user' }, 'What should ORBIT call you?'), name),
+            h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-tone' }, 'Tone'), tone),
+            h('button', { class: 'btn primary', onclick: async () => { S.overview.settings = await api('PATCH', '/api/settings', { userName: name.value, tone: tone.value }); toast('Saved.'); } }, 'Save'))));
+    }).catch((e) => wrap.replaceChildren(empty(e.message)));
+    return wrap;
   },
 
   security() {
@@ -350,7 +391,8 @@ function render() {
 
 function start() {
   $('#login').hidden = true; $('#app').hidden = false;
-  S.view = NAV.some((n) => n[0] === location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard';
+  const wanted = location.hash.slice(1).split('?')[0];
+  S.view = NAV.some((n) => n[0] === wanted) ? wanted : 'dashboard';
   buildNav(); mini = new Core($('#core-mini'), { mini: true });
   connect();
 }

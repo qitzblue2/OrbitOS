@@ -102,7 +102,7 @@ test('memory: add, recall, sensitive guard, delete', async () => {
   assert.equal((await api('DELETE', `/api/memory/${list[0].id}`)).body.ok, true);
 });
 
-test('AI fallback is honest when no model is configured', async () => {
+test('AI fallback is honest when no key is configured', async () => {
   assert.match((await say('explain quantum tunnelling')).reply, /isn't connected/);
 });
 
@@ -115,15 +115,39 @@ test('revoking a device disconnects it and kills its token', async () => {
   assert.equal(status, 401);
 });
 
-test('API key is saved server-side and never returned', async () => {
-  const bad = await api('PATCH', '/api/ai', { anthropicKey: 'hello' });
-  assert.equal(bad.status, 400);
-  const fake = 'sk-ant-test-' + 'x'.repeat(30);
-  const ok = await api('PATCH', '/api/ai', { anthropicKey: fake });
-  assert.equal(ok.body.provider, 'anthropic');
-  const overview = JSON.stringify((await api('GET', '/api/overview')).body);
-  assert.ok(!overview.includes(fake), 'key never sent to the dashboard');
-  assert.match(overview, /"hasKey":true/);
-  assert.ok(fs.readFileSync(process.env.ORBIT_ENV_FILE, 'utf8').includes(fake), 'key written to the env file');
-  await api('PATCH', '/api/ai', { anthropicKey: '' });
+test('unlimited keys: encrypted, never returned, validated', async () => {
+  const k1 = 'sk-ant-test-' + 'a'.repeat(30), k2 = 'sk-ant-test-' + 'b'.repeat(30), k3 = 'gsk_' + 'c'.repeat(30);
+  assert.equal((await api('POST', '/api/ai/keys', { provider: 'openai', key: 'nope' })).status, 400, 'format checked');
+  for (const [provider, key] of [['anthropic', k1], ['anthropic', k2], ['groq', k3]]) assert.equal((await api('POST', '/api/ai/keys', { provider, key })).status, 200);
+  assert.equal((await api('POST', '/api/ai/keys', { provider: 'anthropic', key: k1 })).status, 400, 'duplicates refused');
+  assert.equal((await api('POST', '/api/ai/keys', { provider: 'ollama' })).status, 200, 'local models need no key');
+  const listed = (await api('GET', '/api/ai/keys')).body;
+  assert.equal(listed.length, 4);
+  const everything = JSON.stringify((await api('GET', '/api/overview')).body) + JSON.stringify(listed) + fs.readFileSync(path.join(config.dataDir, 'keys.json'), 'utf8');
+  for (const k of [k1, k2, k3]) assert.ok(!everything.includes(k), 'raw key never exposed or stored in plain text');
+  assert.equal(listed[0].last4, 'aaaa');
+});
+
+test('failover: a dead key hands over to the next key and provider', async () => {
+  const { keyring, brain } = orbit;
+  // Simulate providers: the first Anthropic key is rate-limited, the second works.
+  const seen = [];
+  brain.client = (key) => ({ async *stream() {
+    seen.push(key.label);
+    if (key.last4 === 'aaaa') { const e = new Error('rate limited'); e.status = 429; throw e; }
+    yield 'Hello from '; yield key.provider;
+  } });
+  keyring.setRoutes({ fast: { provider: 'anthropic', model: '' }, fallback: true });
+  let text = '', meta;
+  for (let i = 0; i < 2; i++) { text = ''; for await (const p of brain.answer({ text: 'hi' })) { if (p.meta) meta = p.meta; else text += p.delta; } }
+  assert.equal(text, 'Hello from anthropic');
+  assert.ok(keyring.list().find((k) => k.last4 === 'aaaa').coolingDown, 'rate-limited key is cooled down');
+  // All Anthropic keys disabled: falls back to another provider.
+  for (const k of keyring.list().filter((k) => k.provider === 'anthropic')) keyring.update(k.id, { enabled: false });
+  text = ''; for await (const p of brain.answer({ text: 'hi' })) { if (p.meta) meta = p.meta; else text += p.delta; }
+  assert.notEqual(meta.provider, 'anthropic');
+  assert.match(text, /Hello from (groq|ollama)/);
+  // Routes are changeable per tier.
+  const st = (await api('PATCH', '/api/ai/routes', { reasoning: { provider: 'groq', model: 'llama-3.3-70b-versatile' } })).body;
+  assert.equal(st.reasoningModel, 'llama-3.3-70b-versatile');
 });

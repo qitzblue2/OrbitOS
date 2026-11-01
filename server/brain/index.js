@@ -1,8 +1,9 @@
 // The ORBIT brain: chooses a model tier, injects personality + relevant memories, streams the answer.
 import { AnthropicProvider } from './providers/anthropic.js';
+import { OpenAICompatProvider } from './providers/openai.js';
 import { OfflineProvider } from './providers/offline.js';
+import { PROVIDERS } from './catalog.js';
 
-const PROVIDERS = { anthropic: AnthropicProvider, offline: OfflineProvider };
 
 export function personaPrompt({ userName, tone = 'composed', memories = [], devices = [] }) {
   return [
@@ -28,29 +29,73 @@ export function chooseTier(text, { hasImage = false } = {}) {
 export const needsWeb = (text) => /\b(today|latest|news|current(ly)?|right now|this week|score|weather|price|stock|search)\b/i.test(text);
 
 export class Brain {
-  constructor(aiConfig) {
+  constructor(aiConfig, keyring) {
     this.config = aiConfig;
-    this.setProvider(aiConfig.provider);
+    this.keyring = keyring;
+    this.offline = new OfflineProvider();
   }
-  setProvider(name) {
-    const Impl = PROVIDERS[name] || OfflineProvider;
-    this.provider = name === 'anthropic' && !this.config.anthropicKey ? new OfflineProvider() : new Impl({ apiKey: this.config.anthropicKey });
-    this.config.provider = this.provider.name;
-  }
-  modelFor(tier) { return tier === 'reasoning' ? this.config.reasoningModel : this.config.fastModel; }
-  status() { return { provider: this.provider.name, fastModel: this.config.fastModel, reasoningModel: this.config.reasoningModel }; }
 
-  async *answer({ text, history = [], memories = [], devices = [], persona = {}, image = null, signal }) {
-    const tier = chooseTier(text, { hasImage: !!image });
-    const model = this.modelFor(tier);
+  client(key) {
+    const p = PROVIDERS[key.provider];
+    const apiKey = this.keyring.secretOf(key);
+    return p.kind === 'anthropic' ? new AnthropicProvider({ apiKey }) : new OpenAICompatProvider({ apiKey, baseUrl: key.baseUrl || p.baseUrl, name: p.label });
+  }
+
+  status() {
+    const r = this.keyring.data.routes;
+    const keys = this.keyring.list();
+    const model = (tier) => r[tier].model || PROVIDERS[r[tier].provider]?.models[tier] || '';
+    const live = keys.some((k) => k.enabled);
+    return {
+      provider: live ? (keys.some((k) => k.enabled && k.provider === r.fast.provider) ? r.fast.provider : 'fallback') : 'offline',
+      fastModel: model('fast'), reasoningModel: model('reasoning'),
+      routes: r, fallback: this.keyring.data.fallback, keyCount: keys.length, activeKeys: keys.filter((k) => k.enabled && !k.coolingDown).length,
+    };
+  }
+
+  // Streams an answer. Tries each candidate key in turn: a key that fails before any text arrives
+  // (bad key, rate limit, outage) is cooled down and the next key or provider takes over seamlessly.
+  async *answer({ text, history = [], memories = [], devices = [], persona = {}, image = null, signal, tier: forced }) {
+    const tier = forced || chooseTier(text, { hasImage: !!image });
     const content = image
       ? [{ type: 'image', source: { type: 'base64', media_type: image.mediaType || 'image/png', data: image.data } }, { type: 'text', text }]
       : text;
     const messages = [...history.slice(-12), { role: 'user', content }];
-    yield { meta: { tier, model, provider: this.provider.name } };
-    for await (const delta of this.provider.stream({
-      model, system: personaPrompt({ ...persona, memories, devices }), messages,
-      maxTokens: tier === 'reasoning' ? 2048 : 512, webSearch: needsWeb(text) && this.provider.name === 'anthropic', signal,
-    })) yield { delta };
+    const system = personaPrompt({ ...persona, memories, devices });
+    const candidates = this.keyring.candidates(tier, { needVision: !!image });
+    const errors = [];
+    for (const { key, model } of candidates) {
+      const provider = PROVIDERS[key.provider];
+      let started = false;
+      try {
+        for await (const delta of this.client(key).stream({
+          model, system, messages, maxTokens: tier === 'reasoning' ? 2048 : 512, signal,
+          webSearch: provider.webSearch && needsWeb(text),
+        })) {
+          if (!started) { started = true; yield { meta: { tier, model, provider: key.provider, key: key.label, failovers: errors.length } }; }
+          yield { delta };
+        }
+        if (!started) yield { meta: { tier, model, provider: key.provider, key: key.label, failovers: errors.length } };
+        this.keyring.markSuccess(key);
+        return;
+      } catch (e) {
+        if (signal?.aborted) throw e;
+        if (started) throw e; // mid-answer failure: don't splice two different answers together
+        this.keyring.markFailure(key, e);
+        errors.push(`${key.label}: ${e.message}`);
+      }
+    }
+    if (candidates.length) throw new Error(`Every AI key failed. ${errors.slice(-3).join(' | ')}`);
+    yield { meta: { tier, model: 'none', provider: 'offline' } };
+    for await (const delta of this.offline.stream()) yield { delta };
+  }
+
+  // A tiny real request to confirm a key works.
+  async test(key) {
+    const t0 = performance.now();
+    let out = '';
+    const model = this.keyring.data.routes.fast.provider === key.provider && this.keyring.data.routes.fast.model ? this.keyring.data.routes.fast.model : PROVIDERS[key.provider].models.fast;
+    for await (const d of this.client(key).stream({ model, system: 'Reply with the single word OK.', messages: [{ role: 'user', content: 'ping' }], maxTokens: 5, signal: AbortSignal.timeout(20000) })) out += d;
+    return { ok: true, ms: Math.round(performance.now() - t0), model, reply: out.trim().slice(0, 40) };
   }
 }

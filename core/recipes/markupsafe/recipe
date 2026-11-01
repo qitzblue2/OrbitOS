@@ -1,0 +1,12 @@
+# MarkupSafe: safe string handling for Jinja2.
+name=markupsafe
+version=3.0.3
+stage=base
+sources=(https://files.pythonhosted.org/packages/source/m/markupsafe/markupsafe-3.0.3.tar.gz)
+sha256=(722695808f4b6457b320fdc131280796bdceb04ab50fe1795cd540799ebe1698)
+depends=(base-files python setuptools)
+description="MarkupSafe for Python"
+
+build() {
+  python3 -m pip install --no-index --no-build-isolation --no-deps --no-cache-dir --root="$DESTDIR" .
+}

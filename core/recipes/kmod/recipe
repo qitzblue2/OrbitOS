@@ -1,0 +1,15 @@
+# kmod: load and manage kernel modules (modprobe, lsmod, depmod …).
+name=kmod
+version=34.2
+stage=base
+sources=(https://www.kernel.org/pub/linux/utils/kernel/kmod/kmod-34.2.tar.xz)
+sha256=(5a5d5073070cc7e0c7a7a3c6ec2a0e1780850c8b47b3e3892226b93ffcb9cb54)
+depends=(base-files meson ninja zlib xz zstd openssl)
+description="kernel module tools"
+
+build() {
+  # man pages need scdoc, which Orbit doesn't build yet
+  meson setup --prefix=/usr --buildtype=release -Dmanpages=false build
+  ninja -C build
+  DESTDIR="$DESTDIR" ninja -C build install
+}

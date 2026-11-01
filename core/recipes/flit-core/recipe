@@ -1,0 +1,13 @@
+# flit_core: the build backend Jinja2 uses.
+name=flit-core
+version=3.12.0
+stage=base
+sources=(https://files.pythonhosted.org/packages/source/f/flit_core/flit_core-3.12.0.tar.gz)
+sha256=(18f63100d6f94385c6ed57a72073443e1a71a4acb4339491615d0f16d6ff01b2)
+depends=(base-files python)
+description="flit_core Python build backend"
+
+build() {
+  # flit_core builds itself (bootstraps from its own source)
+  python3 -m pip install --no-index --no-build-isolation --no-deps --no-cache-dir --root="$DESTDIR" .
+}

@@ -1,5 +1,5 @@
 # Builds the ORBIT desktop app installers for Windows, macOS and Linux.
-# Run it from the Actions tab ("Run workflow"), or push a tag like v0.2.0.
+# Runs on every push to the OrbitAI branch, on tags like v0.2.0, or from the Actions tab.
 # The installers appear as downloadable artifacts on the workflow run.
 name: Build ORBIT app
 
@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
   push:
     tags: ['v*']
+    branches: [OrbitAI]
 
 jobs:
   build:

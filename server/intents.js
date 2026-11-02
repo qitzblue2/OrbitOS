@@ -45,8 +45,17 @@ export function normalizeSpeech(text) {
   });
 }
 
+// Removes polite wrappers so "can you please open Spotify for me" works like "open Spotify".
+const LEAD = /^(?:(?:can|could|would|will) you(?: please)?|please|kindly|just|go ahead and|i (?:want|need|would like) you to|i'?d like you to|i want to|i'?d like to|let'?s|hey|ok|okay)[,\s]+/i;
+const TRAIL = /[,\s]+(?:for me|please|now|right now|thanks|thank you|orbit|if you can|real quick)$/i;
+export function simplify(text) {
+  let t = text.trim().replace(/[.!?]+$/, '');
+  for (let i = 0; i < 4; i++) { const before = t; t = t.replace(LEAD, '').replace(TRAIL, '').replace(/[.!?]+$/, '').trim(); if (t === before) break; }
+  return t;
+}
+
 export function parseIntent(raw, now = new Date()) {
-  const clean = normalizeSpeech(stripWake(raw)).replace(/[.!?]+$/, '');
+  const clean = simplify(normalizeSpeech(stripWake(raw)));
   if (!clean) return { type: 'greeting' };
   const { hint, text } = target(clean);
   const t = text.toLowerCase();
@@ -114,7 +123,7 @@ export function parseIntent(raw, now = new Date()) {
   if (/^restart (?:my |the )?(?:computer|pc|laptop|mac)$/.test(t)) return act('system.shutdown', { mode: 'restart' }, 'Restarting.');
   if (/^turn on (?:my |the )?(?:computer|pc)$|^wake (?:up )?(?:my |the )?(?:computer|pc)$/.test(t)) return { type: 'wake.device', hint };
   if ((m = t.match(/^(?:send|text) (?:a )?(?:message )?(?:to )?(.+?) (?:saying|that) (.+)$/))) return act('message.send', { to: m[1], body: text.slice(t.indexOf(m[2])) }, `Message sent to ${m[1]}.`);
-  if (/^(?:device|system|battery) status$|^how(?:'s| is) my (?:computer|pc|battery)( doing)?$/.test(t)) return act('system.status', {}, null);
+  if (/^(?:(?:check|show|get|tell me|give me|what(?:'s| is))(?: me)? )?(?:my |the )?(?:device|system|computer|pc|laptop|mac|battery)(?:'s)? (?:status|health|stats|info|level|life)$|^(?:device|system|battery) status$|^how(?:'s| is) my (?:computer|pc|laptop|mac|battery)(?: doing| holding up)?$|^how much battery(?: do i have| is left)?(?: left)?$/.test(t)) return act('system.status', {}, null);
 
   return null;
 }

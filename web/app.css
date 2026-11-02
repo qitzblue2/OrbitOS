@@ -145,3 +145,10 @@ pre.cmd{margin:0;padding:12px;border-radius:var(--r1);background:#020610;border:
 .menu button[aria-selected="true"]::after{content:"✓";margin-left:auto}
 .menu .foot{border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
 .menu .foot button{font-family:var(--font)}
+
+.meter{flex:1;height:10px;border-radius:999px;background:rgba(3,8,18,.7);border:1px solid var(--line);overflow:hidden}
+.meter-fill{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .08s linear}
+.toast .list .grow{white-space:normal}
+.list li:has(> select){flex-wrap:wrap}
+.list li > select{width:auto;flex:0 1 260px;min-width:160px;max-width:100%}
+.list li > .grow{flex:1 1 220px}

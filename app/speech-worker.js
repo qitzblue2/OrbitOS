@@ -4,10 +4,11 @@ const { LocalSpeech } = require('./speech.js');
 let engine = null;
 const send = (msg) => process.parentPort.postMessage(msg);
 
-function boot({ modelsDir, sensitivity, voice, voiceDirs }) {
+function boot({ modelsDir, sensitivity, voice, voiceDirs, patience }) {
   try {
-    engine = new LocalSpeech(modelsDir, { sensitivity, voice, voiceDirs });
-    for (const ev of ['wake', 'listening', 'partial', 'utterance']) engine.on(ev, (data) => send({ type: ev, data }));
+    engine = new LocalSpeech(modelsDir, { sensitivity, voice, voiceDirs, patience });
+    for (const ev of ['wake', 'listening', 'partial']) engine.on(ev, (data) => send({ type: ev, data }));
+    engine.on('utterance', (text, audio) => send({ type: 'utterance', data: text, audio: audio?.length ? Array.from(audio) : null }));
     send({ type: 'ready', tts: !!engine.tts, voice: engine.voice });
   } catch (e) { send({ type: 'error', message: e.message }); }
 }

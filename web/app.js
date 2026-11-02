@@ -113,6 +113,7 @@ voice.addEventListener('interim', (e) => { S.heard = e.detail; renderLive(); rep
 voice.addEventListener('utterance', (e) => utter(e.detail.text, 'voice'));
 voice.addEventListener('interrupt', () => send({ type: 'interrupt' }));
 voice.addEventListener('error', (e) => toast(e.detail, 'bad'));
+voice.addEventListener('missed', () => { S.heard = ''; renderLive(); toast("Didn't catch that. Try again a little louder, or check Voice › Microphone.", 'warn'); });
 voice.addEventListener('mode', (e) => {
   const on = e.detail !== 'off';
   report({ listening: on });
@@ -170,7 +171,7 @@ menu.addEventListener('keydown', (e) => {
 
 // ---- toasts ----
 function toast(text, kind = '', actions = []) {
-  const t = h('div', { class: `toast glass ${kind}`, role: kind === 'bad' ? 'alert' : 'status' }, h('div', {}, text), actions.length ? h('div', { class: 'row' }, actions) : null);
+  const t = h('div', { class: `toast glass ${kind}`, role: kind === 'bad' ? 'alert' : 'status' }, text?.nodeType ? text : h('div', {}, text), actions.length ? h('div', { class: 'row' }, actions) : null);
   $('#toasts').append(t);
   actions.forEach((a) => a.addEventListener('click', () => t.remove()));
   setTimeout(() => t.remove(), actions.length ? 30000 : 5000);
@@ -190,6 +191,70 @@ const empty = (t) => h('div', { class: 'empty' }, t);
 function renderLive() {
   const el = $('#transcript'); if (el) el.replaceChildren(...[S.heard ? h('span', { class: 'you' }, `“${S.heard}”`) : null, S.live || (S.chat.at(-1)?.role === 'orbit' ? S.chat.at(-1).text : '')].filter(Boolean));
   if (S.view === 'conversations') renderChat();
+}
+
+// Microphone setup for the desktop app: which mic, noise reduction, volume boost, patience and a live test.
+function micPanel() {
+  const prefs = voice.micPrefs;
+  const mics = h('select', { id: 'mic-device', 'aria-label': 'Microphone' }, h('option', { value: '' }, 'System default'));
+  const boost = h('select', { id: 'mic-boost', 'aria-label': 'Volume boost' }, [['auto', 'Automatic (recommended)'], ['1', 'Off'], ['2', '2×'], ['4', '4×'], ['8', '8×']].map(([v, l]) => h('option', { value: v, selected: String(prefs.boost) === v }, l)));
+  const patience = h('select', { id: 'mic-patience', 'aria-label': 'Wait after I stop talking' }, [['0.6', 'Short (0.6 s)'], ['1', 'Normal (1 s)'], ['1.6', 'Long (1.6 s), for slow or paused speech']].map(([v, l]) => h('option', { value: v }, l)));
+  const ns = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Noise reduction', 'aria-checked': String(prefs.noiseSuppression) });
+  const bar = h('div', { class: 'meter-fill' }), meter = h('div', { class: 'meter', role: 'meter', 'aria-label': 'Microphone level', 'aria-valuemin': '0', 'aria-valuemax': '100' }, bar);
+  const verdict = h('div', { class: 'muted', 'aria-live': 'polite', id: 'mic-verdict' }, S.micVerdict || 'Press Test and talk normally.');
+  const test = h('button', { class: 'btn small' }, 'Test');
+
+  const fillMics = async () => {
+    const list = await voice.listMics().catch(() => []);
+    mics.replaceChildren(h('option', { value: '' }, 'System default'), ...list.filter((m) => m.id && m.id !== 'default').map((m) => h('option', { value: m.id, selected: m.id === prefs.deviceId }, m.label)));
+  };
+  fillMics();
+  native.getInfo().then((i) => { patience.value = String(i.patience ?? 1); if (!patience.value) patience.value = '1'; });
+  mics.addEventListener('change', async () => { await voice.setMicPrefs({ deviceId: mics.value }); toast('Microphone changed.'); });
+  boost.addEventListener('change', () => voice.setMicPrefs({ boost: boost.value === 'auto' ? 'auto' : +boost.value }));
+  patience.addEventListener('change', async () => { await native.setPatience(+patience.value); toast('Saved. The voice engine is restarting.'); });
+  ns.addEventListener('click', async () => { const on = ns.getAttribute('aria-checked') !== 'true'; ns.setAttribute('aria-checked', String(on)); await voice.setMicPrefs({ noiseSuppression: on }); });
+
+  // Live meter: shows level after the boost, and says whether you're loud enough.
+  let peak = 0, peakAt = 0, testing = false;
+  const off = (() => { const fn = (e) => {
+    const { level, raw, gain } = e.detail;
+    bar.style.width = `${Math.round(level * 100)}%`; meter.setAttribute('aria-valuenow', String(Math.round(level * 100)));
+    if (!testing) return;
+    if (raw > peak) { peak = raw; peakAt = performance.now(); }
+    if (performance.now() - peakAt > 1500 && peak > 0) {
+      const heard = peak * gain;
+      verdict.textContent = peak < 0.004 ? 'I can barely hear you. Check the right microphone is selected, or set the boost to 4× or 8×.'
+        : heard < 0.05 ? 'A bit quiet. Move closer or raise the boost.' : peak > 0.6 ? 'Very loud, which can distort. Move back a little.' : 'Sounds good.';
+      peak = 0;
+    }
+  }; voice.addEventListener('mic-meter', fn); return () => voice.removeEventListener('mic-meter', fn); })();
+  test.addEventListener('click', async () => {
+    if (testing) return;
+    testing = true; peak = 0; let best = 0; test.textContent = 'Listening…'; verdict.textContent = 'Talk normally for a few seconds.';
+    const track = (e) => { best = Math.max(best, e.detail.raw * e.detail.gain); };
+    voice.addEventListener('mic-meter', track);
+    const wasOff = !voice.stream;
+    try { await voice.openMic(); await fillMics(); } catch { verdict.textContent = 'Microphone access was denied.'; testing = false; test.textContent = 'Test'; voice.removeEventListener('mic-meter', track); return; }
+    setTimeout(() => {
+      voice.removeEventListener('mic-meter', track);
+      testing = false; test.textContent = 'Test';
+      S.micVerdict = best < 0.01 ? "I couldn't hear you. Check the right microphone is selected, and that ORBIT is allowed to use it."
+        : best < 0.05 ? 'Quiet. Move closer, or set the boost to 4× or 8×.' : best > 0.95 ? 'Very loud, which can distort. Move back a little or lower the boost.' : 'Sounds good. ORBIT can hear you clearly.';
+      const v = document.getElementById('mic-verdict'); if (v) v.textContent = S.micVerdict; // survives screen redraws
+      if (wasOff && voice.mode === 'off') voice.closeMic();
+    }, 6000);
+  });
+  const panelEl = panel('Microphone',
+    h('ul', { class: 'list' },
+      h('li', {}, h('span', { class: 'grow' }, 'Microphone'), mics),
+      h('li', {}, h('span', { class: 'grow' }, 'Level', verdict), test),
+      h('li', {}, meter),
+      h('li', {}, h('span', { class: 'grow' }, 'Volume boost', h('div', { class: 'muted' }, 'Raises quiet voices automatically so ORBIT hears you from across the room.')), boost),
+      h('li', {}, h('span', { class: 'grow' }, 'Noise reduction', h('div', { class: 'muted' }, 'Filters background noise. Turn off if ORBIT misses quiet speech.')), ns),
+      h('li', {}, h('span', { class: 'grow' }, 'Wait after I stop talking', h('div', { class: 'muted' }, 'Longer lets you pause mid-sentence without being cut off.')), patience)));
+  S.cleanupMic?.(); S.cleanupMic = off;
+  return panelEl;
 }
 
 // Voice gallery for the desktop app: built-in voices, downloadable natural voices, and cloud voices.
@@ -276,6 +341,12 @@ const VIEWS = {
       panel('Your devices', o.devices.length ? h('ul', { class: 'list' }, o.devices.map((d) => h('li', {},
         h('span', { class: `dot ${d.online ? 'on' : ''}` }),
         h('span', { class: 'grow' }, h('b', {}, d.name), h('div', { class: 'muted mono' }, `${d.platform} · ${d.online ? 'online' : `seen ${ago(d.lastSeen)}`}${d.status?.battery != null ? ` · ${d.status.battery}%` : ''}${d.status?.cpu != null ? ` · cpu ${d.status.cpu}%` : ''}`)),
+        h('button', { class: 'btn small', onclick: async (e) => {
+          const b = e.currentTarget; b.disabled = true; b.textContent = 'Checking…';
+          const r = await api('POST', `/api/devices/${d.id}/check`).catch((err) => ({ ok: false, steps: [{ name: 'Check', ok: false, message: err.message }] }));
+          b.disabled = false; b.textContent = 'Check';
+          toast(h('div', {}, h('b', {}, r.ok ? `${d.name} is working.` : `${d.name} has a problem.`), h('ul', { class: 'list' }, r.steps.map((st) => h('li', {}, h('span', { class: `tag ${st.ok ? 'ok' : 'bad'}` }, st.ok ? 'ok' : 'fix'), h('span', { class: 'grow', title: st.message }, `${st.name}: ${st.message}`))))), r.ok ? '' : 'bad', [h('button', { class: 'btn small' }, 'Close')]);
+        } }, 'Check'),
         h('button', { class: 'btn small', onclick: () => go('security') }, 'Permissions')))) : empty('No devices paired.')));
   },
 
@@ -341,6 +412,16 @@ const VIEWS = {
         h('li', {}, h('span', { class: `dot ${voice.ready ? 'on' : ''}` }), h('span', { class: 'grow' }, voice.ready ? 'Ready' : (S.models || 'Starting…'), h('div', { class: 'muted' }, 'Wake word, speech recognition and the voice all run on this computer. Audio is not sent anywhere for them.'))),
         h('li', {}, h('span', { class: 'grow' }, 'Wake word sensitivity', h('div', { class: 'muted' }, 'Higher hears you from further away but may wake by mistake more often.')),
           (() => { const r = h('input', { type: 'range', min: '0.02', max: '0.3', step: '0.02', 'aria-label': 'Wake word sensitivity', value: String(0.32 - (voice.info?.sensitivity ?? 0.08)) }); r.addEventListener('change', () => { native.setSensitivity(0.32 - +r.value); toast('Sensitivity updated. The voice engine is restarting.'); }); return r; })()),
+        (() => {
+          const sel = h('select', { id: 'stt', 'aria-label': 'Speech recognition' },
+            h('option', { value: 'device' }, 'On this computer (private)'),
+            h('option', { value: 'groq:whisper-large-v3-turbo' }, 'Groq Whisper large v3 turbo (fast, more accurate)'),
+            h('option', { value: 'groq:whisper-large-v3' }, 'Groq Whisper large v3 (most accurate)'));
+          native.getInfo().then((i) => { sel.value = i.stt || 'device'; note.textContent = i.hasGroq ? '' : 'Groq options need a Groq key (free tier available) under AI configuration.'; });
+          const note = h('div', { class: 'muted' });
+          sel.addEventListener('change', async () => { await native.setStt(sel.value); toast(sel.value === 'device' ? 'Speech recognition stays on this computer.' : 'Your spoken commands will be transcribed by Groq. "Hey Orbit" is still detected on this computer.'); });
+          return h('li', {}, h('span', { class: 'grow' }, 'Speech recognition', h('div', { class: 'muted' }, 'Groq Whisper understands names, accents and noisy rooms better. Only what you say after "Hey Orbit" is sent; if Groq is unavailable ORBIT uses the on-device result.'), note), sel);
+        })(),
         h('li', {}, h('span', { class: 'grow' }, 'Start ORBIT when I log in', h('div', { class: 'muted' }, 'Runs in the tray so "Hey Orbit" works without opening the app.')),
           (() => { const b = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Start ORBIT when I log in', 'aria-checked': String(!!voice.info?.launchAtLogin) }); b.addEventListener('click', async () => { const on = await native.setLaunchAtLogin(b.getAttribute('aria-checked') !== 'true'); b.setAttribute('aria-checked', String(on)); if (voice.info) voice.info.launchAtLogin = on; }); return b; })()),
         h('li', {}, h('span', { class: 'grow' }, 'Global push to talk', h('div', { class: 'muted' }, `Press ${native.platform === 'darwin' ? '⌥ Space' : 'Alt+Space'} in any app, speak, press again to send.`))))) : null;
@@ -353,6 +434,7 @@ const VIEWS = {
           h('li', {}, h('span', { class: 'grow' }, 'Stop everything instantly', h('div', { class: 'muted' }, 'Press Esc or say "stop listening".'))),
           h('li', {}, h('span', { class: 'grow' }, 'Speak replies to typed commands'), h('button', { class: 'switch', role: 'switch', 'aria-checked': String(!!s.voice.speakTyped), 'aria-label': 'Speak replies to typed commands', onclick: async (e) => { s.voice.speakTyped = !s.voice.speakTyped; S.speakReplies = s.voice.speakTyped; e.currentTarget.setAttribute('aria-checked', String(s.voice.speakTyped)); await save(); } }))),
         !voice.supported.stt ? h('p', { class: 'error-text' }, 'This browser has no speech recognition. Use Chrome or Edge.') : null),
+      native ? micPanel() : null,
       native ? voicePicker(rate, save) : null,
       native ? null : panel('Voice',
         h('div', { class: 'field' }, h('label', { class: 'label', for: 'v-name' }, 'Voice'), vSel),

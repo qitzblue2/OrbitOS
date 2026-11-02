@@ -5,6 +5,7 @@ import dgram from 'node:dgram';
 import { parseIntent, stripWake } from './intents.js';
 import { CAPABILITIES } from './devices.js';
 
+const ACTIONY = /\b(open|launch|start|run|close|quit|exit|turn|switch|set|put|play|pause|resume|skip|next|mute|unmute|lock|shut|restart|search|google|look up|screenshot|dim|brighten|raise|lower|increase|decrease|louder|quieter|volume|lights?|music|song|playlist|text|message|activate|fire up|bring up|need)\b/i;
 const YES = /^(yes|yeah|yep|confirm|confirmed|do it|go ahead|proceed|sure|affirmative)\b/i;
 const NO = /^(no|nope|cancel|stop|don't|abort|never ?mind)\b/i;
 
@@ -58,6 +59,17 @@ export class Engine {
       const res = await this.execute(intent, { sessionId, emit, utterance: said });
       if (res?.handled) return;
       if (res) return this.finish(emit, res, started, said, intent);
+    }
+    // Sounds like an action but wasn't phrased as one: let the fast model map it to a command.
+    if (ACTIONY.test(said)) {
+      const routed = await this.brain.route(stripWake(said), { routines: this.automations.routines().map((r) => r.name) });
+      const second = routed && parseIntent(routed);
+      if (second && second.type !== 'greeting') {
+        emit('routed', { from: said, to: routed });
+        const res = await this.execute(second, { sessionId, emit, utterance: said });
+        if (res?.handled) return;
+        if (res) return this.finish(emit, res, started, said, second);
+      }
     }
     return this.think({ text: stripWake(said) || said, sessionId, emit, started });
   }

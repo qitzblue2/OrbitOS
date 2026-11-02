@@ -14,6 +14,7 @@ const SAMPLE_RATE = 16000;
 const WAKE_KEYWORDS = [
   '▁HE Y ▁OR B IT :2.0 #0.25 @HEY_ORBIT',
   '▁HE Y ▁O R B IT :2.0 #0.25 @HEY_ORBIT',
+  '▁HI ▁OR B IT :2.0 #0.25 @HI_ORBIT',
   '▁O K ▁OR B IT :2.0 #0.25 @OK_ORBIT',
 ].join('\n');
 
@@ -51,7 +52,7 @@ function voiceDir(dirs, id) { const v = VOICES[id]; if (!v) return null; for (co
 function voiceInstalled(dirs, id) { return !!voiceDir(dirs, id); }
 
 class LocalSpeech extends EventEmitter {
-  constructor(modelsDir, { sensitivity = 0.08, threads = 1, voice = 'alan', voiceDirs = [] } = {}) {
+  constructor(modelsDir, { sensitivity = 0.06, threads = 1, voice = 'alan', voiceDirs = [], patience = 1.0 } = {}) {
     super();
     this.voiceDirs = [modelsDir, ...voiceDirs]; this.ttsCache = new Map();
     const kd = path.join(modelsDir, MODELS.kws), ad = path.join(modelsDir, MODELS.asr);
@@ -82,9 +83,9 @@ class LocalSpeech extends EventEmitter {
       },
       decodingMethod: 'greedy_search',
       enableEndpoint: true,
-      rule1MinTrailingSilence: 2.0,  // nothing said yet: give up after 2 s of silence
-      rule2MinTrailingSilence: 0.7,  // end of turn after 0.7 s of silence following speech
-      rule3MinUtteranceLength: 15,   // hard cap per utterance
+      rule1MinTrailingSilence: 3.0,       // after the wake word, wait up to 3 s for you to start
+      rule2MinTrailingSilence: patience,  // end of turn after this much silence (adjustable: pauses mid-sentence)
+      rule3MinUtteranceLength: 20,        // hard cap per utterance
     });
     this.setVoice(voice);
     this.kwsStream = this.kws.createStream();
@@ -99,7 +100,23 @@ class LocalSpeech extends EventEmitter {
   accept(samples) {
     this.remember(samples);
     if (this.mode === 'wake') {
-      this.kwsStream.acceptWaveform({ samples, sampleRate: SAMPLE_RATE });
+      // A long-running keyword spotter misses far more wake words than a fresh one
+      // (measured: 6–9/24 vs 24/24 on identical audio). So every time speech starts after a
+      // pause, start a fresh detector primed with the last 1.1 s of audio, and feed it from there.
+      let e = 0; for (let i = 0; i < samples.length; i++) e += samples[i] * samples[i];
+      const rms = Math.sqrt(e / Math.max(1, samples.length));
+      this.floor = this.floor == null ? rms : rms < this.floor ? this.floor * 0.7 + rms * 0.3 : Math.min(this.floor * 1.01, rms);
+      const loud = rms > Math.max(this.floor * 2.5, 0.002);
+      const onset = loud && (this.quiet || 0) >= SAMPLE_RATE * 0.45;
+      this.quiet = loud ? 0 : (this.quiet || 0) + samples.length;
+      if (onset) {
+        this.kwsStream = this.kws.createStream();
+        const pre = this.preroll();
+        this.kwsStream.acceptWaveform({ samples: pre.subarray(Math.max(0, pre.length - SAMPLE_RATE * 1.1)), sampleRate: SAMPLE_RATE }); // includes this chunk
+      } else {
+        this.kwsStream.acceptWaveform({ samples, sampleRate: SAMPLE_RATE });
+      }
+
       while (this.kws.isReady(this.kwsStream)) {
         this.kws.decode(this.kwsStream);
         const r = this.kws.getResult(this.kwsStream);
@@ -108,6 +125,7 @@ class LocalSpeech extends EventEmitter {
       return;
     }
     this.asrStream.acceptWaveform({ samples, sampleRate: SAMPLE_RATE });
+    if (this.cmdLen < SAMPLE_RATE * 30) { this.cmdAudio.push(Float32Array.from(samples)); this.cmdLen += samples.length; } // kept for optional cloud transcription
     while (this.asr.isReady(this.asrStream)) this.asr.decode(this.asrStream);
     const text = stripWake(this.asr.getResult(this.asrStream).text);
     if (text && text !== this.lastText) { this.lastText = text; this.deadline = 0; this.emit('partial', text.toLowerCase()); }
@@ -125,7 +143,8 @@ class LocalSpeech extends EventEmitter {
   startCommand({ timeoutMs = 0, ptt = false, preroll = false } = {}) {
     this.mode = 'command'; this.ptt = ptt; this.lastText = '';
     this.asrStream = this.asr.createStream();
-    if (preroll && this.ring) this.asrStream.acceptWaveform({ samples: this.preroll(), sampleRate: SAMPLE_RATE });
+    this.cmdAudio = []; this.cmdLen = 0;
+    if (preroll && this.ring) { const pre = this.preroll(); this.asrStream.acceptWaveform({ samples: pre, sampleRate: SAMPLE_RATE }); this.cmdAudio.push(pre); this.cmdLen = pre.length; }
     this.deadline = timeoutMs ? Date.now() + timeoutMs : 0;
     this.emit('listening', { ptt });
   }
@@ -139,14 +158,17 @@ class LocalSpeech extends EventEmitter {
     const text = stripWake(this.asr.getResult(this.asrStream).text);
     this.asrStream = null; this.mode = 'wake'; this.ptt = false;
     this.kwsStream = this.kws.createStream(); // fresh wake detector for the next turn
-    this.emit('utterance', text);
+    const audio = new Float32Array(this.cmdLen); let o = 0;
+    for (const c of this.cmdAudio) { audio.set(c.subarray(0, Math.min(c.length, audio.length - o)), o); o += c.length; if (o >= audio.length) break; }
+    this.cmdAudio = []; this.cmdLen = 0;
+    this.emit('utterance', text, audio);
   }
 
   // After ORBIT replies, listen briefly for a follow-up without requiring the wake word.
   followUp(ms = 8000) { if (this.mode === 'wake') this.startCommand({ timeoutMs: ms }); }
   pttStart() { this.startCommand({ ptt: true }); }
   pttEnd() { this.finishCommand(); }
-  cancel() { if (this.mode === 'command') { this.asrStream = null; this.mode = 'wake'; this.ptt = false; } }
+  cancel() { if (this.mode === 'command') { this.asrStream = null; this.mode = 'wake'; this.ptt = false; this.kwsStream = this.kws.createStream(); } }
 
   // Loads a voice once and keeps it ready. Unknown or missing voices fall back to the bundled default.
   setVoice(id) {

@@ -30,6 +30,19 @@ Choose a voice on the **Voice** screen, then use **Preview** to hear it.
 
 Speech is played gaplessly, with faded joins. Sentences are grouped into longer phrases so the intonation flows, and markdown, code and links are never read aloud.
 
+### If ORBIT doesn't hear you or doesn't do anything
+
+- **Voice › Microphone:**
+  - **Test** shows whether ORBIT can hear you.
+  - **Microphone** picks the right mic.
+  - **Volume boost** helps quiet voices.
+  - **Noise reduction** can be turned off if quiet speech is missed.
+  - **Wait after I stop talking** keeps ORBIT from cutting you off mid-sentence.
+- **Voice › Speech recognition:** switch to Groq Whisper (free tier) for better accuracy with names, accents and noisy rooms. "Hey Orbit" is still detected on your computer, and only your command is sent.
+- **Devices › Check:** confirms ORBIT can reach and control the computer, and lists actions that are switched off. Locking, shutdown, messages and screenshots are off until you allow them under **Security**.
+- **Speak naturally:** "Can you open Spotify for me?" works. With an AI key, looser requests such as "put some music on" or "make it quieter" are turned into commands too, and still go through the same permission checks.
+- **On Windows:** apps open through the Start menu, so anything listed there, Microsoft Store apps included, opens by name.
+
 ### Choosing the AI model
 
 - **Quick switch:** click the model name in the top bar to pick any model your keys can use. The list comes live from each provider.

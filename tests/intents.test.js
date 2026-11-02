@@ -50,3 +50,17 @@ test('speech misspellings snap to command words', async () => {
   assert.equal(normalizeSpeech('tell me a story'), 'tell me a story', 'ordinary words are untouched');
   assert.equal(p('lock my computere').capability, 'system.lock');
 });
+
+test('natural phrasing works without an AI', () => {
+  assert.deepEqual(p('Orbit, can you open Spotify for me?').params, { app: 'spotify' });
+  assert.deepEqual(p('Hey Orbit, could you please open Chrome').params, { app: 'chrome' });
+  assert.equal(p('please lock my computer now').capability, 'system.lock');
+  assert.equal(p("I'd like you to turn the volume down, thanks").params.delta, -15);
+  assert.equal(p('can you turn off the lights').type, 'home.lights');
+  assert.equal(p('open spotify orbit').params.app, 'spotify');
+  assert.equal(p('can you explain how vaccines work'), null, 'questions still go to the AI');
+});
+
+test('more ways to ask for computer status', () => {
+  for (const t of ['can you check my computer status for me', "what's my battery level", 'how is my laptop doing', 'how much battery is left', 'show me the system status']) assert.equal(p(t)?.capability, 'system.status', t);
+});

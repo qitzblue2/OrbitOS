@@ -73,6 +73,22 @@ export function createOrbit(cfg = config) {
     'GET /api/devices': () => devices.list(),
     'POST /api/devices/pairing-code': () => devices.createPairingCode(),
     'PATCH /api/devices/:id': (b, id) => { if (b.name) devices.rename(id, b.name); if (b.permissions) { audit.write({ kind: 'security', action: 'permissions', deviceId: id, permissions: b.permissions }); return devices.setPermissions(id, b.permissions); } return devices.public(devices.get(id)); },
+    'POST /api/devices/:id/check': async (b, id) => {
+      const d = devices.get(id);
+      if (!d || d.revoked) return { ok: false, steps: [{ name: 'Device', ok: false, message: 'Not paired.' }] };
+      const steps = [];
+      steps.push({ name: 'Connected', ok: devices.sockets.has(id), message: devices.sockets.has(id) ? 'ORBIT is linked to this computer.' : 'Not connected. Make sure ORBIT (or the Companion) is running on it.' });
+      if (devices.sockets.has(id)) {
+        for (const [cap, params, name] of [['system.status', {}, 'Reads status'], ['notify.show', { title: 'ORBIT', text: 'ORBIT can reach this computer.' }, 'Shows a notification']]) {
+          const t0 = performance.now();
+          const r = await engine.sendToDevice(d, cap, params);
+          steps.push({ name, ok: r.ok, message: r.ok ? `Worked in ${Math.round(performance.now() - t0)} ms.` : r.message });
+        }
+      }
+      const off = Object.entries(CAPABILITIES).filter(([c]) => !d.permissions.includes(c)).map(([, v]) => v.label);
+      steps.push({ name: 'Permissions', ok: true, message: off.length ? `Switched off: ${off.join(', ')}. Turn these on under Security if you want ORBIT to do them.` : 'Everything is allowed.' });
+      return { ok: steps.every((s) => s.ok), steps };
+    },
     'DELETE /api/devices/:id': (b, id) => { audit.write({ kind: 'security', action: 'revoke', deviceId: id }); return { ok: devices.revoke(id) }; },
     'GET /api/automations': () => automations.routines(),
     'POST /api/automations': (b) => automations.upsert(b),

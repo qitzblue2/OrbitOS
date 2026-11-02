@@ -25,7 +25,7 @@ app.on('second-instance', () => showMain());
 const settingsFile = () => path.join(app.getPath('userData'), 'app-settings.json');
 function loadSettings() {
   try { state.settings = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch { state.settings = {}; }
-  state.settings = { listenOnStart: false, sensitivity: 0.08, voice: 'alan', ...state.settings };
+  state.settings = { listenOnStart: false, sensitivity: 0.06, voice: 'alan', stt: 'device', patience: 1.0, ...state.settings };
 }
 function saveSettings() { fs.writeFileSync(settingsFile(), JSON.stringify(state.settings, null, 2)); }
 
@@ -86,7 +86,7 @@ async function startSpeech() {
   worker.on('exit', () => { state.speechReady = false; if (!quitting) setTimeout(startSpeech, 1000); });
   state.modelsDir = dir;
   const localVoice = state.settings.voice.includes(':') && !state.settings.voice.startsWith('kokoro:') ? (state.settings.localVoice || 'alan') : state.settings.voice;
-  worker.postMessage({ type: 'boot', modelsDir: dir, sensitivity: state.settings.sensitivity, voice: localVoice, voiceDirs: [path.join(app.getPath('userData'), 'models')] });
+  worker.postMessage({ type: 'boot', modelsDir: dir, sensitivity: state.settings.sensitivity, patience: state.settings.patience, voice: localVoice, voiceDirs: [path.join(app.getPath('userData'), 'models')] });
 }
 
 const pendingSpeech = new Map();
@@ -100,7 +100,22 @@ function onSpeech(m) {
     case 'wake': showOverlay(); toOverlay({ phase: 'listening', heard: '' }); broadcast('wake', m.data); break;
     case 'listening': broadcast('listening', m.data); break;
     case 'partial': toOverlay({ heard: m.data }); broadcast('partial', m.data); break;
-    case 'utterance': toOverlay({ heard: m.data, phase: m.data ? 'processing' : 'idle' }); broadcast('utterance', m.data); break;
+    case 'utterance': {
+      toOverlay({ heard: m.data, phase: m.data || m.audio ? 'processing' : 'idle' });
+      const stt = state.settings.stt;
+      if (!m.data && !stt.startsWith('groq:')) { toOverlay({ phase: 'idle', reply: "Didn't catch that. Try again a little louder." }); broadcast('missed', true); break; }
+      if (!stt.startsWith('groq:') || !m.audio) { broadcast('utterance', m.data); break; }
+      // Optional: a more accurate final transcript from Groq Whisper; on-device text if anything goes wrong.
+      load('server', 'voice', 'stt.js').then(({ bestTranscript }) => bestTranscript({
+        local: m.data, audio: Float32Array.from(m.audio), keyring: orbit.keyring, model: stt.slice(5), stripWake: require('./speech.js').stripWake,
+      })).then((r) => {
+        if (r.note) log('speech recognition:', r.note);
+        if (!r.text) { toOverlay({ phase: 'idle', reply: "Didn't catch that. Try again a little louder." }); broadcast('missed', true); return; }
+        toOverlay({ heard: r.text });
+        broadcast('utterance', r.text);
+      });
+      break;
+    }
     case 'voice': { const done = state.voiceWait; state.voiceWait = null; done?.(m); break; }
     case 'speech': { const done = pendingSpeech.get(m.id); pendingSpeech.delete(m.id); done?.(m.samples ? { samples: Float32Array.from(m.samples), sampleRate: m.sampleRate } : null); break; }
   }
@@ -161,7 +176,9 @@ ipcMain.handle('speak', async (_e, text, speed) => {
   }
   return localSpeak(text, speed);
 });
-ipcMain.handle('info', () => ({ speechReady: state.speechReady, launchAtLogin: app.getLoginItemSettings().openAtLogin, sensitivity: state.settings.sensitivity, listenOnStart: state.settings.listenOnStart, version: app.getVersion() }));
+ipcMain.handle('info', () => ({ patience: state.settings.patience, stt: state.settings.stt, hasGroq: !!orbit?.keyring.data.keys.some((k) => k.provider === 'groq' && k.enabled), speechReady: state.speechReady, launchAtLogin: app.getLoginItemSettings().openAtLogin, sensitivity: state.settings.sensitivity, listenOnStart: state.settings.listenOnStart, version: app.getVersion() }));
+ipcMain.handle('setPatience', (_e, v) => { state.settings.patience = Math.max(0.5, Math.min(2.5, +v)); saveSettings(); if (worker) worker.kill(); return state.settings.patience; });
+ipcMain.handle('setStt', (_e, v) => { if (!/^(device|groq:whisper-large-v3(-turbo)?)$/.test(v)) throw new Error('Unknown option'); state.settings.stt = v; saveSettings(); return v; });
 ipcMain.handle('launchAtLogin', (_e, on) => { app.setLoginItemSettings({ openAtLogin: !!on, openAsHidden: true, args: ['--hidden'] }); return app.getLoginItemSettings().openAtLogin; });
 ipcMain.on('report', (_e, s) => {
   state.phase = s.phase || state.phase;

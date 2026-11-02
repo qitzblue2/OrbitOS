@@ -89,3 +89,49 @@ test('keyring: voice keys need their extras and never answer questions', async (
   assert.equal(f.calls.at(-1).url, 'https://westeurope.tts.speech.microsoft.com/cognitiveservices/v1', 'stored region is used');
   await assert.rejects(cloudSpeak(kr, 'hume:Ava', 'Hi', 1, f), /No Hume key/);
 });
+
+// ---- Groq Whisper speech recognition ----
+import { groqTranscribe, bestTranscript, encodeWav } from '../server/voice/stt.js';
+
+const tone = (sec) => Float32Array.from({ length: 16000 * sec }, (_, i) => Math.sin(i / 10) * 0.3);
+
+test('Groq Whisper: multipart request with model, language and vocabulary prompt', async () => {
+  let seen;
+  const f = async (url, init) => { seen = { url, init, form: init.body }; return new Response(JSON.stringify({ text: ' Hey Orbit, open Spotify.' })); };
+  const text = await groqTranscribe({ key: 'gsk_test', audio: tone(1), model: 'whisper-large-v3', fetchImpl: f });
+  assert.equal(text, 'Hey Orbit, open Spotify.');
+  assert.equal(seen.url, 'https://api.groq.com/openai/v1/audio/transcriptions');
+  assert.equal(seen.init.headers.authorization, 'Bearer gsk_test');
+  assert.equal(seen.form.get('model'), 'whisper-large-v3');
+  assert.equal(seen.form.get('language'), 'en');
+  assert.match(seen.form.get('prompt'), /Spotify/);
+  const file = seen.form.get('file');
+  assert.equal(file.type, 'audio/wav');
+  assert.equal(decodeWav(new Uint8Array(await file.arrayBuffer())).samples.length, 16000);
+});
+
+test('Groq Whisper: better transcript when it works, on-device text whenever it does not', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-stt-'));
+  const kr = new Keyring(dir);
+  const strip = (t) => t.replace(/^(hey |ok )?orbit[,.]?\s*/, '');
+  const reply = (body, status = 200) => async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
+
+  // No Groq key: on-device result, nothing sent
+  assert.deepEqual(await bestTranscript({ local: 'open spotti', audio: tone(1), keyring: kr, fetchImpl: () => assert.fail('should not call') }), { text: 'open spotti', source: 'device' });
+
+  kr.add({ provider: 'groq', key: 'gsk_' + 'z'.repeat(30) });
+  const ok = await bestTranscript({ local: 'open spotti', audio: tone(1), keyring: kr, stripWake: strip, fetchImpl: reply({ text: 'Hey Orbit, open Spotify.' }) });
+  assert.equal(ok.text, 'open spotify'); assert.equal(ok.source, 'groq');
+
+  const limited = await bestTranscript({ local: 'open spotti', audio: tone(1), keyring: kr, fetchImpl: reply('slow down', 429) });
+  assert.equal(limited.text, 'open spotti'); assert.match(limited.note, /free limit/);
+
+  const ghost = await bestTranscript({ local: 'lock my computer', audio: tone(1), keyring: kr, fetchImpl: reply({ text: 'Thank you.' }) });
+  assert.equal(ghost.text, 'lock my computer', 'Whisper silence hallucinations are ignored');
+
+  const silent = await bestTranscript({ local: '', audio: new Float32Array(16000), keyring: kr, fetchImpl: () => assert.fail('silence is not sent') });
+  assert.equal(silent.text, '');
+
+  const offline = await bestTranscript({ local: 'what time is it', audio: tone(1), keyring: kr, fetchImpl: async () => { throw new TypeError('fetch failed'); } });
+  assert.equal(offline.text, 'what time is it');
+});

@@ -30,11 +30,12 @@ const DEFAULT_LOCAL = {
 };
 
 const APP_ALIASES = {
-  darwin: { chrome: 'Google Chrome', 'google chrome': 'Google Chrome', 'visual studio code': 'Visual Studio Code', 'vs code': 'Visual Studio Code', vscode: 'Visual Studio Code', code: 'Visual Studio Code', terminal: 'Terminal', spotify: 'Spotify', discord: 'Discord', steam: 'Steam', safari: 'Safari', slack: 'Slack', netflix: 'Safari' },
-  win32: { chrome: 'chrome', 'google chrome': 'chrome', 'visual studio code': 'code', 'vs code': 'code', vscode: 'code', terminal: 'wt', spotify: 'spotify', discord: 'discord', steam: 'steam', edge: 'msedge', notepad: 'notepad', netflix: 'https://www.netflix.com' },
+  darwin: { youtube: 'https://www.youtube.com', 'file explorer': 'Finder', files: 'Finder', calculator: 'Calculator', settings: 'System Settings', chrome: 'Google Chrome', 'google chrome': 'Google Chrome', 'visual studio code': 'Visual Studio Code', 'vs code': 'Visual Studio Code', vscode: 'Visual Studio Code', code: 'Visual Studio Code', terminal: 'Terminal', spotify: 'Spotify', discord: 'Discord', steam: 'Steam', safari: 'Safari', slack: 'Slack', netflix: 'Safari' },
+  // Start-menu names: Windows launches apps by these (including Microsoft Store apps).
+  win32: { chrome: 'Google Chrome', 'google chrome': 'Google Chrome', 'visual studio code': 'Visual Studio Code', 'vs code': 'Visual Studio Code', vscode: 'Visual Studio Code', code: 'Visual Studio Code', terminal: 'Terminal', 'command prompt': 'Command Prompt', spotify: 'Spotify', discord: 'Discord', steam: 'Steam', edge: 'Microsoft Edge', 'microsoft edge': 'Microsoft Edge', notepad: 'Notepad', calculator: 'Calculator', settings: 'Settings', 'file explorer': 'File Explorer', explorer: 'File Explorer', files: 'File Explorer', word: 'Word', excel: 'Excel', powerpoint: 'PowerPoint', outlook: 'Outlook', teams: 'Microsoft Teams', netflix: 'https://www.netflix.com', youtube: 'https://www.youtube.com' },
   linux: { chrome: 'google-chrome', 'google chrome': 'google-chrome', 'visual studio code': 'code', 'vs code': 'code', vscode: 'code', terminal: 'x-terminal-emulator', spotify: 'spotify', discord: 'discord', steam: 'steam', firefox: 'firefox', netflix: 'https://www.netflix.com' },
 };
-const SAFE_NAME = /^[\w .+&'()-]{1,60}$/;
+const SAFE_NAME = /^[\w .+&'()-]{1,60}$/; // never allows quotes, $, backticks or ; (safe inside PowerShell strings)
 
 function resolveApp(name, local) {
   const key = String(name).toLowerCase().trim();
@@ -51,9 +52,20 @@ const handlers = {
   async 'app.open'({ app }, local) {
     const a = resolveApp(app, local);
     if (/^https:\/\//.test(a)) return handlers['browser.open']({ url: a });
-    if (PLATFORM === 'darwin') await run('open', ['-a', a]);
-    else if (PLATFORM === 'win32') await ps(`Start-Process -FilePath ${JSON.stringify(a)}`);
-    else { const c = execFileDetached(a, []); if (!c) throw new Error(`${a} isn't installed.`); }
+    if (PLATFORM === 'darwin') {
+      await run('open', ['-a', a]).catch(() => { throw new Error(`I couldn't find an app called ${app} on this Mac.`); });
+    } else if (PLATFORM === 'win32') {
+      // Look the app up in the Start menu (exact name first, then partial), which covers normal
+      // programs and Microsoft Store apps alike; fall back to anything on the PATH.
+      const { stdout } = await ps(`$n = ${JSON.stringify(a)}
+$all = Get-StartApps
+$hit = $all | Where-Object { $_.Name -eq $n } | Select-Object -First 1
+if (-not $hit) { $hit = $all | Where-Object { $_.Name -like "*$n*" } | Sort-Object { $_.Name.Length } | Select-Object -First 1 }
+if ($hit) { Start-Process ("shell:AppsFolder\" + $hit.AppID); "OPENED:" + $hit.Name }
+else { try { Start-Process -FilePath $n -ErrorAction Stop; "OPENED:" + $n } catch { "NOTFOUND" } }`);
+      if (/NOTFOUND/.test(stdout) || !/OPENED:/.test(stdout)) throw new Error(`I couldn't find an app called ${app} on this computer.`);
+      return { message: `Opened ${stdout.split('OPENED:')[1].trim()}.` };
+    } else { const c = execFileDetached(a, []); if (!c) throw new Error(`${a} isn't installed.`); }
     return { message: `Opened ${app}.` };
   },
   async 'browser.open'({ url }) {
@@ -69,7 +81,13 @@ const handlers = {
   async 'app.close'({ app }, local) {
     const a = resolveApp(app, local);
     if (PLATFORM === 'darwin') await run('osascript', ['-e', `tell application ${JSON.stringify(a)} to quit`]);
-    else if (PLATFORM === 'win32') await run('taskkill', ['/IM', `${a}.exe`]);
+    else if (PLATFORM === 'win32') {
+      // Politely close matching windows (like clicking X), matched by process or window name.
+      const { stdout } = await ps(`$n = ${JSON.stringify(a)}; $k = $n -replace '\\s',''; $c = 0
+Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and ($_.ProcessName -like "*$k*" -or $_.MainWindowTitle -like "*$n*") } | ForEach-Object { [void]$_.CloseMainWindow(); $c++ }
+if ($c) { "CLOSED:$c" } else { "NOTFOUND" }`);
+      if (!/CLOSED/.test(stdout)) throw new Error(`${app} doesn't seem to be open.`);
+    }
     else await run('pkill', ['-x', a]);
     return { message: `Closed ${app}.` };
   },
@@ -121,7 +139,10 @@ const handlers = {
   async 'system.status'() { return { message: 'Status read.', data: await status() }; },
   async 'notify.show'({ title = 'ORBIT', text }) {
     if (PLATFORM === 'darwin') await run('osascript', ['-e', `display notification ${JSON.stringify(text)} with title ${JSON.stringify(title)}`]);
-    else if (PLATFORM === 'win32') await ps(`[void][System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms'); $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; $n.ShowBalloonTip(5000,${JSON.stringify(title)},${JSON.stringify(text)},'Info')`);
+    else if (PLATFORM === 'win32') {
+      // Runs detached so the balloon stays up for 6 s without delaying ORBIT's reply.
+      execFileDetached('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', `Add-Type -AssemblyName System.Windows.Forms,System.Drawing; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; $n.ShowBalloonTip(6000,${JSON.stringify(title)},${JSON.stringify(text)},'Info'); Start-Sleep -Seconds 7; $n.Dispose()`]);
+    }
     else await run('notify-send', [title, text]);
     return { message: 'Shown.' };
   },

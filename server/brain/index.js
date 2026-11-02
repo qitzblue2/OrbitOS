@@ -55,13 +55,13 @@ export class Brain {
 
   // Streams an answer. Tries each candidate key in turn: a key that fails before any text arrives
   // (bad key, rate limit, outage) is cooled down and the next key or provider takes over seamlessly.
-  async *answer({ text, history = [], memories = [], devices = [], persona = {}, image = null, signal, tier: forced }) {
+  async *answer({ text, history = [], memories = [], devices = [], persona = {}, image = null, signal, tier: forced, system: systemOverride, maxTokens: maxOverride }) {
     const tier = forced || chooseTier(text, { hasImage: !!image });
     const content = image
       ? [{ type: 'image', source: { type: 'base64', media_type: image.mediaType || 'image/png', data: image.data } }, { type: 'text', text }]
       : text;
     const messages = [...history.slice(-12), { role: 'user', content }];
-    const system = personaPrompt({ ...persona, memories, devices });
+    const system = systemOverride || personaPrompt({ ...persona, memories, devices });
     const candidates = this.keyring.candidates(tier, { needVision: !!image });
     const errors = [];
     for (const { key, model } of candidates) {
@@ -69,7 +69,7 @@ export class Brain {
       let started = false;
       try {
         for await (const delta of this.client(key).stream({
-          model, system, messages, maxTokens: tier === 'reasoning' ? 2048 : 512, signal,
+          model, system, messages, maxTokens: maxOverride || (tier === 'reasoning' ? 2048 : 512), signal,
           webSearch: provider.webSearch && needsWeb(text),
         })) {
           if (!started) { started = true; yield { meta: { tier, model, provider: key.provider, key: key.label, failovers: errors.length } }; }
@@ -131,6 +131,27 @@ export class Brain {
       if (!best || score > best.score || (score === best.score && m.length < best.model.length)) best = { provider, model: m, score };
     }
     return best;
+  }
+
+  // Turns a loosely worded request ("put some music on") into one of ORBIT's own commands,
+  // which then runs through the normal permission and confirmation checks. Returns null for chat.
+  async route(text, { routines = [], signal } = {}) {
+    if (this.status().provider === 'offline') return null;
+    const system = [
+      "You translate a person's request into exactly ONE command for a computer assistant, or reply NONE.",
+      'Commands (fill in the <blanks>):',
+      'open <app> | close <app> | search for <query> | set volume to <0-100> | turn the volume up | turn the volume down | mute | unmute',
+      'play music | pause music | next track | previous track | take a screenshot | look at my screen | lock my computer | device status',
+      'turn on the lights | turn off the lights | set the <room> lights to <0-100> percent | set the thermostat to <number>',
+      `start <routine> mode (routines: ${routines.join(', ') || 'none'}) | remember that <fact> | switch to <model name>`,
+      'Reply NONE for questions, conversation, or anything not in the list. Reply with the command only, no punctuation or explanation.',
+    ].join('\n');
+    let out = '';
+    try {
+      for await (const p of this.answer({ text, tier: 'fast', system, maxTokens: 30, signal: signal || AbortSignal.timeout(6000) })) if (p.delta) out += p.delta;
+    } catch { return null; }
+    out = out.trim().split('\n')[0].replace(/^["'`]|["'`.]$/g, '').trim();
+    return !out || /^none\b/i.test(out) ? null : out;
   }
 
   // A tiny real request to confirm a key works.

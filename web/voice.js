@@ -189,6 +189,7 @@ export class NativeVoice extends EventTarget {
     native.on('utterance', (t) => { if (t) this.emit('utterance', { text: t, source: 'voice' }); else this.emit('state', 'idle'); });
     native.on('mic', ({ enabled }) => this.setMode(enabled ? 'wake' : 'off'));
     native.on('ptt-toggle', (down) => (down ? this.pttStart() : this.pttEnd()));
+    native.on('missed', () => { this.cue('miss'); this.emit('state', 'idle'); this.emit('missed', true); });
     native.getInfo().then((i) => { this.ready = i.speechReady; this.info = i; this.emit('ready', this.ready); });
   }
   emit(type, detail) { this.dispatchEvent(new CustomEvent(type, { detail })); }
@@ -202,22 +203,47 @@ export class NativeVoice extends EventTarget {
     return this.ready;
   }
 
+  // Microphone preferences (which mic, noise reduction, boost), remembered on this computer.
+  get micPrefs() { try { return { deviceId: '', noiseSuppression: true, boost: 'auto', ...JSON.parse(localStorage.getItem('orbit.mic') || '{}') }; } catch { return { deviceId: '', noiseSuppression: true, boost: 'auto' }; } }
+  async setMicPrefs(patch) {
+    const p = { ...this.micPrefs, ...patch };
+    try { localStorage.setItem('orbit.mic', JSON.stringify(p)); } catch {}
+    if (patch.boost !== undefined) this.node?.port.postMessage({ boost: p.boost });
+    if ((patch.deviceId !== undefined || patch.noiseSuppression !== undefined) && this.stream) { this.closeMic(); await this.openMic(); }
+    return p;
+  }
+  async listMics() {
+    const all = await navigator.mediaDevices.enumerateDevices();
+    return all.filter((d) => d.kind === 'audioinput').map((d, i) => ({ id: d.deviceId, label: d.label || `Microphone ${i + 1}` }));
+  }
+
   async openMic() {
     if (this.stream) return;
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+    const p = this.micPrefs;
+    const audio = { echoCancellation: true, noiseSuppression: p.noiseSuppression, autoGainControl: true, channelCount: 1 };
+    if (p.deviceId) audio.deviceId = { exact: p.deviceId };
+    try { this.stream = await navigator.mediaDevices.getUserMedia({ audio }); }
+    catch (e) {
+      if (!p.deviceId) throw e;
+      delete audio.deviceId; this.stream = await navigator.mediaDevices.getUserMedia({ audio }); // chosen mic unplugged: use the default
+      this.emit('error', 'Your chosen microphone is not connected, so ORBIT is using the default one.');
+    }
     this.ctx = new AudioContext({ sampleRate: 16000 });
     await this.ctx.audioWorklet.addModule('pcm-worklet.js');
     const src = this.ctx.createMediaStreamSource(this.stream);
     this.node = new AudioWorkletNode(this.ctx, 'pcm-collector');
+    this.node.port.postMessage({ boost: p.boost });
     this.node.port.onmessage = (e) => {
-      const x = e.data;
-      let sum = 0; for (let i = 0; i < x.length; i++) sum += x[i] * x[i];
-      const level = Math.min(1, Math.sqrt(sum / x.length) * 14);
+      const { samples: x, raw, gain } = e.data;
+      const level = Math.min(1, raw * gain * 14);
       this.emit('level', level);
+      this.emit('mic-meter', { raw, gain, level });
       if (this.speaking) { if (level > 0.45) this.interrupt('voice'); return; } // don't feed ORBIT's own voice to the wake detector
       this.n.audio(x);
     };
     src.connect(this.node);
+    // Re-open automatically if the microphone is unplugged or switched.
+    this.stream.getAudioTracks()[0].addEventListener('ended', () => { if (this.mode !== 'off') { this.closeMic(); this.openMic().catch(() => this.emit('error', 'The microphone was disconnected.')); } });
   }
   closeMic() {
     this.stream?.getTracks().forEach((t) => t.stop());

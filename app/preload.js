@@ -14,9 +14,11 @@ contextBridge.exposeInMainWorld('orbitNative', {
   report: (state) => ipcRenderer.send('report', state),            // mirrors state to the tray and overlay
   setSensitivity: (v) => ipcRenderer.send('sensitivity', v),
   getInfo: () => ipcRenderer.invoke('info'),
+  setStt: (v) => ipcRenderer.invoke('setStt', v),
+  setPatience: (v) => ipcRenderer.invoke('setPatience', v),
   setLaunchAtLogin: (on) => ipcRenderer.invoke('launchAtLogin', on),
   on: (channel, fn) => {
-    const allowed = ['wake', 'partial', 'utterance', 'listening', 'speech-ready', 'speech-error', 'mic', 'ptt-toggle', 'models', 'voice-download'];
+    const allowed = ['wake', 'partial', 'utterance', 'listening', 'speech-ready', 'speech-error', 'mic', 'ptt-toggle', 'models', 'voice-download', 'missed'];
     if (!allowed.includes(channel)) return () => {};
     const h = (_e, data) => fn(data);
     ipcRenderer.on(channel, h);

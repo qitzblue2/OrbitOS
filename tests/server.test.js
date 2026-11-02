@@ -103,7 +103,7 @@ test('memory: add, recall, sensitive guard, delete', async () => {
 });
 
 test('AI fallback is honest when no key is configured', async () => {
-  assert.match((await say('explain quantum tunnelling')).reply, /isn't connected/);
+  assert.match((await say('explain quantum tunnelling')).reply, /add an AI key under AI configuration/);
 });
 
 test('revoking a device disconnects it and kills its token', async () => {
@@ -169,4 +169,19 @@ test('choose the AI model: live lists, menu switch and voice command', async () 
   // Per-tier choice from the menu
   st = (await api('PATCH', '/api/ai/routes', { fast: { provider: 'groq', model: 'llama-3.3-70b-versatile' }, reasoning: { provider: 'openai', model: 'o3' } })).body;
   assert.equal(st.fastModel, 'llama-3.3-70b-versatile'); assert.equal(st.reasoningModel, 'o3');
+});
+
+test('loosely worded requests are mapped to commands by the AI, with the same checks', async () => {
+  const { brain } = orbit;
+  const realRoute = brain.route.bind(brain);
+  const asked = [];
+  brain.status = (() => { const st = brain.status.bind(brain); return () => ({ ...st(), provider: 'openai' }); })();
+  brain.answer = async function* ({ system, text }) { asked.push(text); yield { meta: {} }; yield { delta: /music/.test(text) ? 'play music' : /quieter/.test(text) ? 'turn the volume down' : 'NONE' }; };
+  // A command the device isn't allowed to run is still refused after routing
+  const music = await say('put some music on');
+  assert.ok(music.events.some((e) => e.type === 'routed' && e.to === 'play music'), 'mapped to a command');
+  assert.match(music.reply, /isn't allowed|online|No devices|Playing|reported/, 'and still goes through device checks');
+  const r = await say('make it a bit quieter in here');
+  assert.ok(r.events.some((e) => e.type === 'routed' && e.to === 'turn the volume down'));
+  assert.equal(await realRoute('what is the capital of france'), null, 'questions are not commands');
 });

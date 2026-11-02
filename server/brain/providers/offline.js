@@ -2,7 +2,7 @@
 export class OfflineProvider {
   constructor() { this.name = 'offline'; }
   async *stream() {
-    const msg = "My reasoning engine isn't connected yet. Add an API key in the server's .env and I'll be able to answer that. Device commands, routines and memory still work.";
+    const msg = "I can't answer questions yet: add an AI key under AI configuration. I can still open apps, control your computer and lights, run routines and remember things.";
     for (const w of msg.split(/(?<= )/)) { yield w; await new Promise((r) => setTimeout(r, 12)); }
   }
 }

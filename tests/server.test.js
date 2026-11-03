@@ -185,3 +185,15 @@ test('loosely worded requests are mapped to commands by the AI, with the same ch
   assert.ok(r.events.some((e) => e.type === 'routed' && e.to === 'turn the volume down'));
   assert.equal(await realRoute('what is the capital of france'), null, 'questions are not commands');
 });
+
+test('Poe works as an OpenAI-compatible provider with bot names as models', async () => {
+  const { PROVIDERS, SUGGESTED } = await import('../server/brain/catalog.js');
+  assert.equal(PROVIDERS.poe.baseUrl, 'https://api.poe.com/v1');
+  assert.equal(PROVIDERS.poe.kind, 'openai');
+  assert.ok(SUGGESTED.poe.includes('Claude-Sonnet-4'));
+  const added = await api('POST', '/api/ai/keys', { provider: 'poe', key: 'poe_' + 'k'.repeat(30) });
+  assert.equal(added.status, 200);
+  assert.equal(added.body.baseUrl, 'https://api.poe.com/v1');
+  const st = (await api('PATCH', '/api/ai/routes', { fast: { provider: 'poe', model: 'GPT-4o' } })).body;
+  assert.equal(st.fastModel, 'GPT-4o');
+});

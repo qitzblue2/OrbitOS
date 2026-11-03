@@ -17,6 +17,8 @@ export const PROVIDERS = {
                 models: { fast: 'deepseek-chat', reasoning: 'deepseek-reasoner' }, keysUrl: 'https://platform.deepseek.com/api_keys' },
   openrouter: { label: 'OpenRouter (hundreds of models)', kind: 'openai', baseUrl: 'https://openrouter.ai/api/v1', keyHint: 'sk-or-…', keyPattern: /^sk-or-[\w-]{20,}$/, vision: true,
                 models: { fast: 'openai/gpt-4o-mini', reasoning: 'anthropic/claude-opus-4' }, keysUrl: 'https://openrouter.ai/keys' },
+  poe:        { label: 'Poe (many models, one key)', kind: 'openai', baseUrl: 'https://api.poe.com/v1', keyHint: 'Poe API key', keyPattern: /^[\w-]{20,}$/, vision: true,
+                models: { fast: 'GPT-4o-Mini', reasoning: 'Claude-Sonnet-4' }, keysUrl: 'https://poe.com/api_key' },
   ollama:     { label: 'Ollama (local, free)', kind: 'openai', baseUrl: 'http://127.0.0.1:11434/v1', keyHint: 'no key needed', keyOptional: true,
                 models: { fast: 'llama3.2', reasoning: 'llama3.1:70b' }, keysUrl: 'https://ollama.com' },
   // Voice-only providers (text-to-speech). They never answer questions.
@@ -40,6 +42,7 @@ export const SUGGESTED = {
   xai: ['grok-3', 'grok-3-mini'],
   deepseek: ['deepseek-chat', 'deepseek-reasoner'],
   openrouter: ['anthropic/claude-opus-4', 'openai/gpt-4o', 'google/gemini-2.5-pro', 'meta-llama/llama-3.3-70b-instruct'],
+  poe: ['Claude-Sonnet-4', 'Claude-Opus-4', 'GPT-4o', 'GPT-4o-Mini', 'Gemini-2.5-Pro', 'Grok-4', 'Llama-3.3-70B'],
   ollama: ['llama3.2', 'llama3.1', 'qwen2.5', 'mistral'],
   custom: [],
 };

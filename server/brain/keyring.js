@@ -7,8 +7,13 @@ import { JsonStore } from '../store.js';
 import { PROVIDERS, isChat } from './catalog.js';
 
 // Turns provider errors into one plain sentence.
-export function friendly(err) {
+export function friendly(err, provider) {
   const s = err.status, m = String(err.message || err);
+  if (provider === 'poe' && (s === 404 || s === 500 || s === 400)) {
+    const detail = (m.match(/"message"\s*:\s*"([^"]+)"/) || [])[1];
+    return `Poe couldn't run that bot${detail ? ` (${detail})` : ''}. Check the model name exactly matches a public Poe bot, for example Claude-Sonnet-4.6, under "Which AI answers".`;
+  }
+  if (provider === 'poe' && s === 402) return 'Your Poe points have run out.';
   if (s === 401 || s === 403) return 'The provider rejected this key. Check it was copied fully and is still active.';
   if (s === 429) return 'Rate limit or quota reached. ORBIT will retry this key in a minute and use your other keys meanwhile.';
   if (s === 404) return 'Model not found for this key. Pick another model under "Which AI answers".';
@@ -119,7 +124,7 @@ export class Keyring {
   markSuccess(k) { k.uses = (k.uses || 0) + 1; k.lastUsed = new Date().toISOString(); k.lastError = null; this.store.save(); }
   markFailure(k, err) {
     k.failures = (k.failures || 0) + 1;
-    k.lastError = friendly(err);
+    k.lastError = friendly(err, k.provider);
     const s = err.status;
     // Bad key: park it for an hour. Rate limit: one minute. Outage or network: 15 seconds.
     k.cooldownUntil = Date.now() + (s === 401 || s === 403 ? 3600e3 : s === 429 ? 60e3 : 15e3);

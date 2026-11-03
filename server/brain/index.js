@@ -85,7 +85,7 @@ export class Brain {
         errors.push(`${key.label}: ${e.message}`);
       }
     }
-    if (candidates.length) throw new Error(`Every AI key failed. ${errors.slice(-3).join(' | ')}`);
+    if (candidates.length) { const last = this.keyring.data.keys.find((k) => k.label === errors.at(-1)?.split(':')[0]); throw new Error(`Every AI key failed. ${last?.lastError || errors.slice(-1)[0] || ''}`); }
     yield { meta: { tier, model: 'none', provider: 'offline' } };
     for await (const delta of this.offline.stream()) yield { delta };
   }
@@ -159,7 +159,7 @@ export class Brain {
     const t0 = performance.now();
     let out = '';
     const model = this.keyring.data.routes.fast.provider === key.provider && this.keyring.data.routes.fast.model ? this.keyring.data.routes.fast.model : PROVIDERS[key.provider].models.fast;
-    for await (const d of this.client(key).stream({ model, system: 'Reply with the single word OK.', messages: [{ role: 'user', content: 'ping' }], maxTokens: 5, signal: AbortSignal.timeout(20000) })) out += d;
+    for await (const d of this.client(key).stream({ model, system: 'Reply with the single word OK.', messages: [{ role: 'user', content: 'ping' }], maxTokens: 20, signal: AbortSignal.timeout(20000) })) out += d;
     return { ok: true, ms: Math.round(performance.now() - t0), model, reply: out.trim().slice(0, 40) };
   }
 }

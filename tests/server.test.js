@@ -190,7 +190,11 @@ test('Poe works as an OpenAI-compatible provider with bot names as models', asyn
   const { PROVIDERS, SUGGESTED } = await import('../server/brain/catalog.js');
   assert.equal(PROVIDERS.poe.baseUrl, 'https://api.poe.com/v1');
   assert.equal(PROVIDERS.poe.kind, 'openai');
-  assert.ok(SUGGESTED.poe.includes('Claude-Sonnet-4'));
+  assert.ok(SUGGESTED.poe.includes('Claude-Sonnet-4.6'));
+  const { friendly } = await import('../server/brain/keyring.js');
+  const e = Object.assign(new Error('Poe error 500: {"error":{"code":500,"type":"provider_error","message":"Internal server error"}}'), { status: 500 });
+  assert.match(friendly(e, 'poe'), /Check the model name exactly matches a public Poe bot/);
+  assert.match(friendly(Object.assign(new Error('x'), { status: 402 }), 'poe'), /points have run out/);
   const added = await api('POST', '/api/ai/keys', { provider: 'poe', key: 'poe_' + 'k'.repeat(30) });
   assert.equal(added.status, 200);
   assert.equal(added.body.baseUrl, 'https://api.poe.com/v1');

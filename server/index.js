@@ -111,7 +111,7 @@ export function createOrbit(cfg = config) {
         if (PROVIDERS[k.provider].kind === 'voice') { const t0 = performance.now(); await testVoiceKey(k.provider, keyring.secretOf(k), k.baseUrl); keyring.markSuccess(k); return { ok: true, ms: Math.round(performance.now() - t0), model: 'voices' }; }
         const r = await brain.test(k); keyring.markSuccess(k); return r;
       }
-      catch (e) { keyring.markFailure(k, e); return { ok: false, error: friendly(e) }; }
+      catch (e) { keyring.markFailure(k, e); return { ok: false, error: friendly(e, k.provider) }; }
     },
     'PATCH /api/ai/routes': (b) => (keyring.setRoutes(b), brain.status()),
   };

@@ -32,6 +32,7 @@ export function createOrbit(cfg = config) {
     try { keyring.add({ provider: 'anthropic', key: cfg.ai.anthropicKey, label: 'Anthropic (from .env)' }); } catch {}
   }
   const brain = new Brain(cfg.ai, keyring);
+  brain.warmModels();
   const home = createHome(cfg);
   const automations = new Automations(cfg.dataDir);
   const engine = new Engine({ brain, memory, devices, home, automations, audit, settings });
@@ -98,11 +99,11 @@ export function createOrbit(cfg = config) {
     'GET /api/audit': () => audit.tail(100),
     'GET /api/settings': () => settings.data,
     'PATCH /api/settings': (b) => { const allowed = ['userName', 'tone', 'voice', 'wakeWord', 'proactive', 'retentionDays']; for (const k of allowed) if (k in b) settings.data[k] = b[k]; settingsStore.save(); return settings.data; },
-    'GET /api/ai/providers': () => Object.fromEntries(Object.entries(PROVIDERS).map(([id, p]) => [id, { kind: p.kind, extra: p.extra ? { label: p.extra.label, placeholder: p.extra.placeholder } : null, label: p.label, keyHint: p.keyHint, keyOptional: !!p.keyOptional, needsBaseUrl: !!p.needsBaseUrl, baseUrl: p.baseUrl || '', models: p.models, vision: !!p.vision, keysUrl: p.keysUrl || '' }])),
+    'GET /api/ai/providers': () => Object.fromEntries(Object.entries(PROVIDERS).map(([id, p]) => [id, { note: p.note || '', kind: p.kind, extra: p.extra ? { label: p.extra.label, placeholder: p.extra.placeholder } : null, label: p.label, keyHint: p.keyHint, keyOptional: !!p.keyOptional, needsBaseUrl: !!p.needsBaseUrl, baseUrl: p.baseUrl || '', models: p.models, vision: !!p.vision, keysUrl: p.keysUrl || '' }])),
     'GET /api/ai/keys': () => keyring.list(),
     'GET /api/ai/models': () => brain.models(),
-    'POST /api/ai/keys': (b) => { const k = keyring.add(b); audit.write({ kind: 'security', action: 'ai key added', provider: k.provider, label: k.label }); return k; },
-    'PATCH /api/ai/keys/:id': (b, id) => keyring.update(id, b),
+    'POST /api/ai/keys': (b) => { const k = keyring.add(b); audit.write({ kind: 'security', action: 'ai key added', provider: k.provider, label: k.label }); brain.warmModels(); return k; },
+    'PATCH /api/ai/keys/:id': (b, id) => { const r = keyring.update(id, b); brain.warmModels(); return r; },
     'DELETE /api/ai/keys/:id': (b, id) => { audit.write({ kind: 'security', action: 'ai key removed', id }); return { ok: keyring.remove(id) }; },
     'POST /api/ai/keys/:id/test': async (b, id) => {
       const k = keyring.data.keys.find((x) => x.id === id);

@@ -151,13 +151,25 @@ async function openModelMenu() {
     if (S.view === 'ai') render();
   };
   const groups = Object.entries(lists);
-  menu.replaceChildren(
-    ...(groups.length ? groups.flatMap(([provider, g]) => [
-      h('div', { class: 'group' }, g.label),
-      ...g.models.slice(0, 40).map((m) => h('button', { type: 'button', role: 'option', 'aria-selected': String(r.fast.provider === provider && (r.fast.model || '') === m), onclick: () => pick(provider, m) }, m)),
-    ]) : [h('div', { class: 'group' }, 'Add an AI key to choose a model')]),
+  const search = h('input', { type: 'search', placeholder: 'Search models', 'aria-label': 'Search models', class: 'menu-search' });
+  const body = h('div', {});
+  const draw = () => {
+    const q = search.value.trim().toLowerCase();
+    body.replaceChildren(...(groups.length ? groups.flatMap(([provider, g]) => {
+      const ms = g.models.filter((m) => !q || m.toLowerCase().includes(q));
+      if (!ms.length) return [];
+      return [
+        h('div', { class: 'group' }, `${g.label} · ${g.source === 'live' ? `${g.models.length} available` : 'suggested, not checked'}`),
+        ...ms.slice(0, q ? 80 : 25).map((m) => h('button', { type: 'button', role: 'option', 'aria-selected': String(r.fast.provider === provider && (r.fast.model || '') === m), onclick: () => pick(provider, m) }, m)),
+        ms.length > (q ? 80 : 25) ? h('div', { class: 'group' }, `…${ms.length - (q ? 80 : 25)} more, type to search`) : null,
+      ];
+    }) : [h('div', { class: 'group' }, 'Add an AI key to choose a model')]));
+  };
+  search.addEventListener('input', draw);
+  draw();
+  menu.replaceChildren(groups.length ? search : null, body,
     h('div', { class: 'foot' }, h('button', { type: 'button', onclick: () => { closeModelMenu(); go('ai'); } }, 'Separate models for quick and deep answers…')));
-  menu.querySelector('button')?.focus();
+  search.focus();
 }
 function closeModelMenu() { menu.hidden = true; chip.setAttribute('aria-expanded', 'false'); }
 chip.addEventListener('click', () => (menu.hidden ? openModelMenu() : closeModelMenu()));
@@ -461,7 +473,8 @@ const VIEWS = {
       const baseLabel = h('label', { class: 'label', for: 'k-base' }, 'API base URL');
       const baseField = h('div', { class: 'field' }, baseLabel, base);
       const help = h('a', { target: '_blank', rel: 'noopener' }, 'Get a key');
-      const sync = () => { const p = P[prov.value]; key.placeholder = p.keyHint; baseField.hidden = !p.needsBaseUrl && !p.extra; baseLabel.textContent = p.extra ? p.extra.label : 'API base URL'; base.placeholder = p.extra ? p.extra.placeholder : 'https://example.com/v1'; help.hidden = !p.keysUrl; help.href = p.keysUrl || '#'; };
+      const noteEl = h('p', { class: 'muted' });
+      const sync = () => { const p = P[prov.value]; noteEl.textContent = p.note || ''; key.placeholder = p.keyHint; baseField.hidden = !p.needsBaseUrl && !p.extra; baseLabel.textContent = p.extra ? p.extra.label : 'API base URL'; base.placeholder = p.extra ? p.extra.placeholder : 'https://example.com/v1'; help.hidden = !p.keysUrl; help.href = p.keysUrl || '#'; };
       prov.addEventListener('change', sync); sync();
       const add = async () => {
         try { await api('POST', '/api/ai/keys', { provider: prov.value, label: label.value, key: key.value, baseUrl: base.value }); key.value = label.value = ''; toast('Key added.'); await refresh(); }
@@ -492,7 +505,8 @@ const VIEWS = {
           const ids = [...new Set([def, ...live].filter(Boolean))];
           const cur = keepCurrent ? (r.model || def) : def;
           if (cur && !ids.includes(cur)) ids.unshift(cur);
-          pickModel.replaceChildren(...ids.map((m) => h('option', { value: m, selected: m === cur }, m === def ? `${m} (recommended)` : m)), h('option', { value: '__custom' }, 'Other…'));
+          const isLive = S.modelLists?.[sel.value]?.source === 'live';
+          pickModel.replaceChildren(...ids.map((m) => h('option', { value: m, selected: m === cur }, isLive && !S.modelLists[sel.value].models.includes(m) ? `${m} (not available)` : m === def ? `${m} (recommended)` : m)), h('option', { value: '__custom' }, 'Other…'));
           model.hidden = true;
         };
         sel.addEventListener('change', () => fill(false));
@@ -514,9 +528,11 @@ const VIEWS = {
             h('div', { class: 'field' }, h('label', { class: 'label', for: 'k-key' }, 'API key'), key),
             baseField,
             h('div', { class: 'field' }, h('label', { class: 'label', for: 'k-label' }, 'Name (optional)'), label),
+            noteEl,
             h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: add }, 'Add key'), help))),
         h('div', { class: 'grid2' },
           panel('Which AI answers',
+            (o.brain.unavailable || []).length ? h('p', { class: 'error-text' }, `Your chosen ${o.brain.unavailable.map((t) => (t === 'fast' ? 'quick-answer' : 'deep-reasoning')).join(' and ')} model isn't in that provider's current list (renamed, retired or not on your plan). Pick another below.`) : null,
             fast.el, deep.el,
             h('div', { class: 'perm' }, h('span', {}, 'If those keys fail, use my other providers'), fb),
             h('button', { class: 'btn primary', onclick: async () => {

@@ -2,7 +2,7 @@
 import { AnthropicProvider } from './providers/anthropic.js';
 import { OpenAICompatProvider } from './providers/openai.js';
 import { OfflineProvider } from './providers/offline.js';
-import { PROVIDERS, SUGGESTED, NOT_CHAT, isChat } from './catalog.js';
+import { PROVIDERS, SUGGESTED, NOT_CHAT, isChat, pickModel, TIER_PICKS } from './catalog.js';
 
 
 export function personaPrompt({ userName, tone = 'composed', memories = [], devices = [] }) {
@@ -44,12 +44,13 @@ export class Brain {
   status() {
     const r = this.keyring.data.routes;
     const keys = this.keyring.list();
-    const model = (tier) => r[tier].model || PROVIDERS[r[tier].provider]?.models[tier] || '';
+    const model = (tier) => this.resolveModel(r[tier].provider, tier, r[tier].model || PROVIDERS[r[tier].provider]?.models[tier] || '');
     const live = keys.some((k) => k.enabled && isChat(k.provider));
     return {
       provider: live ? (keys.some((k) => k.enabled && k.provider === r.fast.provider) ? r.fast.provider : 'fallback') : 'offline',
       fastModel: model('fast'), reasoningModel: model('reasoning'),
-      routes: r, fallback: this.keyring.data.fallback, keyCount: keys.length, activeKeys: keys.filter((k) => k.enabled && !k.coolingDown && isChat(k.provider)).length,
+      routes: r, fallback: this.keyring.data.fallback,
+      unavailable: ['fast', 'reasoning'].filter((t) => { const c = this.modelCache?.get(r[t].provider)?.value; return r[t].model && c?.source === 'live' && !c.models.includes(r[t].model); }), keyCount: keys.length, activeKeys: keys.filter((k) => k.enabled && !k.coolingDown && isChat(k.provider)).length,
     };
   }
 
@@ -64,8 +65,9 @@ export class Brain {
     const system = systemOverride || personaPrompt({ ...persona, memories, devices });
     const candidates = this.keyring.candidates(tier, { needVision: !!image });
     const errors = [];
-    for (const { key, model } of candidates) {
+    for (const { key, model: wanted } of candidates) {
       const provider = PROVIDERS[key.provider];
+      const model = this.resolveModel(key.provider, tier, wanted);
       let started = false;
       try {
         for await (const delta of this.client(key).stream({
@@ -90,6 +92,20 @@ export class Brain {
     for await (const delta of this.offline.stream()) yield { delta };
   }
 
+  // Uses the provider's real model list (when known) to replace a default that isn't actually
+  // available, e.g. an outdated name or a model outside your subscription. Your own picks are kept.
+  resolveModel(provider, tier, wanted) {
+    const live = this.modelCache?.get(provider);
+    const ids = live?.value.source === 'live' ? live.value.models : null;
+    const chosen = this.keyring.data.routes[tier].provider === provider && this.keyring.data.routes[tier].model;
+    const picks = TIER_PICKS[provider]?.[tier] || [];
+    if (!ids || (wanted && ids.includes(wanted))) return wanted || pickModel(tier, ids || [], SUGGESTED[provider] || [], picks);
+    if (chosen && chosen === wanted) return wanted;
+    return pickModel(tier, ids, SUGGESTED[provider] || [], picks) || wanted;
+  }
+  // Fetch model lists in the background so the first answer already uses accurate models.
+  warmModels() { this.modelCache?.clear(); return this.models().catch(() => {}); }
+
   // Live model lists from each provider you have a key for, cached for 10 minutes.
   async models() {
     this.modelCache ||= new Map();
@@ -108,8 +124,9 @@ export class Brain {
         if (res.ok) live = ((await res.json()).data || []).map((m) => String(m.id).replace(/^models\//, '')).filter((id) => !NOT_CHAT.test(id));
       } catch {}
       const suggested = SUGGESTED[pid] || [];
-      const ids = [...new Set([...suggested.filter((m) => !live.length || live.includes(m)), ...live.sort()])];
-      const value = { label: p.label, source: live.length ? 'live' : 'suggested', models: ids.length ? ids : suggested };
+      // Live list is the truth; suggestions are only shown when the provider can't be asked.
+      const ids = live.length ? [...new Set([...suggested.filter((m) => live.includes(m)), ...live.sort()])] : suggested;
+      const value = { label: p.label, source: live.length ? 'live' : 'suggested', models: ids };
       this.modelCache.set(pid, { at: Date.now(), value });
       out[pid] = value;
     }));

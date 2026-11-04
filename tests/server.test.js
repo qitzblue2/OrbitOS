@@ -211,3 +211,27 @@ test('NanoGPT is available with its documented base URL and model IDs', async ()
   assert.equal(added.status, 200);
   assert.equal(added.body.baseUrl, 'https://nano-gpt.com/api/v1');
 });
+
+test('model accuracy: defaults are corrected from the live list; your own pick is kept', async () => {
+  const { pickModel, PROVIDERS } = await import('../server/brain/catalog.js');
+  const subList = ['google/gemma4-31b-splituntied', 'z-ai/glm-5.3-flash', 'qwen/qwen3.8-max', 'nvidia/nemotron-3.5-content-safety'];
+  assert.equal(pickModel('fast', subList, ['z-ai/glm-5.3-flash']), 'z-ai/glm-5.3-flash');
+  assert.equal(pickModel('reasoning', subList, []), 'qwen/qwen3.8-max');
+  assert.equal(PROVIDERS.nanogpt_sub.baseUrl, 'https://nano-gpt.com/api/subscription/v1');
+
+  const { brain, keyring } = orbit;
+  // Same key can be added as both NanoGPT plans
+  const k = 'nano_' + 'w'.repeat(30);
+  assert.equal((await api('POST', '/api/ai/keys', { provider: 'nanogpt_sub', key: k })).status, 200);
+  assert.equal((await api('POST', '/api/ai/keys', { provider: 'nanogpt_sub', key: k })).status, 400, 'no duplicate within a plan');
+
+  brain.modelCache = new Map([['nanogpt_sub', { at: Date.now(), value: { label: 'x', source: 'live', models: subList } }]]);
+  keyring.setRoutes({ fast: { provider: 'nanogpt_sub', model: '' }, reasoning: { provider: 'nanogpt_sub', model: '' } });
+  let st = brain.status();
+  assert.equal(st.fastModel, 'z-ai/glm-5.3-flash', 'blank default resolved from the subscription list');
+  assert.equal(st.reasoningModel, 'qwen/qwen3.8-max');
+  keyring.setRoutes({ fast: { provider: 'nanogpt_sub', model: 'anthropic/claude-sonnet-5.5' } });
+  st = brain.status();
+  assert.equal(st.fastModel, 'anthropic/claude-sonnet-5.5', 'an explicit choice is never silently replaced');
+  assert.deepEqual(st.unavailable, ['fast'], 'but it is flagged as not available');
+});

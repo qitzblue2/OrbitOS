@@ -66,7 +66,7 @@ export class Keyring {
     if (key && p.keyPattern && !p.keyPattern.test(key)) throw new Error(`That doesn't look like a ${p.label} key (expected ${p.keyHint}).`);
     if (p.needsBaseUrl && !/^https?:\/\/\S+$/.test(baseUrl)) throw new Error('Enter the base URL of the API, for example https://example.com/v1');
     if (p.extra) { baseUrl = String(baseUrl || '').trim().toLowerCase(); if (!p.extra.pattern.test(baseUrl)) throw new Error(`Enter the ${p.extra.label.toLowerCase()}, for example ${p.extra.placeholder}.`); }
-    const fp = key ? this.fingerprint(key) : null;
+    const fp = key ? this.fingerprint(`${provider}:${key}`) : null; // same key may be used for two variants (e.g. NanoGPT plans)
     if (fp && this.data.keys.some((k) => k.fp === fp)) throw new Error('That key is already saved.');
     const item = {
       id: crypto.randomUUID(), provider, label: String(label || `${p.label.replace(/ \(.*\)$/, '')} ${this.data.keys.filter((k) => k.provider === provider).length + 1}`).slice(0, 60),

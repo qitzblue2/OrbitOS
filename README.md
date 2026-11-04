@@ -45,6 +45,8 @@ Speech is played gaplessly, with faded joins. Sentences are grouped into longer 
 
 ### Choosing the AI model
 
+- **Model lists are accurate:** they come live from each provider and show how many models are available. If ORBIT's default model has been renamed, retired or isn't on your plan, ORBIT picks a suitable one from the real list. A model you chose yourself is never swapped, but it's flagged if it isn't available. The model menu has a search box.
+
 - **Quick switch:** click the model name in the top bar to pick any model your keys can use. The list comes live from each provider.
 - **By voice:** say "Orbit, switch to GPT-4o" or "Orbit, use Claude Sonnet". "Which model are you using?" tells you the current one.
 - **Separate models:** in **AI configuration** you can pick one model for quick answers and another for deep reasoning, or type any model name under **Other…**.
@@ -71,7 +73,7 @@ Open **AI configuration** and add as many keys as you like, from any of these:
 - xAI (Grok)
 - DeepSeek
 - OpenRouter
-- NanoGPT (pay as you go, many models)
+- NanoGPT (pay as you go, many models), or **NanoGPT subscription models only**. The subscription option uses NanoGPT's subscription address and lists only included models. To guarantee no balance charges, also set the key to "Subscription only" on nano-gpt.com.
 - Poe (many models with one key, paid from your Poe points)
 - Ollama (local and free, no key needed)
 - any other OpenAI-compatible service

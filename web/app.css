@@ -152,3 +152,4 @@ pre.cmd{margin:0;padding:12px;border-radius:var(--r1);background:#020610;border:
 .list li:has(> select){flex-wrap:wrap}
 .list li > select{width:auto;flex:0 1 260px;min-width:160px;max-width:100%}
 .list li > .grow{flex:1 1 220px}
+.menu-search{margin:4px 4px 6px;width:calc(100% - 8px)}

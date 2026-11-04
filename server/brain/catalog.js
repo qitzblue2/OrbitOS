@@ -19,6 +19,9 @@ export const PROVIDERS = {
                 models: { fast: 'openai/gpt-4o-mini', reasoning: 'anthropic/claude-opus-4' }, keysUrl: 'https://openrouter.ai/keys' },
   nanogpt:    { label: 'NanoGPT (pay as you go, many models)', kind: 'openai', baseUrl: 'https://nano-gpt.com/api/v1', keyHint: 'NanoGPT API key', keyPattern: /^[\w-]{16,}$/, vision: true,
                 models: { fast: 'google/gemini-flash-latest', reasoning: 'anthropic/claude-sonnet-5.5' }, keysUrl: 'https://nano-gpt.com/api' },
+  nanogpt_sub:{ label: 'NanoGPT (subscription models only)', kind: 'openai', baseUrl: 'https://nano-gpt.com/api/subscription/v1', keyHint: 'NanoGPT API key', keyPattern: /^[\w-]{16,}$/,
+                models: { fast: '', reasoning: '' }, keysUrl: 'https://nano-gpt.com/api',
+                note: 'Lists and uses only models included in your NanoGPT subscription. To guarantee no balance charges, also set this key to "Subscription only" on nano-gpt.com.' },
   poe:        { label: 'Poe (many models, one key)', kind: 'openai', baseUrl: 'https://api.poe.com/v1', keyHint: 'Poe API key', keyPattern: /^[\w-]{20,}$/, vision: true,
                 models: { fast: 'Claude-Sonnet-4.6', reasoning: 'Claude-Opus-4.7' }, keysUrl: 'https://poe.com/api/keys' },
   ollama:     { label: 'Ollama (local, free)', kind: 'openai', baseUrl: 'http://127.0.0.1:11434/v1', keyHint: 'no key needed', keyOptional: true,
@@ -46,6 +49,7 @@ export const SUGGESTED = {
   openrouter: ['anthropic/claude-opus-4', 'openai/gpt-4o', 'google/gemini-2.5-pro', 'meta-llama/llama-3.3-70b-instruct'],
   // From NanoGPT's docs; the live list from /api/v1/models replaces these when your key works.
   nanogpt: ['anthropic/claude-sonnet-5.5', 'anthropic/claude-opus-5.5', 'openai/gpt-latest', 'google/gemini-flash-latest', 'google/gemini-3.1-pro-preview', 'x-ai/grok-4.7', 'deepseek/deepseek-v4-flash-latest', 'qwen/qwen3.8-max', 'moonshotai/kimi-k3.1-pro', 'z-ai/glm-5.3'],
+  nanogpt_sub: ['z-ai/glm-5.3-flash', 'google/gemma4-31b-splituntied', 'qwen/qwen3.8-27b-swift'],
   // Names as used in Poe's API docs; any public Poe bot name works (type it under Other…).
   poe: ['Claude-Sonnet-4.6', 'Claude-Opus-4.7', 'GPT-5.4', 'Gemini-3.1-Pro', 'Grok-4'],
   ollama: ['llama3.2', 'llama3.1', 'qwen2.5', 'mistral'],
@@ -54,3 +58,28 @@ export const SUGGESTED = {
 
 // Model IDs that are not chat models (embeddings, speech, images, moderation…).
 export const NOT_CHAT = /embed|whisper|tts|transcri|dall-e|image|audio|realtime|moderation|search|similarity|edit|babbage|davinci|instruct-?0|guard|rerank|vision-preview$/i;
+
+// Preferred picks per tier, used first when they appear in the provider's real list.
+export const TIER_PICKS = {
+  nanogpt_sub: { fast: ['z-ai/glm-5.3-flash', 'minimax/minimax-m3.1-flash'], reasoning: ['z-ai/glm-5.2', 'moonshotai/kimi-k2.6', 'minimax/minimax-m3', 'z-ai/glm-5.1', 'moonshotai/kimi-k2.5'] },
+  nanogpt: { fast: ['google/gemini-flash-latest', 'deepseek/deepseek-v4-flash-latest'], reasoning: ['anthropic/claude-sonnet-5.5', 'openai/gpt-latest', 'google/gemini-3.1-pro-preview'] },
+};
+
+// When a provider's real model list is known, pick a sensible model for each tier from it.
+const PREFER = {
+  fast: [/flash/i, /mini/i, /haiku/i, /instant/i, /small/i, /lite/i, /turbo/i, /8b|12b|27b|31b/i],
+  reasoning: [/opus/i, /sonnet/i, /\bpro\b|-pro/i, /max/i, /large/i, /reason|think/i, /70b|72b/i, /flash/i],
+};
+export function pickModel(tier, ids, suggested = [], picks = []) {
+  if (!ids.length) return '';
+  const first = picks.find((m) => ids.includes(m));
+  if (first) return first;
+  // Automatic picks skip specialised community variants; you can still choose them yourself.
+  const usable = ids.filter((m) => !/embed|guard|safety|tts|whisper|distill|abliterat|uncensor|cybersec|roleplay|nsfw|apex/i.test(m));
+  // Go through preferences in order; within each, a suggested (well-known) model wins.
+  for (const r of PREFER[tier]) {
+    const hits = usable.filter((m) => r.test(m));
+    if (hits.length) return hits.find((m) => suggested.includes(m)) || hits[0];
+  }
+  return suggested.find((m) => ids.includes(m)) || usable[0] || ids[0];
+}

@@ -68,9 +68,10 @@ export class Agent {
     if (needsOk) {
       const id = crypto.randomUUID();
       const ok = await new Promise((resolve) => {
-        this.approvals.set(id, { resolve, tool: tool.name });
+        // Unanswered requests are declined after 10 minutes; the timer is cleared as soon as you answer.
+        const timer = setTimeout(() => { if (this.approvals.delete(id)) resolve(false); }, 10 * 60 * 1000);
+        this.approvals.set(id, { resolve: (v) => { clearTimeout(timer); resolve(v); }, tool: tool.name });
         emit('approve', { id, tool: tool.name, summary: summary(tool.name, args), detail: tool.name === 'write_file' ? String(args.content || '').slice(0, 4000) : args.command || '' });
-        setTimeout(() => { if (this.approvals.delete(id)) resolve(false); }, 10 * 60 * 1000);
       });
       if (!ok) return 'The user declined this action. Ask what they would like instead, or continue without it.';
     }

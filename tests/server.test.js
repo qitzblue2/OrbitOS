@@ -201,3 +201,13 @@ test('Poe works as an OpenAI-compatible provider with bot names as models', asyn
   const st = (await api('PATCH', '/api/ai/routes', { fast: { provider: 'poe', model: 'GPT-4o' } })).body;
   assert.equal(st.fastModel, 'GPT-4o');
 });
+
+test('NanoGPT is available with its documented base URL and model IDs', async () => {
+  const { PROVIDERS, SUGGESTED } = await import('../server/brain/catalog.js');
+  assert.equal(PROVIDERS.nanogpt.baseUrl, 'https://nano-gpt.com/api/v1');
+  assert.equal(PROVIDERS.nanogpt.kind, 'openai');
+  assert.ok(SUGGESTED.nanogpt.includes('x-ai/grok-4.7'));
+  const added = await api('POST', '/api/ai/keys', { provider: 'nanogpt', key: 'nano_' + 'q'.repeat(30) });
+  assert.equal(added.status, 200);
+  assert.equal(added.body.baseUrl, 'https://nano-gpt.com/api/v1');
+});

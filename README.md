@@ -71,6 +71,7 @@ Open **AI configuration** and add as many keys as you like, from any of these:
 - xAI (Grok)
 - DeepSeek
 - OpenRouter
+- NanoGPT (pay as you go, many models)
 - Poe (many models with one key, paid from your Poe points)
 - Ollama (local and free, no key needed)
 - any other OpenAI-compatible service

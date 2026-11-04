@@ -21,8 +21,9 @@ const loadConf = () => (fs.existsSync(CONF) ? JSON.parse(fs.readFileSync(CONF, '
 const saveConf = (c) => fs.writeFileSync(CONF, JSON.stringify(c, null, 2), { mode: 0o600 });
 
 // ---- local policy: the machine owner's own limits, enforced even if the server allows more ----
+export const WORKSPACE = path.join(os.homedir(), 'ORBIT Workspace');
 const DEFAULT_LOCAL = {
-  approvedFolders: [path.join(os.homedir(), 'Documents'), path.join(os.homedir(), 'Desktop')],
+  approvedFolders: [WORKSPACE, path.join(os.homedir(), 'Documents'), path.join(os.homedir(), 'Desktop')],
   approvedCommands: {},            // e.g. { "backup": ["/usr/local/bin/backup.sh"] }
   workflows: {},                   // e.g. { "dev": [["code", "~/work"]] }
   deny: [],                        // capabilities this machine never performs
@@ -69,7 +70,7 @@ else { try { Start-Process -FilePath $n -ErrorAction Stop; "OPENED:" + $n } catc
     return { message: `Opened ${app}.` };
   },
   async 'browser.open'({ url }) {
-    if (!/^https:\/\//.test(url)) throw new Error('Only https links can be opened.');
+    if (!/^https:\/\//.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(url)) throw new Error('Only https links (or local http://localhost pages) can be opened.');
     if (PLATFORM === 'darwin') await run('open', [url]);
     else if (PLATFORM === 'win32') await ps(`Start-Process ${JSON.stringify(url)}`);
     else execFileDetached('xdg-open', [url]);
@@ -152,6 +153,50 @@ if ($c) { "CLOSED:$c" } else { "NOTFOUND" }`);
     const items = fs.readdirSync(dir, { withFileTypes: true }).slice(0, 200).map((d) => ({ name: d.name, dir: d.isDirectory() }));
     return { message: `${items.length} items.`, data: { folder: dir, items } };
   },
+  // ---- AI agent abilities: files and terminal ----
+  async 'files.read'({ path: p, anyPath }, local) {
+    const f = allowedPath(p, local, anyPath);
+    const st = fs.statSync(f);
+    if (st.isDirectory()) return handlers['files.listdir']({ path: f, anyPath: true }, local);
+    if (st.size > 400 * 1024) throw new Error(`${p} is too large to read (${Math.round(st.size / 1024)} KB).`);
+    return { message: `Read ${f}.`, data: { path: f, content: fs.readFileSync(f, 'utf8') } };
+  },
+  async 'files.write'({ path: p, content = '', anyPath }, local) {
+    const f = allowedPath(p, local, anyPath);
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, String(content));
+    return { message: `Wrote ${f}.`, data: { path: f, bytes: Buffer.byteLength(String(content)) } };
+  },
+  async 'files.listdir'({ path: p, anyPath }, local) {
+    const d = allowedPath(p || WORKSPACE, local, anyPath);
+    fs.mkdirSync(d, { recursive: true });
+    const items = fs.readdirSync(d, { withFileTypes: true }).slice(0, 300).map((e) => (e.isDirectory() ? `${e.name}/` : e.name));
+    return { message: `${items.length} items in ${d}.`, data: { path: d, items } };
+  },
+  async 'files.open'({ path: p, anyPath }, local) {
+    const f = allowedPath(p, local, anyPath);
+    if (!fs.existsSync(f)) throw new Error(`${f} doesn't exist.`);
+    if (PLATFORM === 'darwin') await run('open', [f]);
+    else if (PLATFORM === 'win32') execFileDetached('explorer.exe', [f]); // argument array: no shell interpretation of the path
+    else execFileDetached('xdg-open', [f]);
+    return { message: `Opened ${path.basename(f)}.` };
+  },
+  async 'shell.run'({ command, cwd, timeoutSec = 120, anyPath }, local) {
+    if (!command || typeof command !== 'string') throw new Error('No command given.');
+    const dir = allowedPath(cwd || WORKSPACE, local, anyPath);
+    fs.mkdirSync(dir, { recursive: true });
+    const [bin, args] = PLATFORM === 'win32' ? ['powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command]]
+      : [process.env.SHELL || '/bin/bash', ['-lc', command]];
+    return await new Promise((resolve) => {
+      execFile(bin, args, { cwd: dir, timeout: Math.min(600, timeoutSec) * 1000, maxBuffer: 20 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
+        const output = `${stdout || ''}${stderr ? `\n${stderr}` : ''}`.trim();
+        const exitCode = err ? (typeof err.code === 'number' ? err.code : 1) : 0;
+        resolve({ message: exitCode === 0 ? 'Command finished.' : `Command exited with code ${exitCode}${err?.killed ? ' (timed out)' : ''}.`,
+          data: { exitCode, cwd: dir, output: output.length > 12000 ? `…${output.slice(-12000)}` : output } });
+      });
+    });
+  },
+
   async 'command.run'({ name }, local) {
     const cmd = local.approvedCommands[name];
     if (!cmd) throw new Error(`"${name}" isn't an approved command on this device.`);
@@ -168,6 +213,17 @@ if ($c) { "CLOSED:$c" } else { "NOTFOUND" }`);
     throw new Error('Messaging needs a messaging integration on this device; none is configured.');
   },
 };
+
+// Paths: relative ones are inside the ORBIT Workspace; others must be in an approved folder
+// unless the owner has turned on full control (anyPath, set by ORBIT only in that mode).
+function allowedPath(p, local, anyPath) {
+  const raw = String(p || '').replace(/^~(?=$|[\\/])/, os.homedir());
+  const f = path.resolve(path.isAbsolute(raw) ? raw : path.join(WORKSPACE, raw));
+  if (anyPath && local.allowAnyPath !== false) return f;
+  const ok = local.approvedFolders.some((d) => { const r = path.resolve(d); return f === r || f.startsWith(r + path.sep); });
+  if (!ok) throw new Error(`${f} is outside the folders ORBIT may use (ORBIT Workspace, Documents, Desktop). Turn on Full control in Security, or add the folder to the approved list.`);
+  return f;
+}
 
 function execFileDetached(bin, args) {
   try {

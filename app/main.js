@@ -55,6 +55,13 @@ async function startCompanion() {
     conf = { token: paired.token, id: paired.device.id, local: {} };
     fs.writeFileSync(file, JSON.stringify(conf, null, 2), { mode: 0o600 });
   }
+  // This is the user's own computer: let the AI use files and the terminal here (commands and
+  // file edits still ask first unless Full control is on). Applied once, so the user can turn them off.
+  if (!conf.agentPermsV1) {
+    const d = orbit.devices.get(conf.id);
+    if (d) orbit.devices.setPermissions(conf.id, [...new Set([...d.permissions, 'files.read', 'files.write', 'shell.run', 'screen.capture'])]);
+    conf.agentPermsV1 = true; fs.writeFileSync(file, JSON.stringify(conf, null, 2), { mode: 0o600 });
+  }
   const connect = () => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/ws/device`, { headers: { authorization: `Bearer ${conf.token}` } });
     ws.on('message', async (raw) => {

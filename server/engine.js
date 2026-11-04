@@ -5,6 +5,7 @@ import dgram from 'node:dgram';
 import { parseIntent, stripWake } from './intents.js';
 import { CAPABILITIES } from './devices.js';
 
+const AGENTY = /\b(create|build|make me|make a|write (?:me )?(?:a|an|the|some)|set up|setup|install|scaffold|generate|code|program|script|website|web ?site|web ?page|app\b|project|refactor|debug|fix (?:my|the|this)|organi[sz]e (?:my )?files|rename (?:my )?files)\b/i;
 const ACTIONY = /\b(open|launch|start|run|close|quit|exit|turn|switch|set|put|play|pause|resume|skip|next|mute|unmute|lock|shut|restart|search|google|look up|screenshot|dim|brighten|raise|lower|increase|decrease|louder|quieter|volume|lights?|music|song|playlist|text|message|activate|fire up|bring up|need)\b/i;
 const YES = /^(yes|yeah|yep|confirm|confirmed|do it|go ahead|proceed|sure|affirmative)\b/i;
 const NO = /^(no|nope|cancel|stop|don't|abort|never ?mind)\b/i;
@@ -18,15 +19,15 @@ export class Engine {
     this.recent = [];           // recent commands for the dashboard
   }
 
-  persona() { return { userName: this.settings.data.userName, tone: this.settings.data.tone }; }
+  persona() { return { userName: this.settings.data.userName, tone: this.settings.data.tone, customInstructions: this.settings.data.customInstructions }; }
 
   // ---- device transport ----------------------------------------------------
-  sendToDevice(device, capability, params) {
+  sendToDevice(device, capability, params, timeoutMs) {
     const ws = this.devices.sockets.get(device.id);
     if (!ws) return Promise.resolve({ ok: false, message: `${device.name} is offline.` });
     const id = crypto.randomUUID();
     return new Promise((resolve) => {
-      const timer = setTimeout(() => { this.pending.delete(id); resolve({ ok: false, message: `${device.name} didn't confirm in time, so I can't say it worked.` }); }, this.settings.ackTimeoutMs);
+      const timer = setTimeout(() => { this.pending.delete(id); resolve({ ok: false, message: `${device.name} didn't confirm in time, so I can't say it worked.` }); }, timeoutMs || this.settings.ackTimeoutMs);
       this.pending.set(id, (r) => { clearTimeout(timer); resolve(r); });
       ws.send(JSON.stringify({ type: 'command', id, capability, params }));
     });
@@ -38,7 +39,7 @@ export class Engine {
 
   // ---- public entry --------------------------------------------------------
   // emit(event, payload) streams state to the UI: state | text | delta | done | action | confirm | error
-  async handle({ text, sessionId = 'default', source = 'text', emit = () => {} }) {
+  async handle({ text, sessionId = 'default', source = 'text', emit = () => {}, mode = 'chat' }) {
     const started = performance.now();
     const said = String(text || '').trim();
     if (!said) return;
@@ -53,6 +54,9 @@ export class Engine {
       if (NO.test(bare)) { this.confirms.delete(sessionId); return this.finish(emit, { ok: true, say: 'Cancelled.' }, started, said); }
     }
     this.confirms.delete(sessionId);
+
+    // Coding sessions, and multi-step tasks ("create me a website"), go to the agent with tools.
+    if (this.agent && (mode === 'code' || AGENTY.test(said)) && this.brain.status().provider !== 'offline') return this.runAgent({ said, sessionId, emit, started, mode });
 
     const intent = parseIntent(said);
     if (intent) {
@@ -72,6 +76,25 @@ export class Engine {
       }
     }
     return this.think({ text: stripWake(said) || said, sessionId, emit, started });
+  }
+
+  async runAgent({ said, sessionId, emit, started, mode }) {
+    const ctrl = new AbortController();
+    this.active.set(sessionId, ctrl);
+    try {
+      const text = await this.agent.run({ text: stripWake(said) || said, sessionId, emit, mode, signal: ctrl.signal });
+      emit('delta', { text });
+      const ms = Math.round(performance.now() - started);
+      this.recent.unshift({ at: new Date().toISOString(), said, reply: text.slice(0, 200), ok: true, ms, kind: mode === 'code' ? 'code' : 'agent' });
+      this.recent.length = Math.min(this.recent.length, 30);
+      emit('done', { text, ok: true, ms, route: mode === 'code' ? 'code' : 'agent' });
+      emit('state', { state: 'idle' });
+    } catch (e) {
+      if (ctrl.signal.aborted) { emit('done', { text: 'Stopped.', ok: true, interrupted: true }); return; }
+      emit('error', { message: e.message });
+      emit('done', { text: e.message, ok: false });
+      emit('state', { state: 'error' });
+    } finally { if (this.active.get(sessionId) === ctrl) this.active.delete(sessionId); }
   }
 
   cancel(sessionId) { const c = this.active.get(sessionId); if (c) { c.abort(); this.active.delete(sessionId); } }
@@ -212,9 +235,10 @@ export class Engine {
     this.active.set(sessionId, ctrl);
     const memories = this.memory.recall(text);
     if (memories.length) emit('memory', { recalled: memories.map((m) => m.id) });
-    let full = '', meta = null;
+    let full = '', meta = null, thinkingSent = false;
     try {
       for await (const part of this.brain.answer({ text, image, history: this.memory.context(sessionId), memories, devices: this.devices.list(), persona: this.persona(), signal: ctrl.signal })) {
+        if (part.thinking) { if (!thinkingSent) { thinkingSent = true; emit('thinking', {}); } continue; }
         if (part.meta) { meta = part.meta; emit('state', { state: 'speaking', ...meta }); continue; }
         full += part.delta;
         emit('delta', { text: part.delta });

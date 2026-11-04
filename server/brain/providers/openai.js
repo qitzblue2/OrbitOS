@@ -1,5 +1,15 @@
 // OpenAI-compatible chat completions with streaming. Used for OpenAI, Gemini, Groq, Mistral,
 // xAI, DeepSeek, OpenRouter, Ollama and any compatible endpoint.
+// Ends a stream that goes silent, instead of waiting forever.
+export async function* idle(body, ms) {
+  const it = body[Symbol.asyncIterator]();
+  for (;;) {
+    let t; const timeout = new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('The model stopped responding (no data for 90 seconds).'), { status: 504 })), ms); });
+    try { const r = await Promise.race([it.next(), timeout]); if (r.done) return; yield r.value; }
+    finally { clearTimeout(t); }
+  }
+}
+
 export class OpenAICompatProvider {
   constructor({ apiKey, baseUrl, name = 'openai' }) { this.apiKey = apiKey; this.baseUrl = baseUrl.replace(/\/$/, ''); this.name = name; }
 
@@ -24,7 +34,7 @@ export class OpenAICompatProvider {
     if (!res.ok) { const e = new Error(`${this.name} error ${res.status}: ${(await res.text()).slice(0, 300)}`); e.status = res.status; throw e; }
     const decoder = new TextDecoder();
     let buf = '';
-    for await (const chunk of res.body) {
+    for await (const chunk of idle(res.body, 90000)) {
       buf += decoder.decode(chunk, { stream: true });
       let i;
       while ((i = buf.indexOf('\n')) >= 0) {
@@ -34,8 +44,11 @@ export class OpenAICompatProvider {
         if (data === '[DONE]') return;
         let ev; try { ev = JSON.parse(data); } catch { continue; }
         if (ev.error) throw new Error(ev.error.message || 'stream error');
-        const delta = ev.choices?.[0]?.delta?.content;
-        if (delta) yield delta;
+        const d = ev.choices?.[0]?.delta || {};
+        // "Thinking" models stream their reasoning separately before the answer.
+        const thought = d.reasoning_content || d.reasoning || (Array.isArray(d.reasoning_details) ? d.reasoning_details.map((r) => r.text || '').join('') : '');
+        if (thought) yield { thinking: thought };
+        if (d.content) yield d.content;
       }
     }
   }

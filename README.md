@@ -43,6 +43,18 @@ Speech is played gaplessly, with faded joins. Sentences are grouped into longer 
 - **Speak naturally:** "Can you open Spotify for me?" works. With an AI key, looser requests such as "put some music on" or "make it quieter" are turned into commands too, and still go through the same permission checks.
 - **On Windows:** apps open through the Start menu, so anything listed there, Microsoft Store apps included, opens by name.
 
+### Coding sessions and computer control
+
+- **Code mode:** in **Conversations**, switch to **Code** for a coding session. ORBIT plans, writes complete files in the **ORBIT Workspace** folder, runs and tests them, fixes errors, and explains how to run the result. The session remembers earlier turns until you select **New session**.
+- **Multi-step requests work in normal chat too.** Something like "create me a website" or "set up a Python project" makes ORBIT use your computer directly: run commands, read and write files, open apps, pages and files.
+- **You stay in charge:**
+  - Commands and file changes show an approval card: **Approve**, **Allow for this session** or **Deny**.
+  - ORBIT only uses ORBIT Workspace, Documents and Desktop.
+  - **Security › Full control** lets it act anywhere without asking.
+  - Every action is recorded in the audit log.
+- **Your instructions:** under **AI configuration**, tell ORBIT how to behave ("be blunt", "skip disclaimers"). How strictly that's followed, and what a model refuses, depends on the model you pick.
+- **Thinking models** (GLM, Kimi, reasoning models) show "Thinking… 12s" while they work, and get enough room to finish their answers.
+
 ### Choosing the AI model
 
 - **Model lists are accurate:** they come live from each provider and show how many models are available. If ORBIT's default model has been renamed, retired or isn't on your plan, ORBIT picks a suitable one from the real list. A model you chose yourself is never swapped, but it's flagged if it isn't available. The model menu has a search box.

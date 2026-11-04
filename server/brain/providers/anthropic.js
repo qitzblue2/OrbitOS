@@ -13,7 +13,8 @@ export class AnthropicProvider {
     if (!res.ok) { const e = new Error(`Anthropic error ${res.status}: ${(await res.text()).slice(0, 300)}`); e.status = res.status; throw e; }
     const decoder = new TextDecoder();
     let buf = '';
-    for await (const chunk of res.body) {
+    const { idle } = await import('./openai.js');
+    for await (const chunk of idle(res.body, 90000)) {
       buf += decoder.decode(chunk, { stream: true });
       let i;
       while ((i = buf.indexOf('\n\n')) >= 0) {

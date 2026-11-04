@@ -3,9 +3,10 @@ import { AnthropicProvider } from './providers/anthropic.js';
 import { OpenAICompatProvider } from './providers/openai.js';
 import { OfflineProvider } from './providers/offline.js';
 import { PROVIDERS, SUGGESTED, NOT_CHAT, isChat, pickModel, TIER_PICKS } from './catalog.js';
+import { complete } from './tools.js';
 
 
-export function personaPrompt({ userName, tone = 'composed', memories = [], devices = [] }) {
+export function personaPrompt({ userName, tone = 'composed', memories = [], devices = [], customInstructions = '' }) {
   return [
     `You are ORBIT, ${userName ? `${userName}'s` : 'the user\'s'} personal AI system. You run their devices, home and information.`,
     'Personality: highly intelligent, calm, composed, professional and confident; polite and occasionally dryly witty. Never verbose.',
@@ -14,6 +15,7 @@ export function personaPrompt({ userName, tone = 'composed', memories = [], devi
     'Accuracy beats speed. If you are not sure, say so plainly. Never invent facts, sources, or results.',
     'Never claim a device action happened; actions are executed and confirmed by the system, not by you.',
     memories.length ? `Relevant things you remember about the user:\n${memories.map((m) => `- (${m.kind}) ${m.text}`).join('\n')}` : '',
+    customInstructions ? `The user's own instructions (follow them):\n${customInstructions}` : '',
     devices.length ? `Connected devices: ${devices.map((d) => `${d.name} (${d.platform}${d.online ? ', online' : ', offline'})`).join('; ')}.` : '',
   ].filter(Boolean).join('\n\n');
 }
@@ -71,9 +73,10 @@ export class Brain {
       let started = false;
       try {
         for await (const delta of this.client(key).stream({
-          model, system, messages, maxTokens: maxOverride || (tier === 'reasoning' ? 2048 : 512), signal,
+          model, system, messages, maxTokens: maxOverride || (tier === 'reasoning' ? 16000 : 4096), signal, // room for thinking models' hidden reasoning
           webSearch: provider.webSearch && needsWeb(text),
         })) {
+          if (typeof delta === 'object') { if (delta.thinking) yield { thinking: true }; continue; } // reasoning: show progress, not text
           if (!started) { started = true; yield { meta: { tier, model, provider: key.provider, key: key.label, failovers: errors.length } }; }
           yield { delta };
         }
@@ -150,6 +153,25 @@ export class Brain {
     return best;
   }
 
+  // One tool-calling step with failover across keys (same rules as answer()).
+  async step({ system, messages, tools, tier = 'reasoning', signal }) {
+    const errors = [];
+    for (const { key, model: wanted } of this.keyring.candidates(tier)) {
+      const p = PROVIDERS[key.provider];
+      const model = this.resolveModel(key.provider, tier, wanted);
+      try {
+        const r = await complete({ kind: p.kind, apiKey: this.keyring.secretOf(key), baseUrl: key.baseUrl || p.baseUrl, model, system, messages, tools, signal });
+        this.keyring.markSuccess(key);
+        return { ...r, model, provider: key.provider };
+      } catch (e) {
+        if (signal?.aborted) throw e;
+        this.keyring.markFailure(key, e);
+        errors.push(`${key.label}: ${e.message}`);
+      }
+    }
+    throw new Error(errors.length ? `Every AI key failed. ${errors.at(-1)}` : 'Add an AI key under AI configuration to use this.');
+  }
+
   // Turns a loosely worded request ("put some music on") into one of ORBIT's own commands,
   // which then runs through the normal permission and confirmation checks. Returns null for chat.
   async route(text, { routines = [], signal } = {}) {
@@ -165,7 +187,7 @@ export class Brain {
     ].join('\n');
     let out = '';
     try {
-      for await (const p of this.answer({ text, tier: 'fast', system, maxTokens: 30, signal: signal || AbortSignal.timeout(6000) })) if (p.delta) out += p.delta;
+      for await (const p of this.answer({ text, tier: 'fast', system, maxTokens: 1500, signal: signal || AbortSignal.timeout(15000) })) if (p.delta) out += p.delta;
     } catch { return null; }
     out = out.trim().split('\n')[0].replace(/^["'`]|["'`.]$/g, '').trim();
     return !out || /^none\b/i.test(out) ? null : out;
@@ -176,7 +198,7 @@ export class Brain {
     const t0 = performance.now();
     let out = '';
     const model = this.keyring.data.routes.fast.provider === key.provider && this.keyring.data.routes.fast.model ? this.keyring.data.routes.fast.model : PROVIDERS[key.provider].models.fast;
-    for await (const d of this.client(key).stream({ model, system: 'Reply with the single word OK.', messages: [{ role: 'user', content: 'ping' }], maxTokens: 20, signal: AbortSignal.timeout(20000) })) out += d;
+    for await (const d of this.client(key).stream({ model, system: 'Reply with the single word OK.', messages: [{ role: 'user', content: 'ping' }], maxTokens: 1500, signal: AbortSignal.timeout(45000) })) if (typeof d === 'string') out += d;
     return { ok: true, ms: Math.round(performance.now() - t0), model, reply: out.trim().slice(0, 40) };
   }
 }

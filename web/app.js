@@ -65,13 +65,24 @@ function onEvent(m) {
   switch (m.type) {
     case 'hello': S.overview = m.overview; applySettings(); if (!S.greeted) { S.greeted = true; } render(); break;
     case 'state': setState(m.state === 'speaking' && !voice.supported.tts ? 'processing' : m.state); if (m.model) S.lastModel = `${m.provider} · ${m.model}${m.failovers ? ` · switched ${m.failovers}×` : ''}`; updateChip(); break;
-    case 'delta': S.live += m.text; if (voice.mode !== 'off' || S.speakReplies) voice.feed(m.text); renderLive(); break;
+    case 'thinking': if (S.pending) S.pending.thinking = true; renderLive(); break;
+    case 'agent-note': S.chat.push({ role: 'note', text: m.text }); renderLive(); break;
+    case 'tool': {
+      const t = S.chat.find((x) => x.role === 'tool' && x.callId === m.callId);
+      if (t) Object.assign(t, { status: m.status, output: m.output }); else S.chat.push({ role: 'tool', ...m });
+      if (S.pending) S.pending.at = Date.now(); renderLive(); break;
+    }
+    case 'approve':
+      S.chat.push({ role: 'approve', ...m, state: 'pending' });
+      if (S.view !== 'conversations') toast(`ORBIT wants to: ${m.summary}`, 'warn', [h('button', { class: 'btn small primary', onclick: () => answerApproval(m.id, true) }, 'Approve'), h('button', { class: 'btn small', onclick: () => go('conversations') }, 'Review')]);
+      renderLive(); break;
+    case 'delta': S.pending = null; S.live += m.text; if (voice.mode !== 'off' || S.speakReplies) voice.feed(m.text); renderLive(); break;
     case 'done': {
       const text = m.text ?? S.live;
       if (!S.live && text && (voice.mode !== 'off' || S.speakReplies)) voice.say(text); else voice.flush();
       if (text) S.chat.push({ role: 'orbit', text, ok: m.ok, ms: m.ms, route: m.route });
       report({ reply: text || '', phase: m.ok === false ? 'error' : 'idle' });
-      S.live = ''; renderLive(); refresh(); break;
+      S.live = ''; S.pending = null; renderLive(); refresh(); break;
     }
     case 'action': S.actions.unshift({ ...m, at: new Date().toISOString() }); S.actions.length = Math.min(S.actions.length, 20); if (S.view === 'dashboard') render(); break;
     case 'confirm': toast(m.prompt, 'warn', [h('button', { class: 'btn small primary', onclick: () => utter('yes') }, 'Confirm'), h('button', { class: 'btn small', onclick: () => utter('cancel') }, 'Cancel')]); break;
@@ -80,7 +91,7 @@ function onEvent(m) {
     case 'recent': if (S.overview) { S.overview.recent = m.recent; if (S.view === 'dashboard') render(); } break;
     case 'notify': S.notes.unshift({ ...m, at: new Date().toISOString() }); toast(m.text, m.level === 'warn' ? 'warn' : ''); if (m.speak) voice.say(m.text); if (S.view === 'dashboard') render(); break;
     case 'mic': if (!m.enabled) voice.killAll(); break;
-    case 'error': toast(m.message, 'bad'); break;
+    case 'error': S.pending = null; toast(m.message, 'bad'); renderLive(); break;
     case 'model': S.overview.brain = { ...S.overview.brain, ...m }; S.lastModel = ''; updateChip(); if (S.view === 'ai') render(); break;
   }
 }
@@ -98,8 +109,8 @@ function updateChip() { const b = S.overview?.brain; $('#model-chip').textConten
 function utter(text, source = 'text') {
   text = text.trim(); if (!text) return;
   voice.interrupt('new');
-  S.heard = text; S.chat.push({ role: 'user', text }); S.live = '';
-  send({ type: 'utterance', text, source });
+  S.heard = text; S.chat.push({ role: 'user', text }); S.live = ''; S.pending = { at: Date.now(), thinking: false }; startPendingTimer();
+  send({ type: 'utterance', text, source, mode: S.mode || 'chat' });
   renderLive();
 }
 
@@ -136,6 +147,36 @@ $('#ask').addEventListener('submit', (e) => { e.preventDefault(); const i = $('#
 
 function applySettings() { const s = S.overview?.settings; if (s?.voice) voice.voice = { ...voice.voice, ...s.voice }; S.speakReplies = !!s?.voice?.speakTyped; updateChip(); }
 async function refresh() { try { S.overview = await api('GET', '/api/overview'); updateChip(); if (S.view !== 'conversations' || !S.live) render(); } catch {} }
+
+function answerApproval(id, ok, session = false) {
+  const a = S.chat.find((x) => x.role === 'approve' && x.id === id);
+  if (a) a.state = ok ? (session ? 'session' : 'approved') : 'denied';
+  send({ type: 'approve', id, ok, session }); renderLive();
+}
+
+// Minimal, safe markdown: code fences (with copy), inline code, bold, headings and lists. No HTML is ever injected.
+function md(text) {
+  const out = [];
+  const parts = String(text).split(/```([\w+-]*)\n?([\s\S]*?)(?:```|$)/g);
+  for (let i = 0; i < parts.length; i += 3) {
+    for (const para of parts[i].split(/\n{2,}/)) {
+      if (!para.trim()) continue;
+      const lines = para.split('\n');
+      if (lines.every((l) => /^\s*([-*•]|\d+\.)\s+/.test(l))) out.push(h('ul', { class: 'md-list' }, lines.map((l) => h('li', {}, inline(l.replace(/^\s*([-*•]|\d+\.)\s+/, ''))))));
+      else if (/^#{1,4}\s/.test(para)) out.push(h('div', { class: 'md-h' }, inline(para.replace(/^#+\s*/, ''))));
+      else out.push(h('p', { class: 'md-p' }, lines.flatMap((l, j) => [...inline(l), j < lines.length - 1 ? h('br') : null])));
+    }
+    if (i + 2 < parts.length) {
+      const code = parts[i + 2].replace(/\n$/, '');
+      const copy = h('button', { class: 'btn small ghost code-copy', onclick: async () => { try { await navigator.clipboard.writeText(code); copy.textContent = 'Copied'; setTimeout(() => (copy.textContent = 'Copy'), 1500); } catch {} } }, 'Copy');
+      out.push(h('div', { class: 'code-block' }, h('div', { class: 'code-head' }, h('span', { class: 'mono muted' }, parts[i + 1] || 'code'), copy), h('pre', { class: 'cmd' }, h('code', {}, code))));
+    }
+  }
+  return out;
+}
+function inline(t) {
+  return String(t).split(/(`[^`]+`|\*\*[^*]+\*\*)/g).filter(Boolean).map((x) => (x.startsWith('`') ? h('code', { class: 'md-code' }, x.slice(1, -1)) : x.startsWith('**') ? h('b', {}, x.slice(2, -2)) : x));
+}
 
 // ---- model switcher (top bar) ----
 const chip = $('#model-chip'), menu = $('#model-menu');
@@ -200,8 +241,13 @@ function go(v) { S.view = v; try { history.replaceState(null, '', `#${v}`); } ca
 const panel = (title, ...kids) => h('div', { class: 'panel' }, h('h2', {}, title), ...kids);
 const empty = (t) => h('div', { class: 'empty' }, t);
 
+// While waiting for the first words of a reply, show that ORBIT is working (and for how long).
+let pendingTimer;
+function startPendingTimer() { clearInterval(pendingTimer); pendingTimer = setInterval(() => { if (!S.pending) return clearInterval(pendingTimer); renderLive(); }, 1000); }
+const pendingText = () => S.pending && `${S.pending.thinking ? 'Thinking' : 'Working on it'}… ${Math.round((Date.now() - S.pending.at) / 1000)}s`;
+
 function renderLive() {
-  const el = $('#transcript'); if (el) el.replaceChildren(...[S.heard ? h('span', { class: 'you' }, `“${S.heard}”`) : null, S.live || (S.chat.at(-1)?.role === 'orbit' ? S.chat.at(-1).text : '')].filter(Boolean));
+  const el = $('#transcript'); if (el) el.replaceChildren(...[S.heard ? h('span', { class: 'you' }, `“${S.heard}”`) : null, S.live || pendingText() || (S.chat.at(-1)?.role === 'orbit' ? S.chat.at(-1).text : '')].filter(Boolean));
   if (S.view === 'conversations') renderChat();
 }
 
@@ -337,7 +383,13 @@ const VIEWS = {
   conversations() {
     const box = h('div', { class: 'chat', id: 'chat' });
     setTimeout(renderChat);
-    return panel('This session', box);
+    const modeBtn = (m, label) => h('button', { type: 'button', role: 'radio', 'aria-checked': String((S.mode || 'chat') === m), class: `btn small ${(S.mode || 'chat') === m ? 'primary' : ''}`, onclick: () => { S.mode = m; render(); } }, label);
+    return h('div', { class: 'stack' },
+      h('div', { class: 'row' },
+        h('div', { class: 'row', role: 'radiogroup', 'aria-label': 'Mode' }, modeBtn('chat', 'Chat'), modeBtn('code', 'Code')),
+        h('span', { class: 'muted' }, S.mode === 'code' ? 'Coding session: ORBIT plans, writes files in ORBIT Workspace, runs and tests them.' : 'Ask anything. Tasks like "create me a website" use your computer automatically.'),
+        h('button', { class: 'btn small', style: null, onclick: () => { S.chat = []; send({ type: 'new-session' }); render(); } }, 'New session')),
+      panel(S.mode === 'code' ? 'Coding session' : 'This session', box));
   },
 
   devices() {
@@ -542,7 +594,8 @@ const VIEWS = {
           panel('Personality',
             h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-user' }, 'What should ORBIT call you?'), name),
             h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-tone' }, 'Tone'), tone),
-            h('button', { class: 'btn primary', onclick: async () => { S.overview.settings = await api('PATCH', '/api/settings', { userName: name.value, tone: tone.value }); toast('Saved.'); } }, 'Save'))));
+            h('div', { class: 'field' }, h('label', { class: 'label', for: 'ai-instr' }, 'Your instructions for ORBIT'), instr, h('div', { class: 'muted' }, 'Added to every conversation, e.g. "Be blunt", "Skip disclaimers", "Answer in British English". How much a model follows them depends on the model.')),
+            h('button', { class: 'btn primary', onclick: async () => { S.overview.settings = await api('PATCH', '/api/settings', { userName: name.value, tone: tone.value, customInstructions: instr.value }); toast('Saved.'); } }, 'Save'))));
     }).catch((e) => wrap.replaceChildren(empty(e.message)));
     return wrap;
   },
@@ -559,6 +612,13 @@ const VIEWS = {
         } }))),
       h('div', { class: 'row' }, h('button', { class: 'btn danger', onclick: async () => { if (confirm(`Revoke ${d.name}? It will be disconnected immediately and must be paired again.`)) { await api('DELETE', `/api/devices/${d.id}`); refresh(); } } }, 'Revoke access'))));
     return h('div', { class: 'stack' }, h('div', { class: 'grid2' }, ...(devicePanels.length ? devicePanels : [panel('Device permissions', empty('No devices paired.'))])),
+      panel('Full control',
+        h('div', { class: 'perm' }, h('span', {}, 'Let the AI run commands and edit files anywhere without asking', h('div', { class: 'muted' }, 'Off (recommended): ORBIT asks before every command or file change, and only uses ORBIT Workspace, Documents and Desktop. On: it acts on its own, in any folder. Everything is still recorded in the audit log below.')),
+          (() => { const b = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Full control', 'aria-checked': String(!!o.settings.fullControl) }); b.addEventListener('click', async () => {
+            const on = b.getAttribute('aria-checked') !== 'true';
+            if (on && !confirm('Give the AI full control of this computer? It will run commands and change files anywhere without asking.')) return;
+            S.overview.settings = await api('PATCH', '/api/settings', { fullControl: on }); b.setAttribute('aria-checked', String(on)); toast(on ? 'Full control is on.' : 'ORBIT will ask before acting.');
+          }); return b; })())),
       panel('Data', h('p', { class: 'muted' }, 'API keys live only in the server .env. The dashboard uses a separate access token. Device credentials are stored hashed and can be revoked at any time. Screenshots are analysed in memory and never written to the server.')),
       panel('Audit log', log));
   },
@@ -566,9 +626,25 @@ const VIEWS = {
 
 function renderChat() {
   const box = $('#chat'); if (!box) return;
-  const msgs = S.chat.map((m) => h('div', { class: `msg ${m.role}` }, m.text, m.role === 'orbit' && m.ms != null ? h('div', { class: 'muted mono' }, `${m.route || 'local'} · ${m.ms} ms`) : null));
-  if (S.live) msgs.push(h('div', { class: 'msg orbit' }, S.live));
-  box.replaceChildren(...(msgs.length ? msgs : [empty('No conversation yet in this session.')]));
+  const msgs = S.chat.map((m) => {
+    if (m.role === 'user') return h('div', { class: 'msg user' }, m.text);
+    if (m.role === 'note') return h('div', { class: 'msg note' }, ...md(m.text));
+    if (m.role === 'tool') return h('details', { class: `tool-step ${m.status}` },
+      h('summary', {}, h('span', { class: `tag ${m.status === 'ok' ? 'ok' : m.status === 'failed' ? 'bad' : ''}` }, m.status === 'running' ? '…' : m.status === 'ok' ? '✓' : '✕'), ' ', m.summary || m.name),
+      m.output ? h('pre', { class: 'cmd' }, m.output) : null);
+    if (m.role === 'approve') return h('div', { class: 'approve-card', role: 'group', 'aria-label': 'Approval needed' },
+      h('b', {}, m.state === 'pending' ? 'ORBIT wants to:' : m.state === 'denied' ? 'Declined:' : 'Approved:'), ' ', m.summary,
+      m.detail ? h('details', {}, h('summary', {}, 'Details'), h('pre', { class: 'cmd' }, m.detail)) : null,
+      m.state === 'pending' ? h('div', { class: 'row' },
+        h('button', { class: 'btn small primary', onclick: () => answerApproval(m.id, true) }, 'Approve'),
+        h('button', { class: 'btn small', onclick: () => answerApproval(m.id, true, true) }, 'Allow for this session'),
+        h('button', { class: 'btn small danger', onclick: () => answerApproval(m.id, false) }, 'Deny')) : null);
+    return h('div', { class: 'msg orbit' }, ...md(m.text), m.ms != null ? h('div', { class: 'muted mono' }, `${m.route || 'local'} · ${(m.ms / 1000).toFixed(1)} s`) : null);
+  });
+  if (S.live) msgs.push(h('div', { class: 'msg orbit' }, ...md(S.live)));
+  else if (S.pending) msgs.push(h('div', { class: 'msg orbit pending', role: 'status' }, pendingText()));
+  box.replaceChildren(...(msgs.length ? msgs : [empty(S.mode === 'code' ? 'Describe what to build, e.g. "a to-do app in React" or "fix the error in my script".' : 'No conversation yet in this session.')]));
+  box.lastElementChild?.scrollIntoView({ block: 'end' });
 }
 
 function render() {

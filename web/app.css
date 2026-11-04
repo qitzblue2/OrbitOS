@@ -153,3 +153,17 @@ pre.cmd{margin:0;padding:12px;border-radius:var(--r1);background:#020610;border:
 .list li > select{width:auto;flex:0 1 260px;min-width:160px;max-width:100%}
 .list li > .grow{flex:1 1 220px}
 .menu-search{margin:4px 4px 6px;width:calc(100% - 8px)}
+.msg.pending{color:var(--muted);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.5}}
+
+.msg.note{color:var(--text2);font-size:14px;border-left:2px solid var(--line2);padding-left:12px}
+.md-p{margin:0 0 8px} .md-h{font-weight:600;margin:6px 0} .md-list{margin:0 0 8px;padding-left:20px}
+.md-code{font-family:var(--mono);font-size:13px;background:rgba(3,8,18,.7);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.code-block{margin:6px 0 10px;border:1px solid var(--line);border-radius:var(--r1);overflow:hidden;background:#020610}
+.code-head{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;border-bottom:1px solid var(--line)}
+.code-block pre.cmd{border:0;border-radius:0;max-height:480px;overflow:auto;white-space:pre}
+.tool-step{font:13px var(--mono);color:var(--text2);padding:4px 0}
+.tool-step summary{cursor:pointer;list-style:none;display:flex;gap:6px;align-items:center}
+.tool-step pre.cmd{margin-top:6px;max-height:260px;overflow:auto}
+.approve-card{border:1px solid rgba(255,195,92,.45);background:rgba(255,195,92,.07);border-radius:var(--r2);padding:12px 14px;display:flex;flex-direction:column;gap:8px;max-width:720px}
+.msg.orbit{white-space:normal}

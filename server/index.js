@@ -16,10 +16,11 @@ import { testVoiceKey } from './voice/cloud.js';
 import { createHome } from './smarthome/index.js';
 import { Automations } from './automations.js';
 import { Engine } from './engine.js';
+import { Agent } from './agent.js';
 
 export function createOrbit(cfg = config) {
   const settingsStore = new JsonStore(cfg.dataDir, 'settings', {
-    userName: '', tone: 'composed', voice: { name: '', rate: 1.05, pitch: 0.95 },
+    userName: '', tone: 'composed', fullControl: false, customInstructions: '', voice: { name: '', rate: 1.05, pitch: 0.95 },
     wakeWord: true, proactive: { briefing: true, reminders: true, deviceAlerts: true }, retentionDays: 30,
   });
   const settings = { get data() { return settingsStore.data; }, ackTimeoutMs: cfg.deviceAckTimeoutMs };
@@ -36,6 +37,7 @@ export function createOrbit(cfg = config) {
   const home = createHome(cfg);
   const automations = new Automations(cfg.dataDir);
   const engine = new Engine({ brain, memory, devices, home, automations, audit, settings });
+  engine.agent = new Agent({ engine, brain, memory, devices, audit, settings });
   const uiClients = new Set();
   const broadcast = (type, data) => { const m = JSON.stringify({ type, ...data }); for (const c of uiClients) if (c.readyState === 1) c.send(m); };
 
@@ -98,7 +100,8 @@ export function createOrbit(cfg = config) {
     'POST /api/reminders/:id/done': (b, id) => automations.completeReminder(id),
     'GET /api/audit': () => audit.tail(100),
     'GET /api/settings': () => settings.data,
-    'PATCH /api/settings': (b) => { const allowed = ['userName', 'tone', 'voice', 'wakeWord', 'proactive', 'retentionDays']; for (const k of allowed) if (k in b) settings.data[k] = b[k]; settingsStore.save(); return settings.data; },
+    'PATCH /api/settings': (b) => { const allowed = ['userName', 'tone', 'voice', 'wakeWord', 'proactive', 'retentionDays', 'fullControl', 'customInstructions'];
+      if ('fullControl' in b) audit.write({ kind: 'security', action: b.fullControl ? 'full control ON' : 'full control off' }); for (const k of allowed) if (k in b) settings.data[k] = b[k]; settingsStore.save(); return settings.data; },
     'GET /api/ai/providers': () => Object.fromEntries(Object.entries(PROVIDERS).map(([id, p]) => [id, { note: p.note || '', kind: p.kind, extra: p.extra ? { label: p.extra.label, placeholder: p.extra.placeholder } : null, label: p.label, keyHint: p.keyHint, keyOptional: !!p.keyOptional, needsBaseUrl: !!p.needsBaseUrl, baseUrl: p.baseUrl || '', models: p.models, vision: !!p.vision, keysUrl: p.keysUrl || '' }])),
     'GET /api/ai/keys': () => keyring.list(),
     'GET /api/ai/models': () => brain.models(),
@@ -175,8 +178,10 @@ export function createOrbit(cfg = config) {
     ws.on('message', async (raw) => {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
       const emit = (type, data) => { if (ws.readyState === 1) ws.send(JSON.stringify({ type, ...data })); };
+      if (msg.type === 'approve') engine.agent.resolveApproval(msg.id, msg, sessionId);
+      if (msg.type === 'new-session') engine.agent.reset(sessionId);
       if (msg.type === 'utterance') {
-        await engine.handle({ text: msg.text, sessionId, source: msg.source, emit });
+        await engine.handle({ text: msg.text, sessionId, source: msg.source, emit, mode: msg.mode === 'code' ? 'code' : 'chat' });
         broadcast('recent', { recent: engine.recent.slice(0, 12) });
       }
       if (msg.type === 'interrupt') engine.cancel(sessionId);

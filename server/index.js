@@ -43,6 +43,16 @@ export function createOrbit(cfg = config) {
   const broadcast = (type, data) => { const m = JSON.stringify({ type, ...data }); for (const c of uiClients) if (c.readyState === 1) c.send(m); };
 
   const webRoot = path.join(cfg.root, 'web');
+  // Version stamp of the dashboard files: changes whenever any file changes. It is added to every
+  // script/style address, so browsers and CDNs can never keep running an old copy after an update.
+  const VERSION = (() => {
+    const h = crypto.createHash('sha1');
+    for (const f of fs.readdirSync(webRoot).sort()) { const st = fs.statSync(path.join(webRoot, f)); if (st.isFile()) h.update(`${f}:${st.size}:${st.mtimeMs}`); }
+    return h.digest('hex').slice(0, 10);
+  })();
+  const stamp = (text, ext) => (ext === '.html'
+    ? text.replace(/(src|href)="((?:app|core|voice|overlay)\.js|app\.css|overlay\.css|manifest\.webmanifest)"/g, `$1="$2?v=${VERSION}"`)
+    : ext === '.js' ? text.replace(/(from\s+|import\(\s*|addModule\(\s*|register\(\s*)'(\.\/)?([\w-]+\.js)'/g, `$1'./$3?v=${VERSION}'`).replace("'orbit-shell-v2'", `'orbit-shell-${VERSION}'`) : text);
   const MIME = { '.png': 'image/png', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
   const safeEq = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
   // Phones: paired once with a short code, each with its own revocable key (only a hash is stored).
@@ -195,12 +205,13 @@ export function createOrbit(cfg = config) {
       // Static dashboard
       const file = path.normalize(path.join(webRoot, url.pathname === '/' ? 'index.html' : url.pathname));
       if (!file.startsWith(webRoot) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
-      // Always revalidate the dashboard's files, so browsers and CDNs (e.g. Cloudflare) never keep
-      // running an old version after an update. Unchanged files answer 304 and aren't re-sent.
-      const st = fs.statSync(file);
-      const etag = `"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`;
-      const headers = { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache', etag, 'content-security-policy': "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data: blob:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com" };
+      // Always revalidate the dashboard's files, and stamp script/style addresses with the version,
+      // so browsers and CDNs (e.g. Cloudflare) never keep running an old version after an update.
+      const ext = path.extname(file);
+      const etag = `"${VERSION}"`;
+      const headers = { 'content-type': MIME[ext] || 'application/octet-stream', 'cache-control': 'no-cache, must-revalidate', etag, 'content-security-policy': "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data: blob:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com" };
       if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); return res.end(); }
+      if (ext === '.html' || ext === '.js') { res.writeHead(200, headers); return res.end(stamp(fs.readFileSync(file, 'utf8'), ext)); }
       res.writeHead(200, headers);
       fs.createReadStream(file).pipe(res);
     } catch (e) { json(res, 500, { error: 'Server error' }); }

@@ -280,7 +280,13 @@ test('pairing codes are rate-limited against guessing', async () => {
 
 test('dashboard files are always revalidated (no stale versions after updates)', async () => {
   const r = await fetch(`${base}/app.js`);
-  assert.equal(r.headers.get('cache-control'), 'no-cache');
+  assert.match(r.headers.get('cache-control'), /no-cache/);
+  const html = await (await fetch(`${base}/`)).text();
+  const v = html.match(/app\.js\?v=(\w+)/)?.[1];
+  assert.ok(v, 'dashboard script address carries a version stamp');
+  assert.match(html, new RegExp(`app\\.css\\?v=${v}`));
+  const js = await r.text();
+  assert.match(js, new RegExp(`from '\\./core\\.js\\?v=${v}'`), 'imports inside scripts are stamped too');
   const etag = r.headers.get('etag');
   assert.ok(etag);
   const again = await fetch(`${base}/app.js`, { headers: { 'if-none-match': etag } });

@@ -656,6 +656,9 @@ const VIEWS = {
         } }))),
       h('div', { class: 'row' }, h('button', { class: 'btn danger', onclick: async () => { if (confirm(`Revoke ${d.name}? It will be disconnected immediately and must be paired again.`)) { await api('DELETE', `/api/devices/${d.id}`); refresh(); } } }, 'Revoke access'))));
     return h('div', { class: 'stack' }, h('div', { class: 'grid2' }, ...(devicePanels.length ? devicePanels : [panel('Device permissions', empty('No devices paired.'))])),
+      panel('This device',
+        h('p', { class: 'muted' }, 'Sign out of ORBIT on this browser or phone. To use it again you\'ll need a new pairing code (or the access token).'),
+        h('button', { class: 'btn danger', onclick: () => { if (!confirm('Sign out on this device?')) return; try { localStorage.removeItem('orbit.token'); } catch {} location.hash = 'dashboard'; location.reload(); } }, 'Sign out')),
       panel('Full control',
         h('div', { class: 'perm' }, h('span', {}, 'Let the AI run commands and edit files anywhere without asking', h('div', { class: 'muted' }, 'Off (recommended): ORBIT asks before every command or file change, and only uses ORBIT Workspace, Documents and Desktop. On: it acts on its own, in any folder. Everything is still recorded in the audit log below.')),
           (() => { const b = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Full control', 'aria-checked': String(!!o.settings.fullControl) }); b.addEventListener('click', async () => {

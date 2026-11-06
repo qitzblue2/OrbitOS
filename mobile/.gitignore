@@ -1,0 +1,4 @@
+node_modules/
+android/
+capacitor.config.json
+*.apk

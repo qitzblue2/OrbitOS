@@ -132,7 +132,25 @@ To see the logs:
 journalctl -u orbit -f
 ```
 
-On a VPS, voice uses the browser's speech recognition. The on-device "Hey Orbit" wake word is part of the desktop app.
+On a VPS, phones and browsers use ORBIT's own speech engine running on the server: the "Hey Orbit" wake word, speech recognition and ORBIT's voice, with no Google or browser speech. Each phone using voice needs about 150 MB of server memory, and up to 3 can at once.
+
+### Android app (.apk)
+
+GitHub also builds an Android app that opens `https://orbitos.xdevstudios.net` with proper microphone access. Voice uses ORBIT's own speech engine on your server.
+
+1. In the [Actions tab](https://github.com/qitzblue2/OrbitOS/actions), open the newest green **Build ORBIT app** run and download **ORBIT-Android**. It's a zip containing `ORBIT-android.apk`.
+2. Copy the `.apk` to the phone, open it, and allow **Install unknown apps** for the app you opened it with when Android asks. This is the normal way to install apps from outside the Play Store.
+3. Open ORBIT, sign in with a pairing code (**Devices › Phone app › Pair a phone**), and allow the microphone when asked.
+
+To build it for a different server address yourself, run this in `mobile/`:
+
+```bash
+ORBIT_URL=https://your-domain npm run android
+```
+
+It needs Java 17 and the Android SDK.
+
+iPhone isn't available as an installable app: Apple only allows that through the App Store or with a paid developer account. On iPhone, use the home-screen web app instead; it uses the same speech engine on your server.
 
 ### Get the installer
 

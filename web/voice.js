@@ -358,4 +358,37 @@ export class NativeVoice extends EventTarget {
   cue(kind) { Voice.prototype.cue.call(this, kind); }
 }
 
-export const createVoice = () => (window.orbitNative ? new NativeVoice(window.orbitNative) : new Voice());
+// Phones and browsers: ORBIT's own speech engine running on the ORBIT server, reached over the live
+// connection. Falls back to the browser's speech service only if the server has no engine.
+export class RemoteVoice extends NativeVoice {
+  constructor(adapter) {
+    super(adapter);
+    this.remote = true;
+    adapter.on('unavailable', (reason) => this.useFallback(reason));
+  }
+  useFallback(reason) {
+    if (this.fb) return;
+    this.fb = new Voice();
+    for (const ev of ['level', 'state', 'interim', 'utterance', 'interrupt', 'error', 'ready']) this.fb.addEventListener(ev, (e) => this.emit(ev, e.detail));
+    this.fb.addEventListener('mode', (e) => { this.mode = e.detail; this.emit('mode', e.detail); });
+    this.supported = this.fb.supported;
+    this.emit('fallback', reason);
+  }
+  async ensureReady() {
+    for (let i = 0; i < 120 && !this.ready && !this.fb; i++) {
+      this.info = await this.n.getInfo(); this.ready = this.info.speechReady;
+      if (!this.ready && !this.fb) { if (i === 0) this.emit('mode', 'starting'); await new Promise((r) => setTimeout(r, 250)); }
+    }
+    return this.ready || !!this.fb;
+  }
+  async setMode(m) { if (m !== 'off' && !this.fb) await this.ensureReady(); return this.fb ? this.fb.setMode(m) : super.setMode(m); }
+  async pttStart() { if (!this.fb) await this.ensureReady(); return this.fb ? this.fb.pttStart() : super.pttStart(); }
+  pttEnd() { return this.fb ? this.fb.pttEnd() : super.pttEnd(); }
+  feed(d) { return this.fb ? this.fb.feed(d) : super.feed(d); }
+  flush() { return this.fb ? this.fb.flush() : super.flush(); }
+  say(t) { return this.fb ? this.fb.say(t) : super.say(t); }
+  interrupt(by) { return this.fb ? this.fb.interrupt(by) : super.interrupt(by); }
+  killAll() { return this.fb ? this.fb.killAll() : super.killAll(); }
+}
+
+export const createVoice = (remote) => (window.orbitNative ? new NativeVoice(window.orbitNative) : remote ? new RemoteVoice(remote) : new Voice());

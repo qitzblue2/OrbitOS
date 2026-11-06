@@ -1,8 +1,16 @@
 // Runs the on-device speech engine in its own process so wake-word detection never stalls the UI.
 const { LocalSpeech } = require('./speech.js');
 
+// Runs both inside the desktop app (Electron utilityProcess) and on a server (Node child_process),
+// where it gives phones the same on-device speech engine.
+const port = process.parentPort || {
+  postMessage: (m) => process.send && process.send(m),
+  on: (_ev, fn) => process.on('message', (data) => fn({ data })),
+};
+if (!process.parentPort) process.on('disconnect', () => process.exit(0));
+
 let engine = null;
-const send = (msg) => process.parentPort.postMessage(msg);
+const send = (msg) => port.postMessage(msg);
 
 function boot({ modelsDir, sensitivity, voice, voiceDirs, patience }) {
   try {
@@ -13,7 +21,7 @@ function boot({ modelsDir, sensitivity, voice, voiceDirs, patience }) {
   } catch (e) { send({ type: 'error', message: e.message }); }
 }
 
-process.parentPort.on('message', ({ data: m }) => {
+port.on('message', ({ data: m }) => {
   if (m.type === 'boot') return boot(m);
   if (!engine) return;
   switch (m.type) {

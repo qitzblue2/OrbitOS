@@ -6,5 +6,7 @@ APP=/opt/orbit; BRANCH="${ORBIT_BRANCH:-OrbitAI}"
 git -C "$APP" fetch -q origin "$BRANCH"
 git -C "$APP" checkout -q -B "$BRANCH" "origin/$BRANCH"
 (cd "$APP" && npm ci --omit=dev --no-audit --no-fund)
+# ORBIT's own speech engine for phones and browsers (~150 MB, downloaded once)
+(cd "$APP" && node app/models.js) || echo "!!  Speech models could not be downloaded; phones will use browser speech until they are."
 systemctl restart orbit
 echo "ORBIT updated to $(git -C "$APP" log --oneline -1)"

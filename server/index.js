@@ -18,6 +18,7 @@ import { createHome } from './smarthome/index.js';
 import { Automations } from './automations.js';
 import { Engine } from './engine.js';
 import { Agent } from './agent.js';
+import { createPhoneSpeech } from './phone-speech.js';
 
 export function createOrbit(cfg = config) {
   const settingsStore = new JsonStore(cfg.dataDir, 'settings', {
@@ -40,6 +41,7 @@ export function createOrbit(cfg = config) {
   const engine = new Engine({ brain, memory, devices, home, automations, audit, settings });
   engine.agent = new Agent({ engine, brain, memory, devices, audit, settings });
   const uiClients = new Set();
+  const phoneSpeech = createPhoneSpeech(cfg);
   const broadcast = (type, data) => { const m = JSON.stringify({ type, ...data }); for (const c of uiClients) if (c.readyState === 1) c.send(m); };
 
   const webRoot = path.join(cfg.root, 'web');
@@ -85,7 +87,7 @@ export function createOrbit(cfg = config) {
   });
 
   const overview = () => ({
-    brain: brain.status(), aiKeys: keyring.list(), home: { name: home.name, simulated: !!home.simulated },
+    serverSpeech: phoneSpeech.available(), brain: brain.status(), aiKeys: keyring.list(), home: { name: home.name, simulated: !!home.simulated },
     devices: devices.list(), recent: engine.recent.slice(0, 12), routines: automations.routines(),
     reminders: automations.reminders().filter((r) => !r.done), memoryCount: memory.list().length,
     settings: settings.data, capabilities: CAPABILITIES, memoryKinds: MEMORY_KINDS,
@@ -252,9 +254,12 @@ export function createOrbit(cfg = config) {
   function onUi(ws) {
     uiClients.add(ws);
     const sessionId = crypto.randomUUID();
+    const speech = phoneSpeech.attach(ws);
     ws.send(JSON.stringify({ type: 'hello', sessionId, overview: overview() }));
-    ws.on('message', async (raw) => {
+    ws.on('message', async (raw, isBinary) => {
+      if (isBinary) return speech.onAudio(raw);
       let msg; try { msg = JSON.parse(raw); } catch { return; }
+      if (msg.type?.startsWith('speech-')) return speech.onMessage(msg);
       const emit = (type, data) => { if (ws.readyState === 1) ws.send(JSON.stringify({ type, ...data })); };
       if (msg.type === 'approve') engine.agent.resolveApproval(msg.id, msg, sessionId);
       if (msg.type === 'new-session') engine.agent.reset(sessionId);
@@ -265,7 +270,7 @@ export function createOrbit(cfg = config) {
       if (msg.type === 'interrupt') engine.cancel(sessionId);
       if (msg.type === 'state') broadcast('core', { state: msg.state }); // listening/idle from the voice engine
     });
-    ws.on('close', () => { uiClients.delete(ws); engine.cancel(sessionId); });
+    ws.on('close', () => { uiClients.delete(ws); engine.cancel(sessionId); speech.close(); });
   }
 
   function onDevice(ws, device) {

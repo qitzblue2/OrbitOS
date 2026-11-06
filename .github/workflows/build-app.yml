@@ -64,3 +64,28 @@ jobs:
             release/*.AppImage
             release/*.deb
           if-no-files-found: error
+
+  android:
+    # ORBIT for Android: a debug-signed .apk that opens your ORBIT server with microphone access.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Build the Android app
+        working-directory: mobile
+        env:
+          ORBIT_URL: https://orbitos.xdevstudios.net
+        run: |
+          npm ci --no-audit --no-fund
+          npm run android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ORBIT-Android
+          path: mobile/ORBIT-android.apk
+          if-no-files-found: error

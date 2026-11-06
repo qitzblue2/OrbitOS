@@ -49,6 +49,8 @@ else git clone -q --branch "$BRANCH" --depth 1 "$REPO" "$APP" || { echo "Couldn'
 fi
 git -C "$APP" remote set-url origin "$(git -C "$APP" remote get-url origin | sed -E 's#https://[^@/]+@#https://#')" # never keep a token in the config
 (cd "$APP" && npm ci --omit=dev --no-audit --no-fund)
+# ORBIT's own speech engine for phones and browsers (~150 MB, downloaded once)
+(cd "$APP" && node app/models.js) || echo "!!  Speech models could not be downloaded; phones will use browser speech until they are."
 chown -R root:root "$APP"
 
 # Settings (ORBIT listens only locally; Caddy handles the internet side)

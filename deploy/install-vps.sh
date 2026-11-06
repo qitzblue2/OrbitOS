@@ -96,7 +96,21 @@ if command -v ufw >/dev/null && ufw status | grep -q active; then ufw allow 80/t
 systemctl daemon-reload
 systemctl enable --now orbit
 systemctl restart orbit
-systemctl reload caddy || systemctl restart caddy
+
+# Caddy needs ports 80 and 443. Explain clearly if something else already uses them.
+BUSY=$(ss -ltnpH '( sport = :80 or sport = :443 )' 2>/dev/null | grep -v caddy || true)
+if [ -n "$BUSY" ]; then
+  echo "!!  Ports 80/443 are already used by another program:"
+  echo "$BUSY" | sed 's/^/      /'
+  echo "!!  Stop it (e.g. 'sudo systemctl disable --now nginx' or 'apache2'), then run: sudo systemctl restart caddy"
+fi
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+systemctl enable caddy >/dev/null 2>&1 || true
+if ! systemctl restart caddy; then
+  echo "!!  Caddy (HTTPS) didn't start. Last lines of its log:"
+  journalctl -u caddy -n 15 --no-pager | sed 's/^/      /'
+  echo "!!  ORBIT itself is running; fix the issue above, then: sudo systemctl restart caddy"
+fi
 
 for i in $(seq 1 20); do [ -s "$DATA/admin-token" ] && break; sleep 0.5; done
 echo

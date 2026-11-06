@@ -47,7 +47,18 @@ async function api(method, path, body) {
 }
 function showLogin(err = '') { $('#app').hidden = true; $('#login').hidden = false; $('#login-error').textContent = err; $('#token').focus(); }
 $('#login-form').addEventListener('submit', async (e) => {
-  e.preventDefault(); S.token = $('#token').value.trim();
+  e.preventDefault();
+  const v = $('#token').value.trim();
+  // A 6-digit code pairs this phone (or browser) once and gets it its own key.
+  if (/^\d{6}$/.test(v)) {
+    const ua = navigator.userAgent;
+    const name = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android phone' : 'Browser';
+    const r = await fetch('/api/phone/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: v, name }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { $('#login-error').textContent = j.error || 'Pairing failed.'; return; }
+    S.token = j.token; setToken(S.token); start(); return;
+  }
+  S.token = v;
   try { await api('GET', '/api/overview'); setToken(S.token); start(); } catch (err) { if (err.message !== 'unauthorized') $('#login-error').textContent = err.message; }
 });
 
@@ -400,8 +411,34 @@ const VIEWS = {
         codeBox.replaceChildren(h('div', { class: 'code' }, code), h('p', { class: 'muted' }, `Valid until ${new Date(expiresAt).toLocaleTimeString()}. On the device run:`),
           h('pre', { class: 'cmd' }, `node companion/agent.js pair ${location.origin} ${code} "My laptop"\nnode companion/agent.js`));
       } }, 'Pair a new device'));
+    const phoneBox = h('div', { class: 'stack' });
+    const drawPhones = async () => {
+      const [acc, list] = await Promise.all([api('GET', '/api/phone/access'), api('GET', '/api/phones')]);
+      const sw = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Phone access on this Wi-Fi', 'aria-checked': String(acc.on) });
+      sw.addEventListener('click', async () => { await api('POST', '/api/phone/access', { on: !acc.on }); drawPhones(); });
+      const pair = h('button', { class: 'btn primary', disabled: !acc.on }, 'Pair a phone');
+      const out = h('div', {});
+      pair.addEventListener('click', async () => {
+        const r = await api('POST', '/api/phone/code');
+        out.replaceChildren(
+          h('ol', { class: 'md-list' },
+            h('li', {}, 'Connect your phone to the same Wi-Fi as this PC.'),
+            h('li', {}, 'Open this address in your phone\'s browser: ', ...r.urls.map((u, i) => [i ? ' or ' : '', h('b', { class: 'mono' }, u)])),
+            h('li', {}, 'Type this code: ', h('span', { class: 'code' }, r.code)),
+            h('li', {}, 'Add it to your home screen: iPhone: Share › Add to Home Screen. Android: ⋮ › Add to Home screen / Install app.')),
+          h('p', { class: 'muted' }, `The code works once and expires at ${new Date(r.expiresAt).toLocaleTimeString()}.`));
+      });
+      phoneBox.replaceChildren(
+        h('div', { class: 'perm' }, h('span', {}, 'Allow phones on this Wi-Fi', h('div', { class: 'muted' }, 'Off by default. Only paired phones can use ORBIT; your PC may ask to allow ORBIT through the firewall.')), sw),
+        pair, out,
+        list.length ? h('ul', { class: 'list' }, list.map((p) => h('li', {}, h('span', { class: 'grow' }, h('b', {}, p.name), h('div', { class: 'muted mono' }, `paired ${ago(p.createdAt)} ago · last used ${ago(p.lastSeen)}`)),
+          h('button', { class: 'btn small danger', onclick: async () => { await api('DELETE', `/api/phones/${p.id}`); drawPhones(); } }, 'Remove')))) : null,
+        h('p', { class: 'muted' }, 'Voice on the phone needs a secure (https) link, which phones require for the microphone. Typing works on Wi-Fi as is; see Phone app in the guide for voice and use away from home.'));
+    };
+    drawPhones();
     return h('div', { class: 'grid2' },
       panel('Pair', codeBox),
+      panel('Phone app', phoneBox),
       panel('Your devices', o.devices.length ? h('ul', { class: 'list' }, o.devices.map((d) => h('li', {},
         h('span', { class: `dot ${d.online ? 'on' : ''}` }),
         h('span', { class: 'grow' }, h('b', {}, d.name), h('div', { class: 'muted mono' }, `${d.platform} · ${d.online ? 'online' : `seen ${ago(d.lastSeen)}`}${d.status?.battery != null ? ` · ${d.status.battery}%` : ''}${d.status?.cpu != null ? ` · cpu ${d.status.cpu}%` : ''}`)),
@@ -662,6 +699,7 @@ function start() {
   connect();
 }
 
+if ('serviceWorker' in navigator && !window.orbitNative && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) navigator.serviceWorker.register('sw.js').catch(() => {});
 S.token = new URLSearchParams(location.hash.split('?')[1] || '').get('token') || getToken();
 if (S.token) api('GET', '/api/overview').then(() => { setToken(S.token); start(); }).catch(() => {}); else showLogin();
 speechSynthesis?.addEventListener?.('voiceschanged', () => { if (S.view === 'voice') render(); });

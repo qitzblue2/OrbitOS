@@ -3,6 +3,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import { WebSocketServer } from 'ws';
 import { config } from './config.js';
 import { JsonStore } from './store.js';
@@ -42,12 +43,20 @@ export function createOrbit(cfg = config) {
   const broadcast = (type, data) => { const m = JSON.stringify({ type, ...data }); for (const c of uiClients) if (c.readyState === 1) c.send(m); };
 
   const webRoot = path.join(cfg.root, 'web');
-  const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
+  const MIME = { '.png': 'image/png', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
   const safeEq = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  // Phones: paired once with a short code, each with its own revocable key (only a hash is stored).
+  const phones = new JsonStore(cfg.dataDir, 'phones', { phones: [], codes: [] });
+  const hash = (t) => crypto.createHash('sha256').update(t).digest('hex');
+  const phoneFor = (t) => { const h = hash(t); return phones.data.phones.find((p) => safeEq(p.tokenHash, h)); };
   const isAdmin = (req, url) => {
     const t = (req.headers.authorization || '').replace(/^Bearer /, '') || url.searchParams.get('token') || '';
-    return t && safeEq(t, cfg.adminToken);
+    if (!t) return false;
+    if (safeEq(t, cfg.adminToken)) return true;
+    const p = phoneFor(t); if (p) { p.lastSeen = new Date().toISOString(); phones.save(); }
+    return !!p;
   };
+  const lanUrls = (port) => Object.values(os.networkInterfaces()).flat().filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => `http://${i.address}:${port}`);
   const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
   const readBody = (req) => new Promise((resolve, reject) => {
     let b = ''; req.on('data', (c) => { b += c; if (b.length > 2e6) { reject(new Error('too large')); req.destroy(); } });
@@ -117,10 +126,20 @@ export function createOrbit(cfg = config) {
       }
       catch (e) { keyring.markFailure(k, e); return { ok: false, error: friendly(e, k.provider) }; }
     },
+    'POST /api/phone/code': () => {
+      const code = String(crypto.randomInt(100000, 999999));
+      phones.data.codes = phones.data.codes.filter((c) => c.expiresAt > Date.now());
+      phones.data.codes.push({ codeHash: hash(code), expiresAt: Date.now() + 10 * 60 * 1000 }); phones.save();
+      return { code, expiresAt: Date.now() + 10 * 60 * 1000, urls: phoneAccess.port ? lanUrls(phoneAccess.port) : [], phoneAccess: !!phoneAccess.port };
+    },
+    'POST /api/phone/access': async (b) => { const r = await setPhoneAccess(!!b.on); settings.data.phoneAccess = !!b.on; settingsStore.save(); return r; },
+    'GET /api/phone/access': () => ({ on: !!phoneAccess.port, port: phoneAccess.port, urls: phoneAccess.port ? lanUrls(phoneAccess.port) : [] }),
+    'GET /api/phones': () => phones.data.phones.map(({ id, name, createdAt, lastSeen }) => ({ id, name, createdAt, lastSeen })),
+    'DELETE /api/phones/:id': (b, id) => { phones.data.phones = phones.data.phones.filter((p) => p.id !== id); phones.flush(); audit.write({ kind: 'security', action: 'phone removed', id }); return { ok: true }; },
     'PATCH /api/ai/routes': (b) => (keyring.setRoutes(b), brain.status()),
   };
 
-  const server = http.createServer(async (req, res) => {
+  const handleRequest = async (req, res) => {
     const url = new URL(req.url, 'http://x');
     res.setHeader('x-content-type-options', 'nosniff');
     res.setHeader('referrer-policy', 'no-referrer');
@@ -132,6 +151,17 @@ export function createOrbit(cfg = config) {
         return json(res, r ? 200 : 401, r || { error: 'Invalid or expired pairing code' });
       }
       if (url.pathname === '/api/health') return json(res, 200, { ok: true });
+      if (url.pathname === '/api/phone/pair' && req.method === 'POST') {
+        const b = await readBody(req);
+        const i = phones.data.codes.findIndex((c) => c.expiresAt > Date.now() && safeEq(c.codeHash, hash(String(b.code || ''))));
+        if (i < 0) { audit.write({ kind: 'security', action: 'phone pairing refused' }); return json(res, 401, { error: 'That code is wrong or has expired. Make a new one on your PC.' }); }
+        phones.data.codes.splice(i, 1);
+        const token = crypto.randomBytes(32).toString('base64url');
+        const phone = { id: crypto.randomUUID(), name: String(b.name || 'Phone').slice(0, 40), tokenHash: hash(token), createdAt: new Date().toISOString(), lastSeen: null };
+        phones.data.phones.push(phone); phones.flush();
+        audit.write({ kind: 'security', action: 'phone paired', name: phone.name });
+        return json(res, 200, { token, name: phone.name });
+      }
       if (url.pathname.startsWith('/api/')) {
         if (!isAdmin(req, url)) return json(res, 401, { error: 'Unauthorized' });
         let fn = routes[`${req.method} ${url.pathname}`], id = null;
@@ -152,11 +182,12 @@ export function createOrbit(cfg = config) {
       res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'content-security-policy': "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data: blob:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com" });
       fs.createReadStream(file).pipe(res);
     } catch (e) { json(res, 500, { error: 'Server error' }); }
-  });
+  };
+  const server = http.createServer(handleRequest);
 
   // ---- realtime ------------------------------------------------------------
   const wss = new WebSocketServer({ noServer: true, maxPayload: 12 * 1024 * 1024 });
-  server.on('upgrade', (req, socket, head) => {
+  const handleUpgrade = (req, socket, head) => {
     const url = new URL(req.url, 'http://x');
     if (url.pathname === '/ws/ui') {
       if (!isAdmin(req, url)) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
@@ -169,7 +200,21 @@ export function createOrbit(cfg = config) {
       return wss.handleUpgrade(req, socket, head, (ws) => onDevice(ws, device));
     }
     socket.destroy();
-  });
+  };
+  server.on('upgrade', handleUpgrade);
+
+  // Phone access: a second entrance on the home network, only while switched on.
+  const phoneAccess = { server: null, port: 0 };
+  async function setPhoneAccess(on, port = 7790) {
+    if (phoneAccess.server) { phoneAccess.server.close(); phoneAccess.server = null; phoneAccess.port = 0; }
+    if (!on) return { on: false };
+    const srv = http.createServer(handleRequest); srv.on('upgrade', handleUpgrade);
+    const tryListen = (p) => new Promise((resolve, reject) => { srv.once('error', reject); srv.listen(p, '0.0.0.0', () => resolve(srv.address().port)); });
+    phoneAccess.port = await tryListen(port).catch(() => tryListen(0));
+    phoneAccess.server = srv;
+    audit.write({ kind: 'security', action: 'phone access on', port: phoneAccess.port });
+    return { on: true, port: phoneAccess.port, urls: lanUrls(phoneAccess.port) };
+  }
 
   function onUi(ws) {
     uiClients.add(ws);
@@ -219,10 +264,11 @@ export function createOrbit(cfg = config) {
     for (const r of automations.due()) { r.fired = true; automations.store.save(); broadcast('notify', { level: 'info', text: `Reminder: ${r.text}`, speak: true, reminderId: r.id }); }
   }, 15000);
 
+  if (settings.data.phoneAccess) setPhoneAccess(true).catch(() => {});
   return {
-    server, engine, devices, memory, automations, brain, keyring,
+    setPhoneAccess, server, engine, devices, memory, automations, brain, keyring,
     listen: (port = cfg.port, host = cfg.host) => new Promise((r) => server.listen(port, host, () => r(server.address()))),
-    close: () => { clearInterval(heartbeat); clearInterval(reminderTimer); for (const c of wss.clients) c.terminate(); return new Promise((r) => server.close(r)); },
+    close: () => { if (phoneAccess.server) phoneAccess.server.close(); clearInterval(heartbeat); clearInterval(reminderTimer); for (const c of wss.clients) c.terminate(); return new Promise((r) => server.close(r)); },
   };
 }
 

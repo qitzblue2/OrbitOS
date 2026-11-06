@@ -235,3 +235,37 @@ test('model accuracy: defaults are corrected from the live list; your own pick i
   assert.equal(st.fastModel, 'anthropic/claude-sonnet-5.5', 'an explicit choice is never silently replaced');
   assert.deepEqual(st.unavailable, ['fast'], 'but it is flagged as not available');
 });
+
+test('phone app: pairing code works once, phone key works, removing it revokes it', async () => {
+  const off = (await api('GET', '/api/phone/access')).body;
+  assert.equal(off.on, false, 'phone access is off by default');
+  const on = (await api('POST', '/api/phone/access', { on: true })).body;
+  assert.ok(on.on && on.port > 0);
+  // The phone entrance answers on the network address too
+  const lan = await fetch(`http://127.0.0.1:${on.port}/api/health`);
+  assert.equal(lan.status, 200);
+
+  const { code } = (await api('POST', '/api/phone/code')).body;
+  const pair = (c) => fetch(`http://127.0.0.1:${on.port}/api/phone/pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: c, name: 'iPhone' }) });
+  assert.equal((await pair('000000')).status, 401, 'wrong code refused');
+  const ok = await pair(code);
+  assert.equal(ok.status, 200);
+  const { token } = await ok.json();
+  assert.equal((await pair(code)).status, 401, 'code works only once');
+
+  const asPhone = (p) => fetch(`http://127.0.0.1:${on.port}${p}`, { headers: { authorization: `Bearer ${token}` } });
+  assert.equal((await asPhone('/api/overview')).status, 200, 'phone key works');
+  const list = (await api('GET', '/api/phones')).body;
+  assert.equal(list[0].name, 'iPhone');
+  assert.ok(!JSON.stringify(list).includes(token), 'key never listed');
+  await api('DELETE', `/api/phones/${list[0].id}`);
+  assert.equal((await asPhone('/api/overview')).status, 401, 'removed phone is cut off');
+
+  const manifest = await fetch(`http://127.0.0.1:${on.port}/manifest.webmanifest`);
+  assert.match(manifest.headers.get('content-type'), /manifest/);
+  assert.equal((await manifest.json()).display, 'standalone');
+  assert.equal((await fetch(`http://127.0.0.1:${on.port}/icons/icon-192.png`)).headers.get('content-type'), 'image/png');
+
+  await api('POST', '/api/phone/access', { on: false });
+  await assert.rejects(fetch(`http://127.0.0.1:${on.port}/api/health`), 'entrance closed when switched off');
+});

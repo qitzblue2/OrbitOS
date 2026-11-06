@@ -1,0 +1,15 @@
+{
+  "name": "ORBIT",
+  "short_name": "ORBIT",
+  "description": "Your personal AI, connected to your computer.",
+  "start_url": "./#dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#03060d",
+  "theme_color": "#03060d",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

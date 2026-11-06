@@ -63,6 +63,33 @@ Speech is played gaplessly, with faded joins. Sentences are grouped into longer 
 - **By voice:** say "Orbit, switch to GPT-4o" or "Orbit, use Claude Sonnet". "Which model are you using?" tells you the current one.
 - **Separate models:** in **AI configuration** you can pick one model for quick answers and another for deep reasoning, or type any model name under **Other…**.
 
+### Phone app (iPhone and Android)
+
+ORBIT has a phone app that installs from the browser, so no app store is needed. It connects to ORBIT on your PC, so you get the same AI, chats, coding sessions and PC control.
+
+1. On the PC, go to **Devices › Phone app** and turn on **Allow phones on this Wi-Fi**.
+2. Select **Pair a phone**. It shows an address and a 6-digit code.
+3. On the phone, on the same Wi-Fi, open that address and type the code.
+4. Add it to the home screen:
+   - **iPhone:** Share › **Add to Home Screen**.
+   - **Android:** ⋮ › **Install app** or **Add to Home screen**.
+
+Each phone gets its own key, which you can remove under **Devices**.
+
+**Voice and use away from home:** phones only allow the microphone on secure `https://` links. The simplest free option is Tailscale:
+1. Install Tailscale on the PC and the phone.
+2. On the PC, run:
+
+```bash
+tailscale serve 7790
+```
+
+3. Open the `https://…ts.net` address it gives you on the phone.
+
+That makes voice work, and it works away from home too.
+
+ORBIT isn't in the App Store or Google Play. Publishing there needs a developer account (adult, or held by a parent or guardian) and a store review.
+
 ### Get the installer
 
 Open the repository's **Actions** tab, choose **Build ORBIT app**, and select **Run workflow**. When the run finishes, download your installer from its artifacts:

@@ -6,6 +6,12 @@
 <meta name="theme-color" content="#03060d">
 <title>ORBIT</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ORBIT">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="app.css">
 <script type="module" src="app.js"></script>
@@ -16,9 +22,9 @@
 <div id="login" class="login" hidden>
   <form id="login-form" class="glass login-card">
     <div class="brand"><span class="brand-mark" aria-hidden="true"></span>ORBIT</div>
-    <p class="muted">Enter the dashboard token printed when the ORBIT server started.</p>
-    <label for="token" class="label">Access token</label>
-    <input id="token" type="password" autocomplete="current-password" required>
+    <p class="muted">On your PC, open ORBIT › Devices › Pair a phone, and type the 6-digit code here.</p>
+    <label for="token" class="label">Pairing code (or access token)</label>
+    <input id="token" type="text" inputmode="numeric" autocomplete="one-time-code" required>
     <button class="btn primary" type="submit">Connect</button>
     <p id="login-error" class="error-text" role="alert"></p>
   </form>

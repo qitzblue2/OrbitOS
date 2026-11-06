@@ -126,7 +126,9 @@ pre.cmd{margin:0;padding:12px;border-radius:var(--r1);background:#020610;border:
   .rail button span{display:none}
   .hud{grid-template-columns:1fr}
   .core-wrap{min-height:340px}
-  .dock{left:12px;right:12px;bottom:12px}
+  .dock{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom))}
+  .rail{bottom:calc(84px + env(safe-area-inset-bottom))}
+  .topbar{padding-top:calc(16px + env(safe-area-inset-top))}
   .main{padding-bottom:160px}
   .topbar,.view{padding-left:16px;padding-right:16px}
   .banner{margin:0 16px}

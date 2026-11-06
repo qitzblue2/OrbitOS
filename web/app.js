@@ -53,9 +53,10 @@ $('#login-form').addEventListener('submit', async (e) => {
   if (/^\d{6}$/.test(v)) {
     const ua = navigator.userAgent;
     const name = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android phone' : 'Browser';
-    const r = await fetch('/api/phone/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: v, name }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) { $('#login-error').textContent = j.error || 'Pairing failed.'; return; }
+    let r, j = {};
+    try { r = await fetch('/api/phone/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: v, name }) }); j = await r.json().catch(() => ({})); }
+    catch { $('#login-error').textContent = "Can't reach ORBIT. Check the phone is on the same Wi-Fi (or use the server's https address)."; return; }
+    if (!r.ok) { $('#login-error').textContent = `${j.error || 'Pairing failed.'} Make sure the code came from ORBIT at ${location.host}.`; return; }
     S.token = j.token; setToken(S.token); start(); return;
   }
   S.token = v;
@@ -420,17 +421,20 @@ const VIEWS = {
       const pair = h('button', { class: 'btn primary', disabled: !acc.on && !online }, 'Pair a phone');
       const out = h('div', {});
       pair.addEventListener('click', async () => {
-        const r = await api('POST', '/api/phone/code'); if (!r.urls.length) r.urls = [location.origin];
+        const r = await api('POST', '/api/phone/code');
+        if (online) r.urls = [location.origin]; // on a server with its own https address, that's the one phones use
+        else if (!r.urls.length) r.urls = [location.origin];
         out.replaceChildren(
           h('ol', { class: 'md-list' },
             online ? null : h('li', {}, 'Connect your phone to the same Wi-Fi as this PC.'),
             h('li', {}, 'Open this address in your phone\'s browser: ', ...r.urls.map((u, i) => [i ? ' or ' : '', h('b', { class: 'mono' }, u)])),
             h('li', {}, 'Type this code: ', h('span', { class: 'code' }, r.code)),
             h('li', {}, 'Add it to your home screen: iPhone: Share › Add to Home Screen. Android: ⋮ › Add to Home screen / Install app.')),
-          h('p', { class: 'muted' }, `The code works once and expires at ${new Date(r.expiresAt).toLocaleTimeString()}.`));
+          h('p', { class: 'muted' }, `This code only works on ${r.urls[0]} (the ORBIT you're using now, not the desktop app or another server). It works once and expires at ${new Date(r.expiresAt).toLocaleTimeString()}.`));
       });
       phoneBox.replaceChildren(
-        h('div', { class: 'perm' }, h('span', {}, 'Allow phones on this Wi-Fi', h('div', { class: 'muted' }, 'Off by default. Only paired phones can use ORBIT; your PC may ask to allow ORBIT through the firewall.')), sw),
+        online ? h('p', { class: 'muted' }, `This ORBIT has its own secure address (${location.origin}), so phones can pair from anywhere; no Wi-Fi setting needed.`)
+          : h('div', { class: 'perm' }, h('span', {}, 'Allow phones on this Wi-Fi', h('div', { class: 'muted' }, 'Off by default. Only paired phones can use ORBIT. When Windows asks, allow ORBIT on Private networks, and make sure your Wi-Fi is set to Private (not Public).')), sw),
         pair, out,
         list.length ? h('ul', { class: 'list' }, list.map((p) => h('li', {}, h('span', { class: 'grow' }, h('b', {}, p.name), h('div', { class: 'muted mono' }, `paired ${ago(p.createdAt)} ago · last used ${ago(p.lastSeen)}`)),
           h('button', { class: 'btn small danger', onclick: async () => { await api('DELETE', `/api/phones/${p.id}`); drawPhones(); } }, 'Remove')))) : null,

@@ -195,7 +195,13 @@ export function createOrbit(cfg = config) {
       // Static dashboard
       const file = path.normalize(path.join(webRoot, url.pathname === '/' ? 'index.html' : url.pathname));
       if (!file.startsWith(webRoot) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
-      res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'content-security-policy': "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data: blob:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com" });
+      // Always revalidate the dashboard's files, so browsers and CDNs (e.g. Cloudflare) never keep
+      // running an old version after an update. Unchanged files answer 304 and aren't re-sent.
+      const st = fs.statSync(file);
+      const etag = `"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`;
+      const headers = { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache', etag, 'content-security-policy': "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data: blob:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com" };
+      if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); return res.end(); }
+      res.writeHead(200, headers);
       fs.createReadStream(file).pipe(res);
     } catch (e) { json(res, 500, { error: 'Server error' }); }
   };

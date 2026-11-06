@@ -277,3 +277,12 @@ test('pairing codes are rate-limited against guessing', async () => {
   const other = await fetch(`${base}/api/phone/pair`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.4' }, body: JSON.stringify({ code: '123123' }) });
   assert.equal(other.status, 401, 'other addresses are not blocked');
 });
+
+test('dashboard files are always revalidated (no stale versions after updates)', async () => {
+  const r = await fetch(`${base}/app.js`);
+  assert.equal(r.headers.get('cache-control'), 'no-cache');
+  const etag = r.headers.get('etag');
+  assert.ok(etag);
+  const again = await fetch(`${base}/app.js`, { headers: { 'if-none-match': etag } });
+  assert.equal(again.status, 304, 'unchanged files are not re-sent');
+});

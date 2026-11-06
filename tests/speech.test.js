@@ -31,7 +31,9 @@ test('wake word and local speech recognition', { skip: !ready && 'models not dow
     feed(z(0.6)); feed(say('Hey Orbit.')); feed(z(0.2)); feed(say(cmd)); feed(z(1.6)); s.cancel();
   }
   assert.ok(wakes >= 2, `woke ${wakes}/3 times`);
-  assert.ok(heard.some((t) => t.includes('lights')), JSON.stringify(heard));
+  // Synthetic speech varies run to run; require most commands to be caught and correctly transcribed.
+  const right = heard.filter((t) => /lights|time|lock|computer/.test(t));
+  assert.ok(right.length >= 2, JSON.stringify(heard));
 
   const before = wakes;
   for (const t of ['The satellite stays in a low orbit.', 'Hey Robert, are you coming?', 'A bit of rain is expected.']) { feed(z(0.6)); feed(say(t)); feed(z(1.2)); s.cancel(); }

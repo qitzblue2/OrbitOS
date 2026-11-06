@@ -20,7 +20,8 @@ test('every screen renders without errors, and adding an AI key works', { skip: 
   const { port } = await orbit.listen(0, '127.0.0.1');
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    // bypassCSP only lets the test tool inject its own helpers (some Playwright versions need it); ORBIT's real CSP is unchanged.
+    const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, bypassCSP: true })).newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => { if (m.type() === 'error' && !/fonts\.g|net::ERR/.test(m.text())) errors.push(m.text()); });

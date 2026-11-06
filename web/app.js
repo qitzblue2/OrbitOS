@@ -550,6 +550,8 @@ const VIEWS = {
     const wrap = h('div', { class: 'stack' });
     const name = h('input', { id: 'ai-user', value: st.userName, placeholder: 'Alex' });
     const tone = h('select', { id: 'ai-tone' }, ['composed', 'concise', 'warm', 'witty', 'formal'].map((t) => h('option', { value: t, selected: t === st.tone }, t)));
+    const instr = h('textarea', { id: 'ai-instr', rows: '4', placeholder: 'Anything ORBIT should always do or avoid' });
+    instr.value = st.customInstructions || '';
     S.modelsReady = api('GET', '/api/ai/models').then((l) => { S.modelLists = l; }).catch(() => {});
     api('GET', '/api/ai/providers').then((P) => {
       const keys = o.aiKeys || [];

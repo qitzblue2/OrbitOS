@@ -31,6 +31,9 @@ jobs:
       - run: npm ci
       - name: Download on-device speech models
         run: npm run models
+      - name: Browser for the dashboard test (Linux only)
+        if: runner.os == 'Linux'
+        run: npm i --no-save playwright@1.49.1 && npx playwright install --with-deps chromium
       - name: Test
         run: npm test
       - name: Build installer

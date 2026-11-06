@@ -416,13 +416,14 @@ const VIEWS = {
       const [acc, list] = await Promise.all([api('GET', '/api/phone/access'), api('GET', '/api/phones')]);
       const sw = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Phone access on this Wi-Fi', 'aria-checked': String(acc.on) });
       sw.addEventListener('click', async () => { await api('POST', '/api/phone/access', { on: !acc.on }); drawPhones(); });
-      const pair = h('button', { class: 'btn primary', disabled: !acc.on }, 'Pair a phone');
+      const online = location.protocol === 'https:'; // on a server with its own https address, phones use that address
+      const pair = h('button', { class: 'btn primary', disabled: !acc.on && !online }, 'Pair a phone');
       const out = h('div', {});
       pair.addEventListener('click', async () => {
-        const r = await api('POST', '/api/phone/code');
+        const r = await api('POST', '/api/phone/code'); if (!r.urls.length) r.urls = [location.origin];
         out.replaceChildren(
           h('ol', { class: 'md-list' },
-            h('li', {}, 'Connect your phone to the same Wi-Fi as this PC.'),
+            online ? null : h('li', {}, 'Connect your phone to the same Wi-Fi as this PC.'),
             h('li', {}, 'Open this address in your phone\'s browser: ', ...r.urls.map((u, i) => [i ? ' or ' : '', h('b', { class: 'mono' }, u)])),
             h('li', {}, 'Type this code: ', h('span', { class: 'code' }, r.code)),
             h('li', {}, 'Add it to your home screen: iPhone: Share › Add to Home Screen. Android: ⋮ › Add to Home screen / Install app.')),

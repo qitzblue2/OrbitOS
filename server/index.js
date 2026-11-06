@@ -56,6 +56,17 @@ export function createOrbit(cfg = config) {
     const p = phoneFor(t); if (p) { p.lastSeen = new Date().toISOString(); phones.save(); }
     return !!p;
   };
+  // Brute-force guard for pairing codes (matters once ORBIT is on the internet): per address,
+  // at most 8 failed attempts per 15 minutes, plus a global cap of 60.
+  const fails = new Map(); let globalFails = [];
+  const ipOf = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?';
+  const limited = (req) => {
+    const now = Date.now(), cut = now - 15 * 60 * 1000;
+    globalFails = globalFails.filter((t) => t > cut);
+    const mine = (fails.get(ipOf(req)) || []).filter((t) => t > cut);
+    return mine.length >= 8 || globalFails.length >= 60;
+  };
+  const failed = (req) => { const ip = ipOf(req); fails.set(ip, [...(fails.get(ip) || []), Date.now()]); globalFails.push(Date.now()); };
   const lanUrls = (port) => Object.values(os.networkInterfaces()).flat().filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => `http://${i.address}:${port}`);
   const json = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
   const readBody = (req) => new Promise((resolve, reject) => {
@@ -144,8 +155,13 @@ export function createOrbit(cfg = config) {
     res.setHeader('x-content-type-options', 'nosniff');
     res.setHeader('referrer-policy', 'no-referrer');
     try {
+      if ((url.pathname === '/api/pair' || url.pathname === '/api/phone/pair') && req.method === 'POST' && limited(req)) {
+        audit.write({ kind: 'security', action: 'pairing rate-limited', ip: ipOf(req) });
+        return json(res, 429, { error: 'Too many wrong codes. Wait 15 minutes and make a new code.' });
+      }
       if (url.pathname === '/api/pair' && req.method === 'POST') {
         const r = devices.pair(await readBody(req));
+        if (!r) failed(req);
         audit.write({ kind: 'security', action: 'pair', ok: !!r, device: r?.device.name });
         if (r) broadcast('devices', { devices: devices.list() });
         return json(res, r ? 200 : 401, r || { error: 'Invalid or expired pairing code' });
@@ -154,7 +170,7 @@ export function createOrbit(cfg = config) {
       if (url.pathname === '/api/phone/pair' && req.method === 'POST') {
         const b = await readBody(req);
         const i = phones.data.codes.findIndex((c) => c.expiresAt > Date.now() && safeEq(c.codeHash, hash(String(b.code || ''))));
-        if (i < 0) { audit.write({ kind: 'security', action: 'phone pairing refused' }); return json(res, 401, { error: 'That code is wrong or has expired. Make a new one on your PC.' }); }
+        if (i < 0) { failed(req); audit.write({ kind: 'security', action: 'phone pairing refused' }); return json(res, 401, { error: 'That code is wrong or has expired. Make a new one on your PC.' }); }
         phones.data.codes.splice(i, 1);
         const token = crypto.randomBytes(32).toString('base64url');
         const phone = { id: crypto.randomUUID(), name: String(b.name || 'Phone').slice(0, 40), tokenHash: hash(token), createdAt: new Date().toISOString(), lastSeen: null };

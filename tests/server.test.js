@@ -269,3 +269,11 @@ test('phone app: pairing code works once, phone key works, removing it revokes i
   await api('POST', '/api/phone/access', { on: false });
   await assert.rejects(fetch(`http://127.0.0.1:${on.port}/api/health`), 'entrance closed when switched off');
 });
+
+test('pairing codes are rate-limited against guessing', async () => {
+  let last;
+  for (let i = 0; i < 10; i++) last = await fetch(`${base}/api/phone/pair`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.9' }, body: JSON.stringify({ code: String(100000 + i) }) });
+  assert.equal(last.status, 429);
+  const other = await fetch(`${base}/api/phone/pair`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.4' }, body: JSON.stringify({ code: '123123' }) });
+  assert.equal(other.status, 401, 'other addresses are not blocked');
+});

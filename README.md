@@ -90,6 +90,50 @@ That makes voice work, and it works away from home too.
 
 ORBIT isn't in the App Store or Google Play. Publishing there needs a developer account (adult, or held by a parent or guardian) and a store review.
 
+### Running ORBIT on a VPS (with your own domain)
+
+The server runs around the clock at your own `https://` address, so the dashboard and phone app work from anywhere, and voice works on phones. Your PC stays controllable through the Companion.
+
+1. **Point the domain at the VPS.** At your DNS provider, add an **A record**: `orbitos` (in `xdevstudios.net`) → your VPS's IP address.
+2. **Open ports 80 and 443** in your VPS provider's firewall.
+3. **On the VPS** (Ubuntu or Debian), run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/qitzblue2/OrbitOS/OrbitAI/deploy/install-vps.sh -o install-vps.sh
+```
+
+```bash
+sudo bash install-vps.sh orbitos.xdevstudios.net
+```
+
+   This installs Node.js and Caddy (which gets the HTTPS certificate automatically), runs ORBIT as an always-on service, and prints your sign-in token.
+4. **Open `https://orbitos.xdevstudios.net`** and sign in with that token. Add your AI keys under **AI configuration**.
+5. **Let it control your PC.** On the dashboard, go to **Devices › Pair a new device**. Then, on your PC, run:
+
+```bash
+node companion/agent.js pair https://orbitos.xdevstudios.net <code> "My PC"
+```
+
+```bash
+node companion/agent.js
+```
+
+6. **Phone:** **Devices › Phone app › Pair a phone**, then open the site on the phone, type the code and add it to the home screen.
+
+To update later, run this on the VPS:
+
+```bash
+sudo bash /opt/orbit/deploy/update-vps.sh
+```
+
+To see the logs:
+
+```bash
+journalctl -u orbit -f
+```
+
+On a VPS, voice uses the browser's speech recognition. The on-device "Hey Orbit" wake word is part of the desktop app.
+
 ### Get the installer
 
 Open the repository's **Actions** tab, choose **Build ORBIT app**, and select **Run workflow**. When the run finishes, download your installer from its artifacts:

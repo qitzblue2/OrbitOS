@@ -12,7 +12,15 @@ EXTRA_MB="${EXTRA_MB:-3500}"
 OUT="${OUT:-$REPO/pi/orbit-os-pi4.img}"
 
 [ "$(id -u)" = 0 ] || { echo "Run with sudo"; exit 1; }
-apt-get install -y -qq qemu-user-static binfmt-support parted e2fsprogs xz-utils curl rsync >/dev/null
+apt-get update -qq
+apt-get install -y -qq parted e2fsprogs xz-utils curl rsync file >/dev/null
+# The arm64 emulator: called qemu-user-static on older Ubuntu, merged into qemu-user (+ qemu-user-binfmt) on newer.
+apt-get install -y -qq qemu-user-static >/dev/null 2>&1 || apt-get install -y -qq qemu-user qemu-user-binfmt >/dev/null
+QEMU=$(command -v qemu-aarch64-static || command -v qemu-aarch64)
+[ -n "$QEMU" ] || { echo "No arm64 emulator found"; exit 1; }
+# Make sure the kernel runs arm64 programs through it (systemd-binfmt or binfmt-support, whichever exists).
+systemctl restart systemd-binfmt 2>/dev/null || update-binfmts --enable qemu-aarch64 2>/dev/null || true
+ls /proc/sys/fs/binfmt_misc/ | grep -q aarch64 || { echo "arm64 emulation isn't registered"; exit 1; }
 mkdir -p "$WORK"
 
 echo "==> Downloading Raspberry Pi OS Lite (64-bit)"
@@ -33,7 +41,7 @@ ROOT="$WORK/root"; mkdir -p "$ROOT"
 mount "${LOOP}p2" "$ROOT"
 mkdir -p "$ROOT/boot/firmware" && mount "${LOOP}p1" "$ROOT/boot/firmware"
 for d in proc sys dev dev/pts; do mount --bind "/$d" "$ROOT/$d"; done
-cp /usr/bin/qemu-aarch64-static "$ROOT/usr/bin/"
+cp "$QEMU" "$ROOT/usr/bin/qemu-aarch64-static"; [ "$(basename "$QEMU")" = qemu-aarch64 ] && cp "$QEMU" "$ROOT/usr/bin/qemu-aarch64" || true
 cp /etc/resolv.conf "$ROOT/etc/resolv.conf"
 
 echo "==> Copying ORBIT"
@@ -48,7 +56,7 @@ echo "==> Smoke test: ORBIT starts inside the image"
 chroot "$ROOT" /bin/bash -c 'cd /opt/orbit && ORBIT_DATA_DIR=/tmp/orbit-smoke ORBIT_PORT=7799 timeout 60 node server/index.js >/tmp/smoke.log 2>&1 & for i in $(seq 1 50); do curl -fs http://127.0.0.1:7799/api/health && exit 0; sleep 1; done; cat /tmp/smoke.log; exit 1'
 rm -rf "$ROOT/tmp/orbit-smoke" "$ROOT/tmp/smoke.log"
 
-rm -f "$ROOT/usr/bin/qemu-aarch64-static"
+rm -f "$ROOT/usr/bin/qemu-aarch64-static" "$ROOT/usr/bin/qemu-aarch64"
 ln -sf /run/systemd/resolve/stub-resolv.conf "$ROOT/etc/resolv.conf" 2>/dev/null || : > "$ROOT/etc/resolv.conf"
 cleanup; trap - EXIT
 

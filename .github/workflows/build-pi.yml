@@ -1,0 +1,27 @@
+# Builds ORBIT OS for Raspberry Pi 4 (a flashable SD-card image with ORBIT built in).
+# Runs when files in pi/ change on OrbitAI, or from the Actions tab. Takes ~30-40 minutes.
+name: Build ORBIT OS (Raspberry Pi 4)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [OrbitAI]
+    paths: ['pi/**', '.github/workflows/build-pi.yml']
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      - name: Build the image
+        run: sudo bash pi/build-image.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ORBIT-OS-Pi4
+          path: pi/orbit-os-pi4.img.xz
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error

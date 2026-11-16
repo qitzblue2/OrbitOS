@@ -4,3 +4,6 @@ data/
 *.log
 models/
 release/
+pi/work/
+pi/*.img
+pi/*.img.xz

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Pairs this Raspberry Pi with its own ORBIT once, so the AI can use it as a device.
+set -e
+CONF=/var/lib/orbit-companion/companion.json
+mkdir -p /var/lib/orbit-companion && chown orbitagent:orbitagent /var/lib/orbit-companion 2>/dev/null || true
+[ -s "$CONF" ] && exit 0
+for i in $(seq 1 60); do [ -s /var/lib/orbit/admin-token ] && curl -fs http://127.0.0.1:7777/api/health >/dev/null && break; sleep 1; done
+TOKEN=$(cat /var/lib/orbit/admin-token)
+CODE=$(curl -fs -X POST -H "authorization: Bearer $TOKEN" http://127.0.0.1:7777/api/devices/pairing-code | jq -r .code)
+su -s /bin/sh orbitagent -c "ORBIT_COMPANION_CONFIG=$CONF node /opt/orbit/companion/agent.js pair http://127.0.0.1:7777 $CODE 'ORBIT Pi'"

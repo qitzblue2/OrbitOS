@@ -152,6 +152,28 @@ It needs Java 17 and the Android SDK.
 
 iPhone isn't available as an installable app: Apple only allows that through the App Store or with a paid developer account. On iPhone, use the home-screen web app instead; it uses the same speech engine on your server.
 
+### ORBIT OS for Raspberry Pi 4
+
+A ready-to-flash SD-card image: Raspberry Pi OS Lite (64-bit) with ORBIT built in. It boots straight into ORBIT full-screen.
+
+- **Everything runs on the Pi:** the ORBIT server, your AI keys, memory, routines and smart home.
+- **ORBIT's own speech engine:** "Hey Orbit" works with a USB microphone, and ORBIT's voice plays through HDMI or the headphone jack.
+- **The Pi is paired as a device automatically,** so the AI can run commands and manage files on it (asking first).
+- **Phones and PCs can connect to it** on your network (Devices › Phone app / Pair a new device).
+
+**Get it:** in the Actions tab, open the newest green **Build ORBIT OS (Raspberry Pi 4)** run and download **ORBIT-OS-Pi4**. Inside is `orbit-os-pi4.img.xz`.
+
+**Flash it:**
+1. In Raspberry Pi Imager, choose **Use custom** and pick `orbit-os-pi4.img.xz`.
+2. When asked, **Edit settings**: set your own username and password, your Wi-Fi, and your time zone. Otherwise the login is `orbit` / `orbit`, so change it.
+3. Put the card in the Pi 4 (2 GB RAM minimum, 4 GB+ recommended), connect a screen, a USB microphone and speakers, and power on. The first boot takes a few minutes.
+
+On the screen, go to **AI configuration** and add a key. Then turn the mic on and say "Hey Orbit".
+
+**Good to know:**
+- The dashboard is reachable on your network at `http://orbit.local:7777`. Sign in with the token from `/var/lib/orbit/admin-token` on the Pi.
+- The image is about 2 GB compressed and needs an 8 GB+ microSD card.
+
 ### Get the installer
 
 Open the repository's **Actions** tab, choose **Build ORBIT app**, and select **Run workflow**. When the run finishes, download your installer from its artifacts:

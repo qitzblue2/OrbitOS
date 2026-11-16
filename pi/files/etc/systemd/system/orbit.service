@@ -1,0 +1,22 @@
+[Unit]
+Description=ORBIT personal AI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=orbitd
+EnvironmentFile=/etc/orbit/orbit.env
+WorkingDirectory=/opt/orbit
+ExecStartPre=+/bin/sh -c 'chgrp orbitd /var/lib/orbit; chmod 750 /var/lib/orbit'
+ExecStart=/usr/bin/node /opt/orbit/server/index.js
+ExecStartPost=/bin/sh -c 'for i in $(seq 1 40); do [ -f /var/lib/orbit/admin-token ] && chmod 640 /var/lib/orbit/admin-token && exit 0; sleep 0.5; done'
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/orbit
+
+[Install]
+WantedBy=multi-user.target

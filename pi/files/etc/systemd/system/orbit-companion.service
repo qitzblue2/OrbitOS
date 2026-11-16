@@ -1,0 +1,15 @@
+[Unit]
+Description=ORBIT Companion (lets ORBIT act on this Raspberry Pi)
+After=orbit.service
+Requires=orbit.service
+
+[Service]
+User=orbitagent
+Environment=ORBIT_COMPANION_CONFIG=/var/lib/orbit-companion/companion.json
+ExecStartPre=+/usr/local/bin/orbit-pair-pi
+ExecStart=/usr/bin/node /opt/orbit/companion/agent.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

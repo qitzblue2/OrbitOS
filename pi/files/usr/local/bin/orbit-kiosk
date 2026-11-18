@@ -1,9 +1,10 @@
 #!/bin/sh
-# Opens the ORBIT dashboard full-screen. The microphone is allowed automatically for ORBIT only.
+# Shows ORBIT on the projector (JARVIS mode: black, a small orb, voice only).
+# The full dashboard is at http://orbit.local:7777 on your phone or computer. The microphone is allowed automatically for ORBIT only.
 for i in $(seq 1 60); do [ -r /var/lib/orbit/admin-token ] && curl -fs http://127.0.0.1:7777/api/health >/dev/null && break; sleep 1; done
 TOKEN=$(cat /var/lib/orbit/admin-token)
 BROWSER=$(command -v chromium-browser || command -v chromium)
 exec "$BROWSER" --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble \
   --ozone-platform=wayland --enable-features=UseOzonePlatform --autoplay-policy=no-user-gesture-required \
   --use-fake-ui-for-media-stream --check-for-update-interval=31536000 \
-  --user-data-dir="$HOME/.config/orbit-kiosk" "http://127.0.0.1:7777/#dashboard?token=$TOKEN&kiosk=1"
+  --user-data-dir="$HOME/.config/orbit-kiosk" "http://127.0.0.1:7777/projector.html#token=$TOKEN"

@@ -1,7 +1,7 @@
 // ORBIT phone app: keeps the app's own files on the phone so it opens instantly.
 // Everything personal (API, live connection) always comes fresh from your PC and is never cached.
 const CACHE = 'orbit-shell-v2'; // bump to drop old copies on phones
-const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'core.js', 'voice.js', 'pcm-worklet.js', 'icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'manifest.webmanifest'];
+const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'core.js', 'voice.js', 'remote-speech.js', 'pcm-worklet.js', 'icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'manifest.webmanifest'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {

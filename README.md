@@ -154,7 +154,9 @@ iPhone isn't available as an installable app: Apple only allows that through the
 
 ### ORBIT OS for Raspberry Pi 4
 
-A ready-to-flash SD-card image: Raspberry Pi OS Lite (64-bit) with ORBIT built in. It boots straight into ORBIT full-screen.
+A ready-to-flash SD-card image: Raspberry Pi OS Lite (64-bit) with ORBIT built in. It runs ORBIT in **JARVIS mode**: no dashboard, just a small glowing orb on a black screen or projector. You talk to it, and it projects answers, lists, code, or anything you ask it to show ("Orbit, show me…"), then fades back to the orb. Say "hide it" to clear the projection; say "approve" or "deny" when it asks permission.
+
+**First start:** until an AI key is added, the projector shows only setup steps. Open `http://orbit.local:7777` on your phone or computer, type the code shown, and add a key under **AI configuration**. ORBIT starts listening the moment a key exists. The full dashboard stays available there for settings.
 
 - **Everything runs on the Pi:** the ORBIT server, your AI keys, memory, routines and smart home.
 - **ORBIT's own speech engine:** "Hey Orbit" works with a USB microphone, and ORBIT's voice plays through HDMI or the headphone jack.
@@ -168,7 +170,18 @@ A ready-to-flash SD-card image: Raspberry Pi OS Lite (64-bit) with ORBIT built i
 2. When asked, **Edit settings**: set your own username and password, your Wi-Fi, and your time zone. Otherwise the login is `orbit` / `orbit`, so change it.
 3. Put the card in the Pi 4 (2 GB RAM minimum, 4 GB+ recommended), connect a screen, a USB microphone and speakers, and power on. The first boot takes a few minutes.
 
-On the screen, go to **AI configuration** and add a key. Then turn the mic on and say "Hey Orbit".
+Follow the setup steps on the projector to add an AI key from your phone, then say "Hey Orbit".
+
+**Running it 24/7 (heat):**
+- **Use a heatsink case** (an aluminium "armour" or Flirc-style case) or a case with a small fan. A bare Pi 4 hits 80 °C and slows itself down.
+- **Give it airflow**, not a closed box.
+- **Use the official 5V 3A power supply**; weak supplies cause slowdowns too.
+- **Check its temperature:** say "Orbit, device status", or look under **Devices**. ORBIT warns you once an hour if it's too hot.
+- **Already flashed it?** To update in place, keeping your keys, run on the Pi (over SSH, or a keyboard with Ctrl+Alt+F2):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/qitzblue2/OrbitOS/OrbitAI/pi/orbit-update.sh | sudo sh
+```
 
 **Good to know:**
 - The dashboard is reachable on your network at `http://orbit.local:7777`. Sign in with the token from `/var/lib/orbit/admin-token` on the Pi.

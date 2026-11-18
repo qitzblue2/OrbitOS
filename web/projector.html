@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORBIT</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="projector.css">
+<script type="module" src="projector.js"></script>
+</head>
+<body>
+<main>
+  <canvas id="orb" width="160" height="160" aria-hidden="true"></canvas>
+  <div id="caption" class="caption" aria-live="polite"></div>
+  <section id="setup" class="setup" hidden>
+    <h1>ORBIT</h1>
+    <p class="lead">Before we talk, I need an AI key.</p>
+    <ol>
+      <li>On your phone or computer, open <b id="setup-url">http://orbit.local:7777</b></li>
+      <li>Type this code: <span id="setup-code" class="code">······</span></li>
+      <li>Go to <b>AI configuration</b> and add a key.</li>
+    </ol>
+    <p class="hint">I'll start listening as soon as a key is added.</p>
+  </section>
+  <section id="card" class="card" hidden></section>
+</main>
+</body>
+</html>

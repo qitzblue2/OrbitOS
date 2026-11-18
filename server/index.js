@@ -40,6 +40,7 @@ export function createOrbit(cfg = config) {
   const automations = new Automations(cfg.dataDir);
   const engine = new Engine({ brain, memory, devices, home, automations, audit, settings });
   engine.agent = new Agent({ engine, brain, memory, devices, audit, settings });
+  engine.agent.broadcast = (type, data) => broadcast(type, data);
   const uiClients = new Set();
   const heatWarned = new Map();
   const phoneSpeech = createPhoneSpeech(cfg);
@@ -54,7 +55,7 @@ export function createOrbit(cfg = config) {
     return h.digest('hex').slice(0, 10);
   })();
   const stamp = (text, ext) => (ext === '.html'
-    ? text.replace(/(src|href)="((?:app|core|voice|overlay)\.js|app\.css|overlay\.css|manifest\.webmanifest)"/g, `$1="$2?v=${VERSION}"`)
+    ? text.replace(/(src|href)="((?:app|core|voice|overlay|projector|remote-speech)\.js|app\.css|overlay\.css|projector\.css|manifest\.webmanifest)"/g, `$1="$2?v=${VERSION}"`)
     : ext === '.js' ? text.replace(/(from\s+|import\(\s*|addModule\(\s*|register\(\s*)'(\.\/)?([\w-]+\.js)'/g, `$1'./$3?v=${VERSION}'`).replace("'orbit-shell-v2'", `'orbit-shell-${VERSION}'`) : text);
   const MIME = { '.png': 'image/png', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
   const safeEq = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -158,6 +159,7 @@ export function createOrbit(cfg = config) {
     },
     'POST /api/phone/access': async (b) => { const r = await setPhoneAccess(!!b.on); settings.data.phoneAccess = !!b.on; settingsStore.save(); return r; },
     'GET /api/phone/access': () => ({ on: !!phoneAccess.port, port: phoneAccess.port, urls: phoneAccess.port ? lanUrls(phoneAccess.port) : [] }),
+    'GET /api/network': () => ({ urls: cfg.host === '127.0.0.1' ? [] : lanUrls(cfg.port) }),
     'GET /api/phones': () => phones.data.phones.map(({ id, name, createdAt, lastSeen }) => ({ id, name, createdAt, lastSeen })),
     'DELETE /api/phones/:id': (b, id) => { phones.data.phones = phones.data.phones.filter((p) => p.id !== id); phones.flush(); audit.write({ kind: 'security', action: 'phone removed', id }); return { ok: true }; },
     'PATCH /api/ai/routes': (b) => (keyring.setRoutes(b), brain.status()),

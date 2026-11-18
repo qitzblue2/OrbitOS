@@ -45,6 +45,14 @@ test('every screen renders without errors, and adding an AI key works', { skip: 
     await page.click('.panel:has(h2:text("Personality")) button:has-text("Save")');
     await page.waitForTimeout(300);
     assert.equal(orbit.engine.settings.data.customInstructions, 'Be brief.');
+    // JARVIS projector page: setup until a key exists (one was just added above, so: the orb only)
+    const proj = await (await browser.newContext({ bypassCSP: true })).newPage();
+    proj.on('pageerror', (e) => errors.push(`projector: ${e.message}`));
+    await proj.goto(`http://127.0.0.1:${port}/projector.html#token=${config.adminToken}`);
+    await proj.waitForTimeout(1500);
+    assert.ok(await proj.isHidden('#setup'), 'with a key, the projector shows only the orb');
+    orbit.engine.agent.broadcast('project', { content: '## Plan\n- one\n- two' });
+    await proj.waitForSelector('#card:not([hidden]) li');
     assert.deepEqual(errors, [], `page errors: ${errors.join(' | ')}`);
   } finally { await browser.close(); await orbit.close(); }
 });

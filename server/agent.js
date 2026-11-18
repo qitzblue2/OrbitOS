@@ -21,6 +21,9 @@ export const TOOLS = [
   { name: 'set_volume', capability: 'volume.set', description: 'Set the system volume (0-100).', parameters: { type: 'object', properties: { level: { type: 'number' } }, required: ['level'] } },
   { name: 'media', capability: 'media.control', description: 'Control media playback.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['play', 'pause', 'next', 'previous'] } }, required: ['action'] } },
   { name: 'device_status', capability: 'system.status', description: 'Read CPU, memory, battery and uptime.', parameters: { type: 'object', properties: {} } },
+  { name: 'show_on_display', local: true,
+    description: 'Put something on the user\'s screen or projector: text, a list, a short table or code (markdown). Use when the user asks to show, display or project something, or when an answer is easier to read than to hear.',
+    parameters: { type: 'object', properties: { content: { type: 'string', description: 'Markdown to display' }, seconds: { type: 'number', description: 'How long to show it (default 60)' } }, required: ['content'] } },
   { name: 'remember', description: 'Save a lasting fact about the user to ORBIT\'s memory.', parameters: { type: 'object', properties: { fact: { type: 'string' } }, required: ['fact'] } },
 ];
 
@@ -28,7 +31,7 @@ const summary = (name, a) => ({
   run_command: `Run: ${a.command}${a.cwd ? `  (in ${a.cwd})` : ''}`,
   write_file: `Write ${a.path} (${String(a.content || '').split('\n').length} lines)`,
   read_file: `Read ${a.path}`, list_directory: `List ${a.path || 'ORBIT Workspace'}`, open: `Open ${a.target}`,
-  set_volume: `Volume ${a.level}%`, media: `Media: ${a.action}`, device_status: 'Read device status', remember: `Remember: ${a.fact}`,
+  show_on_display: 'Show on the display', set_volume: `Volume ${a.level}%`, media: `Media: ${a.action}`, device_status: 'Read device status', remember: `Remember: ${a.fact}`,
 }[name] || name);
 
 export class Agent {
@@ -61,6 +64,7 @@ export class Agent {
   }
 
   async exec(tool, args, { device, sessionId, emit }) {
+    if (tool.name === 'show_on_display') { this.broadcast?.('project', { content: String(args.content || '').slice(0, 20000), seconds: Math.min(600, Number(args.seconds) || 60) }); return 'Shown on the display.'; }
     if (tool.name === 'remember') { this.memory.add({ text: String(args.fact || ''), kind: 'fact', source: 'agent', allowSensitive: false }); emit('memory', {}); return 'Saved to memory.'; }
     if (!device) return 'No computer is connected to ORBIT, so this could not be done.';
     if (!device.permissions.includes(tool.capability)) return `Not permitted: "${CAPABILITIES[tool.capability].label}" is switched off for ${device.name}. The user can enable it in Security.`;

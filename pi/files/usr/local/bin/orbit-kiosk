@@ -6,4 +6,4 @@ BROWSER=$(command -v chromium-browser || command -v chromium)
 exec "$BROWSER" --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble \
   --ozone-platform=wayland --enable-features=UseOzonePlatform --autoplay-policy=no-user-gesture-required \
   --use-fake-ui-for-media-stream --check-for-update-interval=31536000 \
-  --user-data-dir="$HOME/.config/orbit-kiosk" "http://127.0.0.1:7777/#dashboard?token=$TOKEN"
+  --user-data-dir="$HOME/.config/orbit-kiosk" "http://127.0.0.1:7777/#dashboard?token=$TOKEN&kiosk=1"

@@ -6,7 +6,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 apt-get update -qq
 apt-get install -y -qq curl ca-certificates gnupg git xz-utils bzip2 jq \
-  cage seatd fonts-dejavu-core pipewire pipewire-pulse wireplumber alsa-utils >/dev/null
+  cage seatd rsync fonts-dejavu-core pipewire pipewire-pulse wireplumber alsa-utils >/dev/null
 apt-get install -y -qq chromium-browser >/dev/null 2>&1 || apt-get install -y -qq chromium >/dev/null
 
 # Node.js 22

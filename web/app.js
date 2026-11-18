@@ -138,7 +138,7 @@ function onEvent(m) {
     case 'memory': if (m.recalled) S.memRecalled = m.recalled; refresh(); break;
     case 'devices': if (S.overview) { S.overview.devices = m.devices; if (['dashboard', 'devices', 'security'].includes(S.view)) render(); } break;
     case 'recent': if (S.overview) { S.overview.recent = m.recent; if (S.view === 'dashboard') render(); } break;
-    case 'notify': S.notes.unshift({ ...m, at: new Date().toISOString() }); toast(m.text, m.level === 'warn' ? 'warn' : ''); if (m.speak) voice.say(m.text); if (S.view === 'dashboard') render(); break;
+    case 'notify': wakeScreen(); S.notes.unshift({ ...m, at: new Date().toISOString() }); toast(m.text, m.level === 'warn' ? 'warn' : ''); if (m.speak) voice.say(m.text); if (S.view === 'dashboard') render(); break;
     case 'mic': if (!m.enabled) voice.killAll(); break;
     case 'error': S.pending = null; toast(m.message, 'bad'); renderLive(); break;
     case 'model': S.overview.brain = { ...S.overview.brain, ...m }; S.lastModel = ''; updateChip(); if (S.view === 'ai') render(); break;
@@ -169,6 +169,7 @@ voice.addEventListener('level', (e) => { core?.setLevel(e.detail); mini?.setLeve
 voice.addEventListener('ready', () => { if (S.view === 'voice') render(); });
 voice.addEventListener('models', (e) => { const m = e.detail; if (m.status === 'downloading') { S.models = `Downloading voice models… ${Math.round(m.fraction * 100)}%`; } else S.models = ''; if (S.view === 'voice') render(); });
 voice.addEventListener('state', (e) => setState(e.detail));
+voice.addEventListener('state', () => wakeScreen());
 voice.addEventListener('interim', (e) => { S.heard = e.detail; renderLive(); report({ heard: e.detail }); });
 voice.addEventListener('utterance', (e) => utter(e.detail.text, 'voice'));
 voice.addEventListener('interrupt', () => send({ type: 'interrupt' }));
@@ -483,7 +484,7 @@ const VIEWS = {
       panel('Phone app', phoneBox),
       panel('Your devices', o.devices.length ? h('ul', { class: 'list' }, o.devices.map((d) => h('li', {},
         h('span', { class: `dot ${d.online ? 'on' : ''}` }),
-        h('span', { class: 'grow' }, h('b', {}, d.name), h('div', { class: 'muted mono' }, `${d.platform} · ${d.online ? 'online' : `seen ${ago(d.lastSeen)}`}${d.status?.battery != null ? ` · ${d.status.battery}%` : ''}${d.status?.cpu != null ? ` · cpu ${d.status.cpu}%` : ''}`)),
+        h('span', { class: 'grow' }, h('b', {}, d.name), h('div', { class: 'muted mono' }, `${d.platform} · ${d.online ? 'online' : `seen ${ago(d.lastSeen)}`}${d.status?.battery != null ? ` · ${d.status.battery}%` : ''}${d.status?.cpu != null ? ` · cpu ${d.status.cpu}%` : ''}${d.status?.temperature != null ? ` · ${d.status.temperature} °C${d.status.temperature >= 75 || d.status.throttled ? ' (hot)' : ''}` : ''}`)),
         h('button', { class: 'btn small', onclick: async (e) => {
           const b = e.currentTarget; b.disabled = true; b.textContent = 'Checking…';
           const r = await api('POST', `/api/devices/${d.id}/check`).catch((err) => ({ ok: false, steps: [{ name: 'Check', ok: false, message: err.message }] }));
@@ -737,6 +738,22 @@ function render() {
   if (S.view !== 'dashboard') core = null;
   $('#view').replaceChildren(VIEWS[S.view]());
 }
+
+// Screen sleep: after a quiet spell the screen goes black and all drawing stops (saves heat and
+// power on an always-on screen like the Raspberry Pi). Any touch, key, wake word or reply wakes it.
+const kiosk = /[?&]kiosk=1/.test(location.hash) || (() => { try { return localStorage.getItem('orbit.kiosk') === '1'; } catch { return false; } })();
+if (/[?&]kiosk=1/.test(location.hash)) try { localStorage.setItem('orbit.kiosk', '1'); } catch {}
+const SLEEP_MIN = kiosk ? 10 : 0;
+let lastActive = Date.now(), asleep = false;
+const sleeper = document.createElement('div'); sleeper.className = 'screen-sleep'; sleeper.hidden = true; document.body.append(sleeper);
+function wakeScreen() { lastActive = Date.now(); if (!asleep) return; asleep = false; sleeper.hidden = true; Core.paused = false; }
+function sleepScreen() { asleep = true; sleeper.hidden = false; Core.paused = true; }
+for (const ev of ['pointerdown', 'keydown', 'touchstart', 'wheel']) addEventListener(ev, wakeScreen, { capture: true, passive: true });
+setInterval(() => {
+  if (!SLEEP_MIN || asleep) return;
+  if (S.state !== 'idle' || S.pending || S.live || voice.speaking) { lastActive = Date.now(); return; }
+  if (Date.now() - lastActive > SLEEP_MIN * 60000) sleepScreen();
+}, 15000);
 
 function start() {
   $('#login').hidden = true; $('#app').hidden = false;

@@ -169,3 +169,4 @@ pre.cmd{margin:0;padding:12px;border-radius:var(--r1);background:#020610;border:
 .tool-step pre.cmd{margin-top:6px;max-height:260px;overflow:auto}
 .approve-card{border:1px solid rgba(255,195,92,.45);background:rgba(255,195,92,.07);border-radius:var(--r2);padding:12px 14px;display:flex;flex-direction:column;gap:8px;max-width:720px}
 .msg.orbit{white-space:normal}
+.screen-sleep{position:fixed;inset:0;background:#000;z-index:100;cursor:none}

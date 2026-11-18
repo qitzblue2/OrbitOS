@@ -25,15 +25,23 @@ export class Core {
   }
   setState(s) { this.state = STATES[s] ? s : 'idle'; }
   setLevel(v) { this.level = Math.max(0, Math.min(1, v)); }
+  // Frame budget: 30 fps when something is happening, ~8 fps at rest, nothing when the page is
+  // hidden or the screen is asleep. Keeps small machines (e.g. a Raspberry Pi running 24/7) cool.
+  static paused = false;
   loop(now) {
+    requestAnimationFrame(this.loop);
+    const busy = this.state !== 'idle' && this.state !== 'muted' || this.level > 0.05;
+    const minGap = busy ? 33 : 120;
+    if (Core.paused || document.hidden || now - (this.lastFrame || 0) < minGap) return;
+    const dt = Math.min(4, (now - (this.lastFrame || now - 16)) / 16.7); // keep motion speed independent of frame rate
+    this.lastFrame = now;
     const target = STATES[this.state];
     const k = 0.06; // ease between states
     this.mix.speed += (target.speed - this.mix.speed) * k;
     this.mix.energy += (target.energy - this.mix.energy) * k;
     this.mix.hue = this.mix.hue.map((v, i) => v + (target.hue[i] - v) * k);
-    this.t += (this.reduced ? 0.2 : 1) * 0.016 * this.mix.speed;
+    this.t += (this.reduced ? 0.2 : 1) * 0.016 * this.mix.speed * dt;
     this.draw();
-    requestAnimationFrame(this.loop);
   }
   draw() {
     const { g, w, h, t } = this, cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.46;

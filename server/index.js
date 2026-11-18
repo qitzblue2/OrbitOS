@@ -41,6 +41,7 @@ export function createOrbit(cfg = config) {
   const engine = new Engine({ brain, memory, devices, home, automations, audit, settings });
   engine.agent = new Agent({ engine, brain, memory, devices, audit, settings });
   const uiClients = new Set();
+  const heatWarned = new Map();
   const phoneSpeech = createPhoneSpeech(cfg);
   const broadcast = (type, data) => { const m = JSON.stringify({ type, ...data }); for (const c of uiClients) if (c.readyState === 1) c.send(m); };
 
@@ -285,7 +286,15 @@ export function createOrbit(cfg = config) {
     ws.on('message', (raw) => {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
       if (msg.type === 'result') engine.onDeviceResult(msg);
-      if (msg.type === 'status') { devices.touch(device.id, msg.status); broadcast('devices', { devices: devices.list() }); }
+      if (msg.type === 'status') {
+        devices.touch(device.id, msg.status); broadcast('devices', { devices: devices.list() });
+        // Heat warning (e.g. a Raspberry Pi without enough cooling), at most once an hour per device.
+        const st = msg.status || {};
+        if ((st.temperature >= 80 || st.overheating || st.throttled || st.underVoltage) && Date.now() - (heatWarned.get(device.id) || 0) > 3600e3) {
+          heatWarned.set(device.id, Date.now());
+          broadcast('notify', { level: 'warn', text: st.underVoltage ? `${device.name}'s power supply is too weak. Use the official 5V 3A power supply.` : `${device.name} is too hot${st.temperature ? ` (${st.temperature} °C)` : ''} and is slowing itself down. It needs better cooling.` });
+        }
+      }
     });
     ws.on('close', () => {
       if (devices.sockets.get(device.id) === ws) devices.sockets.delete(device.id);

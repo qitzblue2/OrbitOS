@@ -250,7 +250,16 @@ async function status() {
   };
   if (PLATFORM === 'darwin') {
     try { const { stdout } = await run('pmset', ['-g', 'batt']); const m = stdout.match(/(\d+)%;\s*(\w+)/); if (m) { s.battery = +m[1]; s.charging = m[2] !== 'discharging'; } } catch {}
-  } else if (PLATFORM === 'linux' && fs.existsSync('/sys/class/power_supply/BAT0/capacity')) {
+  }
+  if (PLATFORM === 'linux') {
+    try { s.temperature = Math.round(Number(fs.readFileSync('/sys/class/thermal/thermal_zone0/temp', 'utf8')) / 1000); } catch {}
+    try { // Raspberry Pi: is the chip slowing itself down because of heat (or weak power)?
+      const { stdout } = await run('vcgencmd', ['get_throttled'], { timeout: 2000 });
+      const v = parseInt((stdout.split('=')[1] || '0').trim(), 16);
+      s.throttled = !!(v & 0x4) ; s.overheating = !!(v & 0x8); s.underVoltage = !!(v & 0x1);
+    } catch {}
+  }
+  if (PLATFORM === 'linux' && fs.existsSync('/sys/class/power_supply/BAT0/capacity')) {
     s.battery = +fs.readFileSync('/sys/class/power_supply/BAT0/capacity', 'utf8'); s.charging = fs.readFileSync('/sys/class/power_supply/BAT0/status', 'utf8').trim() !== 'Discharging';
   }
   return s;

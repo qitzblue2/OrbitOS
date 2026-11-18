@@ -284,5 +284,8 @@ function describeStatus(name, s) {
   if (s.cpu != null) parts.push(`CPU ${s.cpu} percent`);
   if (s.memoryUsed != null) parts.push(`memory ${s.memoryUsed} percent used`);
   if (s.uptimeHours != null) parts.push(`up ${s.uptimeHours} hours`);
+  if (s.temperature != null) parts.push(`${s.temperature} degrees${s.temperature >= 80 ? ', too hot' : s.temperature >= 70 ? ', running warm' : ''}`);
+  if (s.overheating || s.throttled) parts.push('slowing itself down to cool off; it needs better cooling');
+  if (s.underVoltage) parts.push('its power supply is too weak');
   return parts.length > 1 ? `${parts[0]}: ${parts.slice(1).join(', ')}.` : `${name} is online.`;
 }

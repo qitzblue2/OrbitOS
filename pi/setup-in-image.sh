@@ -34,7 +34,7 @@ mkdir -p /var/lib/systemd/linger && touch /var/lib/systemd/linger/orbitui   # so
 # user "orbit", password "orbit". Raspberry Pi Imager's settings replace it with your own.
 [ -f /boot/firmware/userconf.txt ] || echo "orbit:$(openssl passwd -6 orbit)" > /boot/firmware/userconf.txt
 
-systemctl enable orbit.service orbit-companion.service orbit-kiosk.service seatd.service
+systemctl enable orbit.service orbit-companion.service orbit-kiosk.service seatd.service orbit-hotkey.service
 systemctl disable getty@tty1.service || true
 # Quiet, fast boot to the dashboard
 sed -i 's/$/ quiet loglevel=3 logo.nologo vt.global_cursor_default=0/' /boot/firmware/cmdline.txt

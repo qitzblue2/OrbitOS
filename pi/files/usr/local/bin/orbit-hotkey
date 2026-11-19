@@ -1,0 +1,28 @@
+#!/usr/bin/python3
+# Ctrl+Shift+Delete on any keyboard toggles between the ORBIT screen (tty1) and a text console (tty2).
+import glob, os, select, struct, subprocess, time
+FMT = 'llHHi'; SZ = struct.calcsize(FMT)
+CTRL, SHIFT, DEL = {29, 97}, {42, 54}, 111
+down, fds, last_scan = set(), {}, 0
+def scan():
+    for p in glob.glob('/dev/input/event*'):
+        if p not in fds.values():
+            try: fds[os.open(p, os.O_RDONLY | os.O_NONBLOCK)] = p
+            except OSError: pass
+def toggle():
+    try: cur = subprocess.run(['fgconsole'], capture_output=True, text=True).stdout.strip()
+    except Exception: cur = ''
+    subprocess.run(['chvt', '1' if cur == '2' else '2'])
+while True:
+    if time.time() - last_scan > 5: scan(); last_scan = time.time()
+    r, _, _ = select.select(list(fds), [], [], 5)
+    for fd in r:
+        try: data = os.read(fd, SZ * 64)
+        except OSError: os.close(fd); fds.pop(fd, None); continue
+        for i in range(0, len(data) - SZ + 1, SZ):
+            _, _, typ, code, val = struct.unpack(FMT, data[i:i + SZ])
+            if typ != 1: continue
+            if val == 0: down.discard(code)
+            elif val == 1:
+                down.add(code)
+                if code == DEL and down & CTRL and down & SHIFT: toggle()

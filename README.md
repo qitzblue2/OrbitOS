@@ -177,7 +177,7 @@ Follow the setup steps on the projector to add an AI key from your phone, then s
 - **Give it airflow**, not a closed box.
 - **Use the official 5V 3A power supply**; weak supplies cause slowdowns too.
 - **Check its temperature:** say "Orbit, device status", or look under **Devices**. ORBIT warns you once an hour if it's too hot.
-- **Already flashed it?** To update in place, keeping your keys, run on the Pi (over SSH, or a keyboard with Ctrl+Alt+F2):
+- **Already flashed it?** To update in place, keeping your keys, run on the Pi (over SSH, or a keyboard: press Ctrl+Shift+Delete for a console, log in as orbit / orbit, and press Ctrl+Shift+Delete again to return to the orb):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/qitzblue2/OrbitOS/OrbitAI/pi/orbit-update.sh | sudo sh

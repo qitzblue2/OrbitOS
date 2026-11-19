@@ -15,5 +15,7 @@ cp -r "$SRC/pi/files/." /
 chmod +x /usr/local/bin/orbit-*
 (cd /opt/orbit && npm ci --omit=dev --no-audit --no-fund && node app/models.js)
 systemctl daemon-reload
+systemctl enable orbit-hotkey >/dev/null 2>&1 || true
 systemctl restart orbit orbit-companion orbit-kiosk
+systemctl restart orbit-hotkey || true
 echo "==> ORBIT updated."

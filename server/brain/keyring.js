@@ -19,6 +19,9 @@ export function friendly(err, provider) {
   if (s === 404) return 'Model not found for this key. Pick another model under "Which AI answers".';
   if (s === 402) return 'This account is out of credit.';
   if (s >= 500) return 'The provider is having problems right now.';
+  const code = err.cause?.code || err.cause?.cause?.code || '';
+  if (/ENOTFOUND|EAI_AGAIN/.test(code)) return `This device can't look up ${provider === 'ollama' ? 'Ollama' : 'the provider'}'s address (DNS). Check its internet connection.`;
+  if (/CERT|SSL|TLS/i.test(code)) return "Secure connection failed. This device's clock may be wrong; check its date and internet.";
   if (/ECONNREFUSED|fetch failed/i.test(m)) return 'Could not reach the provider. For Ollama, make sure it is running.';
   if (/timeout|aborted/i.test(m)) return 'The provider took too long to answer.';
   return m.slice(0, 160);

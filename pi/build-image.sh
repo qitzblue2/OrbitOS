@@ -42,7 +42,8 @@ mount "${LOOP}p2" "$ROOT"
 mkdir -p "$ROOT/boot/firmware" && mount "${LOOP}p1" "$ROOT/boot/firmware"
 for d in proc sys dev dev/pts; do mount --bind "/$d" "$ROOT/$d"; done
 cp "$QEMU" "$ROOT/usr/bin/qemu-aarch64-static"; [ "$(basename "$QEMU")" = qemu-aarch64 ] && cp "$QEMU" "$ROOT/usr/bin/qemu-aarch64" || true
-cp /etc/resolv.conf "$ROOT/etc/resolv.conf"
+cp -P "$ROOT/etc/resolv.conf" "$WORK/resolv.conf.orig" 2>/dev/null || true
+rm -f "$ROOT/etc/resolv.conf"; cp /etc/resolv.conf "$ROOT/etc/resolv.conf"
 
 echo "==> Copying ORBIT"
 mkdir -p "$ROOT/opt/orbit"
@@ -57,7 +58,9 @@ chroot "$ROOT" /bin/bash -c 'cd /opt/orbit && ORBIT_DATA_DIR=/tmp/orbit-smoke OR
 rm -rf "$ROOT/tmp/orbit-smoke" "$ROOT/tmp/smoke.log"
 
 rm -f "$ROOT/usr/bin/qemu-aarch64-static" "$ROOT/usr/bin/qemu-aarch64"
-ln -sf /run/systemd/resolve/stub-resolv.conf "$ROOT/etc/resolv.conf" 2>/dev/null || : > "$ROOT/etc/resolv.conf"
+# Give the Pi back its own resolv.conf (NetworkManager manages it); a dangling symlink here broke DNS.
+rm -f "$ROOT/etc/resolv.conf"
+if [ -e "$WORK/resolv.conf.orig" ] || [ -L "$WORK/resolv.conf.orig" ]; then cp -P "$WORK/resolv.conf.orig" "$ROOT/etc/resolv.conf"; else : > "$ROOT/etc/resolv.conf"; fi
 cleanup; trap - EXIT
 
 echo "==> Compressing"

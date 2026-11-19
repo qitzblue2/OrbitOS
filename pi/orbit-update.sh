@@ -10,6 +10,8 @@ curl -fsSL "https://codeload.github.com/qitzblue2/OrbitOS/tar.gz/refs/heads/$BRA
 SRC=$(find "$TMP" -mindepth 1 -maxdepth 1 -type d | head -1)
 echo "==> Installing"
 command -v rsync >/dev/null || apt-get install -y -qq rsync
+command -v bluetoothctl >/dev/null || apt-get install -y -qq bluez libspa-0.2-bluetooth fswebcam || true
+usermod -aG bluetooth,video orbitagent 2>/dev/null || true
 rsync -a --delete --exclude node_modules --exclude models --exclude mobile --exclude release "$SRC/" /opt/orbit/
 cp -r "$SRC/pi/files/." /
 chmod +x /usr/local/bin/orbit-*

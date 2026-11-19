@@ -9,14 +9,26 @@ const port = process.parentPort || {
 };
 if (!process.parentPort) process.on('disconnect', () => process.exit(0));
 
-let engine = null;
+let engine = null, speaker = null;
+const fs = require('node:fs');
+const path = require('node:path');
+// Optional voice ID: a voice fingerprint (embedding) of each utterance, for checking who is speaking.
+function voiceprint(audio) {
+  if (!speaker || !audio || audio.length < 16000 * 0.8) return null;
+  try { const st = speaker.createStream(); st.acceptWaveform({ sampleRate: 16000, samples: audio }); st.inputFinished(); return speaker.isReady(st) ? Array.from(speaker.compute(st)) : null; } catch { return null; }
+}
 const send = (msg) => port.postMessage(msg);
 
 function boot({ modelsDir, sensitivity, voice, voiceDirs, patience }) {
   try {
     engine = new LocalSpeech(modelsDir, { sensitivity, voice, voiceDirs, patience });
     for (const ev of ['wake', 'listening', 'partial']) engine.on(ev, (data) => send({ type: ev, data }));
-    engine.on('utterance', (text, audio) => send({ type: 'utterance', data: text, audio: audio?.length ? Array.from(audio) : null }));
+    try {
+      const { MODELS } = require('./speech.js');
+      const f = path.join(modelsDir, MODELS.speaker);
+      if (fs.existsSync(f)) speaker = new (require('sherpa-onnx-node').SpeakerEmbeddingExtractor)({ model: f, numThreads: 1, debug: false });
+    } catch {}
+    engine.on('utterance', (text, audio) => send({ type: 'utterance', data: text, audio: audio?.length ? Array.from(audio) : null, voiceprint: voiceprint(audio) }));
     send({ type: 'ready', tts: !!engine.tts, voice: engine.voice });
   } catch (e) { send({ type: 'error', message: e.message }); }
 }

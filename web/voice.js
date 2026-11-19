@@ -137,7 +137,7 @@ export class Voice extends EventTarget {
     const u = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, ''));
     const v = speechSynthesis.getVoices().find((x) => x.name === this.voice.name);
     if (v) u.voice = v;
-    u.rate = this.voice.rate; u.pitch = this.voice.pitch;
+    u.rate = this.voice.rate; u.pitch = this.voice.pitch; u.volume = this.quiet?.() ? 0.35 : 1;
     u.onstart = () => { this.speaking = true; this.emit('state', 'speaking'); };
     u.onend = u.onerror = () => {
       if (!speechSynthesis.pending && !speechSynthesis.speaking) {
@@ -324,7 +324,9 @@ export class NativeVoice extends EventTarget {
     const buf = ctx.createBuffer(1, data.length, sampleRate);
     buf.copyToChannel(data, 0);
     const src = ctx.createBufferSource();
-    src.buffer = buf; src.connect(ctx.destination);
+    src.buffer = buf;
+    // Quiet hours: speak softly.
+    if (this.quiet?.()) { const g = ctx.createGain(); g.gain.value = 0.35; src.connect(g); g.connect(ctx.destination); } else src.connect(ctx.destination);
     const at = Math.max(ctx.currentTime + 0.03, this.playHead || 0);
     src.start(at);
     this.playHead = at + buf.duration + pause;
@@ -392,3 +394,11 @@ export class RemoteVoice extends NativeVoice {
 }
 
 export const createVoice = (remote) => (window.orbitNative ? new NativeVoice(window.orbitNative) : remote ? new RemoteVoice(remote) : new Voice());
+
+// Same rule as the server (server/features.js): { enabled, start: '22:30', end: '07:00' }.
+export function inQuietHours(q, now = new Date()) {
+  if (!q?.enabled) return false;
+  const m = (x) => { const [h, mm] = String(x || '0:0').split(':').map(Number); return h * 60 + (mm || 0); };
+  const t = now.getHours() * 60 + now.getMinutes(), a = m(q.start || '22:30'), b = m(q.end || '07:00');
+  return a <= b ? t >= a && t < b : t >= a || t < b;
+}

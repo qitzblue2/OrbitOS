@@ -31,6 +31,7 @@ export function createPhoneSpeech(cfg, { keyring, settings, saveSettings } = {})
 
   function attach(ws) {
     let worker = null, ready = false, listening = false;
+    const heard = { print: null, level: 0, at: 0 }; // voice fingerprint and loudness of the last utterance
     const pending = new Map();
     const tell = (type, data) => { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'speech', ev: type, data })); };
 
@@ -44,7 +45,11 @@ export function createPhoneSpeech(cfg, { keyring, settings, saveSettings } = {})
         if (m.type === 'ready') { ready = true; tell('ready', { tts: m.tts }); }
         else if (m.type === 'speech') { const done = pending.get(m.id); pending.delete(m.id); done?.(m); }
         else if (m.type === 'error') tell('error', m.message);
-        else if (m.type === 'utterance' && sttMode().startsWith('groq:') && m.audio && hasGroq()) {
+        if (m.type === 'utterance') {
+          let sum = 0; const a = m.audio || []; for (let i = 0; i < a.length; i++) sum += a[i] * a[i];
+          Object.assign(heard, { print: m.voiceprint || null, level: a.length ? Math.sqrt(sum / a.length) : 0, at: Date.now() });
+        }
+        if (m.type === 'utterance' && sttMode().startsWith('groq:') && m.audio && hasGroq()) {
           bestTranscript({ local: m.data, audio: Float32Array.from(m.audio), keyring, model: sttMode().slice(5), stripWake })
             .then((r) => tell('utterance', r.text || ''));
         }
@@ -90,7 +95,9 @@ export function createPhoneSpeech(cfg, { keyring, settings, saveSettings } = {})
     }
 
     function close() { if (worker) worker.kill(); }
-    return { onMessage, onAudio, close };
+    // What the server engine heard for the utterance this client just sent (if it is recent).
+    const lastHeard = () => (Date.now() - heard.at < 15000 ? heard : null);
+    return { onMessage, onAudio, close, lastHeard };
   }
 
   return { available: () => !!modelsDir, attach };

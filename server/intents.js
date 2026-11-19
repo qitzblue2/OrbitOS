@@ -77,7 +77,7 @@ export function parseIntent(raw, now = new Date()) {
 
   // AI model switching ("switch to GPT-4o", "use Claude Sonnet", "change the model to Llama 70b")
   if ((m = t.match(/^(?:switch|change|set) (?:the |your )?(?:ai |brain )?(?:model )?to (.+)$/)) || (m = t.match(/^use (.+?)(?: model| for everything)?$/)))
-    if (!/\b(lights?|volume|thermostat|computer|pc|laptop|mode|routine)\b/.test(m[1])) return { type: 'model.switch', name: m[1] };
+    if (!/\b(lights?|volume|thermostat|computer|pc|laptop|mode|routine|speakers?|audio|sound|headphones)\b/.test(m[1])) return { type: 'model.switch', name: m[1] };
   if (/^(?:which|what) (?:ai )?model (?:are you|is this|am i)(?: using| on)?$/.test(t)) return { type: 'model.which' };
 
   // Briefing
@@ -98,6 +98,37 @@ export function parseIntent(raw, now = new Date()) {
     return { type: 'home.lights', on: true, brightness: num(m[2]), area: m[1] || null };
   if ((m = t.match(/^what(?:'s| is) the temperature(?: in (?:the |my )?(.+))?$/))) return { type: 'home.temperature', area: m[1] || null };
   if ((m = t.match(/^set (?:the )?(?:thermostat|heating|temperature) to (\d{1,2}(?:\.\d)?)(?: degrees)?$/))) return { type: 'home.thermostat', value: Number(m[1]) };
+
+  // Weather (Open-Meteo, no key) and "show me" cards for the projector
+  if ((m = t.match(/^(?:set|change) my (?:location|city|town) to (.+)$/)) || (m = t.match(/^i live in (.+)$/))) return { type: 'location.set', name: text.slice(t.indexOf(m[1])) };
+  if (/^(?:show|put up|display)(?: me)? (?:the )?weather(?: (?:for )?(?:this|the) week| forecast)?(?: on the (?:wall|projector|screen))?$|^(?:what(?:'s| is) the )?weather (?:for )?(?:this|the) week$|^weekly forecast$/.test(t)) return { type: 'weather', show: true };
+  if (/^(?:what(?:'s| is)|how(?:'s| is)) (?:the )?weather(?: like)?(?: today| outside| now)?$|^(?:is it|will it) (?:going to )?(?:rain|snow|be cold|be hot|be sunny)(?: today)?$|^weather$|^do i need (?:a jacket|an umbrella)$/.test(t)) return { type: 'weather', show: false };
+  if (/^(?:show|put up|display)(?: me)? my (?:to-?do(?: list)?|todo(?: list)?|reminders|tasks)(?: on the (?:wall|projector|screen))?$|^what(?:'s| is) on my (?:to-?do|todo) list$/.test(t)) return { type: 'reminders.show' };
+  if (/^(?:hide|clear|close) (?:it|that|the (?:screen|projector|display|card))$/.test(t)) return { type: 'project.clear' };
+
+  // ORBIT's own machine (the Raspberry Pi)
+  if (/^how(?:'s| is) (?:the |my )?(?:pi|raspberry pi|orbit|server)(?: doing| holding up)?$|^(?:pi|orbit|server) (?:health|status)$|^how hot is (?:the |my )?(?:pi|raspberry pi)$|^(?:show|check)(?: me)? (?:the )?(?:pi|raspberry pi)(?:'s)? (?:health|status|temperature)$/.test(t)) return { type: 'health', show: /^show/.test(t) };
+
+  // Camera ("what am I holding?")
+  if (/^what am i holding(?: up)?$|^what(?: do| can) you see$|^look at this$|^what(?:'s| is) (?:this|in front of you|in my hand)$|^what(?:'s| is) this (?:thing|object)$/.test(t)) return { type: 'camera.look', question: clean };
+
+  // Intercom ("tell the desk dinner's ready", "announce dinner's ready")
+  if ((m = t.match(/^announce(?: that)? (.+)$/))) return { type: 'intercom', room: null, message: text.slice(t.indexOf(m[1])) };
+  if ((m = t.match(/^(?:tell|say to|message) (?:the )?([a-z][\w' ]{1,30}?)[,:]? (?:that )?(.+)$/)) && !/^(?:me|us|him|her|them|a|an|my|everyone|everybody)$/.test(m[1])) return { type: 'intercom', room: m[1], message: text.slice(t.indexOf(m[2], m[1].length)) };
+
+  // Bluetooth speakers on the ORBIT machine
+  if (/^(?:pair|add|set up) (?:a |my |the )?(?:new )?(?:bluetooth )?(?:speaker|headphones|earbuds)$/.test(t)) return { type: 'bt', action: 'pair' };
+  if ((m = t.match(/^(?:connect|switch|play)(?: to| through| on)? (?:the |my )?(?:bluetooth )?(?:speaker|headphones|earbuds)(?: (?:called |named )?(.+))?$/)) || (m = t.match(/^(?:connect|switch)(?: to)? (?:the |my )?(.+?) speaker$/))) return { type: 'bt', action: 'connect', name: m[1] || null };
+  if (/^(?:disconnect|turn off) (?:the |my )?(?:bluetooth )?(?:speaker|headphones|earbuds)$|^use (?:the |my )?(?:pi|built-in|normal|projector) (?:speaker|audio|sound)$/.test(t)) return { type: 'bt', action: 'disconnect' };
+
+  // Spotify (needs Spotify connected in Settings; playback control needs Spotify Premium)
+  if (/^play (?:my )?(?:liked|favou?rite|saved) songs$/.test(t)) return { type: 'spotify', action: 'liked', hint };
+  if ((m = t.match(/^play (?:the )?(?:playlist|album|artist|song|track)? ?(.+?) on spotify$/))) return { type: 'spotify', action: 'play', query: m[1], kind: (t.match(/^play (?:the )?(playlist|album|artist|song|track)/) || [])[1] || null, hint };
+  if ((m = t.match(/^play (?:the )?(playlist|album|artist) (.+)$/))) return { type: 'spotify', action: 'play', query: m[2], kind: m[1], hint };
+  if ((m = t.match(/^(?:what(?:'s| is)|which song is) (?:this song|playing|this)(?: called)?$/))) return { type: 'spotify', action: 'now' };
+
+  // Voice ID
+  if (/^(?:learn|remember|recogni[sz]e) my voice$|^(?:set up|enrol+) (?:my )?voice(?: id)?$/.test(t)) return { type: 'voiceid.enroll' };
 
   // Device actions
   const act = (capability, params, speak) => ({ type: 'action', capability, params, hint, speak });

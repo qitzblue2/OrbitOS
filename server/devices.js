@@ -13,6 +13,10 @@ export const CAPABILITIES = {
   'system.lock':     { label: 'Lock the device',      sensitive: false },
   'system.status':   { label: 'Read device status',   sensitive: false },
   'notify.show':     { label: 'Show notifications',   sensitive: false },
+  'camera.capture':  { label: 'Use the camera',       sensitive: false, privacy: true },
+  'bt.pair':         { label: 'Pair Bluetooth speakers', sensitive: false },
+  'bt.connect':      { label: 'Switch Bluetooth speakers', sensitive: false },
+  'bt.disconnect':   { label: 'Disconnect Bluetooth speakers', sensitive: false },
   'files.list':      { label: 'List approved folders',sensitive: false },
   'workflow.run':    { label: 'Run approved workflows', sensitive: false },
   'files.read':      { label: 'Read files',           sensitive: false },
@@ -22,7 +26,7 @@ export const CAPABILITIES = {
   'system.shutdown': { label: 'Shut down / restart',  sensitive: true },
   'command.run':     { label: 'Run approved commands',sensitive: true },
 };
-export const DEFAULT_PERMISSIONS = ['app.open', 'app.close', 'volume.set', 'media.control', 'browser.search', 'system.status', 'notify.show'];
+export const DEFAULT_PERMISSIONS = ['app.open', 'app.close', 'volume.set', 'media.control', 'browser.search', 'system.status', 'notify.show', 'bt.pair', 'bt.connect', 'bt.disconnect'];
 
 const hash = (t) => crypto.createHash('sha256').update(t).digest('hex');
 

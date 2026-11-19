@@ -18,3 +18,9 @@ body.has-card .caption{display:none}
 .code{font:600 1.5em 'JetBrains Mono',monospace;letter-spacing:.25em;color:#38e8ff}
 @keyframes fade{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* Ambient: a faint clock, the weather and the next reminder while nothing else is shown. */
+.ambient{position:absolute;left:50%;bottom:9%;transform:translateX(-50%);text-align:center;color:#5c7d99;opacity:.55;transition:opacity .6s}
+.amb-time{font-size:clamp(28px,4vw,56px);letter-spacing:.06em;font-weight:500}
+.amb-line{font-size:clamp(14px,1.5vw,22px);margin-top:.3em}
+body.has-card .ambient,body.setup-mode .ambient,body.busy .ambient{opacity:0}
+body.quiet .ambient{opacity:.3}

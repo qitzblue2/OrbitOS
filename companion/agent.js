@@ -137,6 +137,53 @@ if ($c) { "CLOSED:$c" } else { "NOTFOUND" }`);
     else await run('systemctl', [restart ? 'reboot' : 'poweroff']);
     return { message: restart ? 'Restarting.' : 'Shutting down.' };
   },
+  // ---- Bluetooth speakers (Linux / Raspberry Pi, via bluetoothctl) ----
+  async 'bt.pair'() {
+    if (PLATFORM !== 'linux') throw new Error('Pairing speakers by voice works on the Raspberry Pi / Linux. Pair it in your system settings here.');
+    await run('bluetoothctl', ['power', 'on']).catch(() => {});
+    const before = new Set((await btList('Paired')).map((d) => d.mac));
+    await run('bluetoothctl', ['--timeout', '15', 'scan', 'on']).catch(() => {});
+    const all = await btList();
+    for (const d of all.filter((x) => !before.has(x.mac))) {
+      const { stdout } = await run('bluetoothctl', ['info', d.mac]).catch(() => ({ stdout: '' }));
+      if (!/Icon: audio|UUID: Audio Sink/i.test(stdout)) continue;
+      await run('bluetoothctl', ['pair', d.mac], { timeout: 25000 }).catch(() => {});
+      await run('bluetoothctl', ['trust', d.mac]).catch(() => {});
+      const c = await run('bluetoothctl', ['connect', d.mac], { timeout: 20000 }).catch((e) => ({ stdout: e.stdout || '' }));
+      if (/Connection successful/i.test(c.stdout)) return { message: `Connected to ${d.name}. Sound now plays there.` };
+    }
+    return { message: "I couldn't find a speaker in pairing mode. Put it in pairing mode (usually hold the Bluetooth button until it flashes) and ask again." };
+  },
+  async 'bt.connect'({ name }) {
+    if (PLATFORM !== 'linux') throw new Error('Switching speakers by voice works on the Raspberry Pi / Linux.');
+    await run('bluetoothctl', ['power', 'on']).catch(() => {});
+    const paired = await btList('Paired');
+    if (!paired.length) return { message: 'No Bluetooth speakers are paired yet. Say "pair a new speaker" with the speaker in pairing mode.' };
+    const d = (name && paired.find((x) => x.name.toLowerCase().includes(name.toLowerCase()))) || paired[paired.length - 1];
+    const c = await run('bluetoothctl', ['connect', d.mac], { timeout: 20000 }).catch((e) => ({ stdout: e.stdout || '' }));
+    if (!/Connection successful|already connected/i.test(c.stdout)) throw new Error(`${d.name} didn't connect. Is it switched on and nearby?`);
+    return { message: `Connected to ${d.name}. Sound now plays there.` };
+  },
+  async 'bt.disconnect'() {
+    if (PLATFORM !== 'linux') throw new Error('Works on the Raspberry Pi / Linux.');
+    await run('bluetoothctl', ['disconnect']).catch(() => {});
+    return { message: 'Bluetooth speaker disconnected. Sound is back on the normal output.' };
+  },
+  // ---- camera (Raspberry Pi camera or a USB webcam) ----
+  async 'camera.capture'() {
+    const file = path.join(os.tmpdir(), `orbit-cam-${Date.now()}.jpg`);
+    const tries = PLATFORM === 'linux'
+      ? [['rpicam-still', ['-n', '-t', '800', '--width', '1280', '--height', '960', '-o', file]], ['libcamera-still', ['-n', '-t', '800', '--width', '1280', '--height', '960', '-o', file]], ['fswebcam', ['-q', '-r', '1280x960', '--no-banner', '-S', '8', file]], ['ffmpeg', ['-y', '-loglevel', 'error', '-f', 'v4l2', '-i', '/dev/video0', '-frames:v', '1', file]]]
+      : PLATFORM === 'darwin' ? [['imagesnap', ['-q', '-w', '1', file]], ['ffmpeg', ['-y', '-loglevel', 'error', '-f', 'avfoundation', '-i', '0', '-frames:v', '1', file]]]
+      : [['ffmpeg', ['-y', '-loglevel', 'error', '-f', 'dshow', '-i', 'video=Integrated Camera', '-frames:v', '1', file]]];
+    for (const [cmd, args] of tries) {
+      try { await run(cmd, args, { timeout: 15000 }); if (fs.existsSync(file) && fs.statSync(file).size > 1000) break; } catch {}
+    }
+    if (!fs.existsSync(file)) throw new Error('No camera found. Plug in a Raspberry Pi camera or a USB webcam.');
+    const data = fs.readFileSync(file).toString('base64');
+    fs.unlinkSync(file); // never kept on disk
+    return { message: 'Photo taken.', data: { image: data, mediaType: 'image/jpeg' } };
+  },
   async 'system.status'() { return { message: 'Status read.', data: await status() }; },
   async 'notify.show'({ title = 'ORBIT', text }) {
     if (PLATFORM === 'darwin') await run('osascript', ['-e', `display notification ${JSON.stringify(text)} with title ${JSON.stringify(title)}`]);
@@ -263,6 +310,11 @@ async function status() {
     s.battery = +fs.readFileSync('/sys/class/power_supply/BAT0/capacity', 'utf8'); s.charging = fs.readFileSync('/sys/class/power_supply/BAT0/status', 'utf8').trim() !== 'Discharging';
   }
   return s;
+}
+
+async function btList(filter) {
+  const { stdout } = await run('bluetoothctl', filter ? ['devices', filter] : ['devices']).catch(() => ({ stdout: '' }));
+  return stdout.split('\n').map((l) => l.match(/^Device ([0-9A-F:]{17}) (.+)$/i)).filter(Boolean).map((m) => ({ mac: m[1], name: m[2].trim() }));
 }
 
 export async function execute(capability, params, local) {

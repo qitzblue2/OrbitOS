@@ -26,6 +26,7 @@ function stripWake(raw) {
 }
 
 const MODELS = {
+  speaker: 'wespeaker_en_voxceleb_CAM++.onnx', // optional: voice ID
   kws: 'sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01',
   asr: 'sherpa-onnx-streaming-zipformer-en-20M-2023-02-17',
   tts: 'vits-piper-en_GB-alan-medium', // default voice, bundled

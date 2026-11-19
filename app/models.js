@@ -14,6 +14,7 @@ const SOURCES = {
   [MODELS.asr]: `${BASE}/asr-models/${MODELS.asr}.tar.bz2`,
   [MODELS.tts]: tts(MODELS.tts),
   [VOICES.lessac.dir]: tts(VOICES.lessac.dir),
+  [MODELS.speaker]: `${BASE}/speaker-recongition-models/${MODELS.speaker}`, // (sic) the release tag's spelling
 };
 const REQUIRED = [MODELS.kws, MODELS.asr, MODELS.tts];
 const has = (dir) => REQUIRED.every((m) => fs.existsSync(path.join(dir, m)));
@@ -27,12 +28,14 @@ async function download(dir, onProgress = () => {}, sources = SOURCES) {
     const res = await fetch(sources[name]);
     if (!res.ok) throw new Error(`Download failed for ${name}: ${res.status}`);
     const total = Number(res.headers.get('content-length')) || 0;
-    const tmp = path.join(os.tmpdir(), `${name}.tar.bz2`);
+    const single = /\.onnx$/.test(name); // a single model file, not an archive
+    const tmp = single ? path.join(dir, `${name}.part`) : path.join(os.tmpdir(), `${name}.tar.bz2`);
     const out = fs.createWriteStream(tmp);
     let got = 0;
     for await (const chunk of res.body) { got += chunk.length; out.write(chunk); onProgress({ name, index: i, count: names.length, fraction: total ? got / total : 0 }); }
     await new Promise((r) => out.end(r));
     // bsdtar/GNU tar handle .tar.bz2 on Windows 10+, macOS and Linux.
+    if (single) { fs.renameSync(tmp, path.join(dir, name)); continue; }
     await new Promise((resolve, reject) => execFile('tar', ['-xjf', tmp, '-C', dir], (e) => (e ? reject(e) : resolve())));
     fs.unlinkSync(tmp);
   }

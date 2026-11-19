@@ -37,5 +37,23 @@ test('phone voice: wake word, transcript and ORBIT\'s voice come from the server
     ws.send(JSON.stringify({ type: 'speech-say', id: 'r1', text: "It's noon." }));
     const voice = await waitFor((m) => m.type === 'speech-tts' && m.id === 'r1');
     assert.ok(voice.sampleRate >= 22050 && voice.pcm.length > 1000, 'ORBIT voice audio returned');
+
+    // Voice ID: "learn my voice", then three spoken sentences teach ORBIT this voice.
+    if (fs.existsSync(path.resolve('models', 'wespeaker_en_voxceleb_CAM++.onnx'))) {
+      const done = []; ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.type === 'done') done.push(m.text); });
+      ws.send(JSON.stringify({ type: 'utterance', text: 'learn my voice', source: 'text' }));
+      await new Promise((r) => setTimeout(r, 300));
+      for (const [i, line] of ['This is my voice.', 'I would like a cup of tea.', 'Turn on the lights please.'].entries()) {
+        got.length = 0;
+        const a = Float32Array.from([...new Float32Array(9600), ...say('Hey Orbit.'), ...new Float32Array(3200), ...say(line), ...new Float32Array(32000)]);
+        for (let j = 0; j < a.length; j += 1600) ws.send(Buffer.from(a.slice(j, j + 1600).buffer));
+        const u = await waitFor((m) => m.ev === 'utterance');
+        ws.send(JSON.stringify({ type: 'utterance', text: u.data, source: 'voice' }));
+        await new Promise((r) => setTimeout(r, 300));
+        assert.match(done.at(-1), i < 2 ? /more/ : /recognise your voice/, `sample ${i + 1}: ${done.at(-1)}`);
+      }
+      const st = await (await fetch(`http://127.0.0.1:${port}/api/voiceid`, { headers: { authorization: `Bearer ${config.adminToken}` } })).json();
+      assert.equal(st.enrolled, true);
+    }
   } finally { ws.close(); await orbit.close(); }
 });

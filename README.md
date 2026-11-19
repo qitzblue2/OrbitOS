@@ -187,6 +187,19 @@ curl -fsSL https://raw.githubusercontent.com/qitzblue2/OrbitOS/OrbitAI/pi/orbit-
 - The dashboard is reachable on your network at `http://orbit.local:7777`. Sign in with the token from `/var/lib/orbit/admin-token` on the Pi.
 - The image is about 2 GB compressed and needs an 8 GB+ microSD card.
 
+### Around the house
+
+- **Bedside mode** (phones): tap the moon button. The screen goes black apart from a tiny dim orb, and the phone stays awake and listening. Double-tap to leave.
+- **Rooms and intercom:** give each screen or phone a room under **Security › This device** (the projector is "Desk"; change it with the `projectorRoom` setting). Then say "tell the bedroom dinner's ready", or "announce dinner's ready" for every device. When several devices hear you, only the one that heard you loudest answers.
+- **Quiet hours** (**Integrations**): at night ORBIT speaks softly and keeps answers short.
+- **Weather:** set your city under **Integrations**, then ask "what's the weather?" or "show me the weather this week" (Open-Meteo, free, no key).
+- **Projector:** while idle it shows a faint clock, the weather and your next reminder. "Show my to-do list" puts it on the wall; "hide it" clears it.
+- **Bluetooth speakers on the Pi:** put the speaker in pairing mode and say "pair a new speaker". Later: "connect the speaker", "connect the kitchen speaker", "use the Pi speaker".
+- **Camera on the Pi:** plug in a Raspberry Pi camera or USB webcam, turn on **Use the camera** for "ORBIT Pi" under **Security**, then ask "what am I holding?".
+- **Spotify:** connect it under **Integrations** (needs a free Spotify developer app; playback control needs Premium). Then: "play my liked songs", "play Daft Punk on Spotify", "play the playlist chill vibes", "pause", "next".
+- **Pi health:** "how's the Pi doing?" tells you its temperature, fan, load and power, and ORBIT warns you at 75 °C, before the Pi slows itself down.
+- **Voice ID:** say "learn my voice" and three sentences. After that, only your voice can confirm risky spoken commands (shut down, run commands, send messages, approve AI actions). Only a voice fingerprint is stored, not a recording.
+
 ### Get the installer
 
 Open the repository's **Actions** tab, choose **Build ORBIT app**, and select **Run workflow**. When the run finishes, download your installer from its artifacts:

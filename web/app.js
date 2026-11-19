@@ -1,5 +1,5 @@
 import { Core, stateLabel } from './core.js';
-import { createVoice } from './voice.js';
+import { createVoice, inQuietHours } from './voice.js';
 import { createRemoteSpeech } from './remote-speech.js';
 
 // ---- tiny DOM helper (no innerHTML with user data) ----
@@ -33,6 +33,11 @@ const NAV = [
 const S = { token: '', ws: null, overview: null, view: 'dashboard', state: 'idle', chat: [], live: '', heard: '', notes: [], memRecalled: [], actions: [] };
 const remoteSpeech = createRemoteSpeech({ ws: () => S.ws, send: (m) => send(m) });
 const voice = createVoice(window.orbitNative ? null : remoteSpeech);
+voice.quiet = () => inQuietHours(S.overview?.settings?.quietHours);
+// Which room this screen or phone is in (for "tell the bedroom…" and for picking the closest device).
+const getRoom = () => { try { return localStorage.getItem('orbit.room') || ''; } catch { return ''; } };
+const setRoom = (r) => { try { localStorage.setItem('orbit.room', r); } catch {} sendInfo(); };
+function sendInfo() { if (S.ws?.readyState === 1) S.ws.send(JSON.stringify({ type: 'client-info', room: getRoom(), voice: voice.mode !== 'off' })); }
 const native = window.orbitNative || null;
 const report = (d) => native?.report(d);
 let core, mini;
@@ -69,7 +74,7 @@ $('#login-form').addEventListener('submit', async (e) => {
 function connect() {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/ui?token=${encodeURIComponent(S.token)}`);
   S.ws = ws;
-  ws.onopen = () => { $('#offline').hidden = true; $('#link-dot').className = 'dot on'; $('#link-text').textContent = 'Linked'; };
+  ws.onopen = () => { sendInfo(); $('#offline').hidden = true; $('#link-dot').className = 'dot on'; $('#link-text').textContent = 'Linked'; };
   ws.onclose = () => { remoteSpeech.reset(); $('#offline').hidden = false; $('#link-dot').className = 'dot off'; $('#link-text').textContent = 'Offline'; setState('error'); setTimeout(connect, 2000); };
   ws.onmessage = (ev) => onEvent(JSON.parse(ev.data));
 }
@@ -105,6 +110,10 @@ function onEvent(m) {
     case 'memory': if (m.recalled) S.memRecalled = m.recalled; refresh(); break;
     case 'devices': if (S.overview) { S.overview.devices = m.devices; if (['dashboard', 'devices', 'security'].includes(S.view)) render(); } break;
     case 'recent': if (S.overview) { S.overview.recent = m.recent; if (S.view === 'dashboard') render(); } break;
+    case 'announce': {
+      wakeScreen(); const t = `${m.from ? `From the ${m.from.toLowerCase()}: ` : 'Message: '}${m.text}`;
+      toast(t); voice.say(t); window.orbitBedside?.say(t); break;
+    }
     case 'notify': wakeScreen(); S.notes.unshift({ ...m, at: new Date().toISOString() }); toast(m.text, m.level === 'warn' ? 'warn' : ''); if (m.speak) voice.say(m.text); if (S.view === 'dashboard') render(); break;
     case 'mic': if (!m.enabled) voice.killAll(); break;
     case 'error': S.pending = null; toast(m.message, 'bad'); renderLive(); break;
@@ -147,6 +156,7 @@ voice.addEventListener('mode', (e) => {
   report({ listening: on });
   $('#mic-toggle').setAttribute('aria-pressed', String(on));
   $('#mic-label').textContent = e.detail === 'starting' ? 'Starting voice engine…' : e.detail === 'wake' ? 'Listening for "Hey Orbit"' : on ? 'Mic on' : 'Mic off';
+  sendInfo();
   if (e.detail === 'starting') return;
   setState(on ? 'idle' : 'idle');
 });
@@ -508,6 +518,7 @@ const VIEWS = {
       panel('Smart home', h('ul', { class: 'list' },
         h('li', {}, h('span', { class: `dot ${o.home.simulated ? '' : 'on'}` }), h('span', { class: 'grow' }, o.home.name), o.home.simulated ? h('span', { class: 'tag bad' }, 'simulated') : h('span', { class: 'tag ok' }, 'connected'))),
         h('p', { class: 'muted' }, 'Set HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN (recommended, covers Hue, plugs, thermostats, sensors and cameras) or HUE_BRIDGE_IP and HUE_USERNAME in the server .env, then restart.')),
+      panelLocation(o), panelQuiet(o), panelSpotify(),
       panel('Try it', h('div', { class: 'row' }, ['turn off all the lights', 'set the bedroom lights to 30 percent', "what's the temperature in my room", 'activate movie mode', 'good morning'].map((c) => h('button', { class: 'btn small', onclick: () => utter(c) }, c)))));
   },
 
@@ -672,8 +683,11 @@ const VIEWS = {
       h('div', { class: 'row' }, h('button', { class: 'btn danger', onclick: async () => { if (confirm(`Revoke ${d.name}? It will be disconnected immediately and must be paired again.`)) { await api('DELETE', `/api/devices/${d.id}`); refresh(); } } }, 'Revoke access'))));
     return h('div', { class: 'stack' }, h('div', { class: 'grid2' }, ...(devicePanels.length ? devicePanels : [panel('Device permissions', empty('No devices paired.'))])),
       panel('This device',
+        (() => { const i = h('input', { id: 'room', value: getRoom(), placeholder: 'e.g. Bedroom, Desk, Kitchen' }); i.addEventListener('change', () => { setRoom(i.value.trim()); toast('Saved.'); });
+          return h('div', { class: 'field' }, h('label', { class: 'label', for: 'room' }, 'Room'), i, h('div', { class: 'muted' }, 'Lets you say "tell the bedroom dinner\'s ready". When several devices hear you, the closest one answers.')); })(),
         h('p', { class: 'muted' }, 'Sign out of ORBIT on this browser or phone. To use it again you\'ll need a new pairing code (or the access token).'),
         h('button', { class: 'btn danger', onclick: () => { if (!confirm('Sign out on this device?')) return; try { localStorage.removeItem('orbit.token'); } catch {} location.hash = 'dashboard'; location.reload(); } }, 'Sign out')),
+      panelVoiceId(),
       panel('Full control',
         h('div', { class: 'perm' }, h('span', {}, 'Let the AI run commands and edit files anywhere without asking', h('div', { class: 'muted' }, 'Off (recommended): ORBIT asks before every command or file change, and only uses ORBIT Workspace, Documents and Desktop. On: it acts on its own, in any folder. Everything is still recorded in the audit log below.')),
           (() => { const b = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Full control', 'aria-checked': String(!!o.settings.fullControl) }); b.addEventListener('click', async () => {
@@ -716,6 +730,58 @@ function render() {
   $('#view').replaceChildren(VIEWS[S.view]());
 }
 
+// ---- settings panels for location, quiet hours, Spotify and voice ID ----
+function panelLocation(o) {
+  const i = h('input', { id: 'loc', value: o.settings.location?.name || '', placeholder: 'e.g. Amsterdam' });
+  return panel('Your location (weather)',
+    h('div', { class: 'field' }, h('label', { class: 'label', for: 'loc' }, 'City'), i, h('div', { class: 'muted' }, 'For "what\'s the weather" and the projector\'s clock. Weather comes from Open-Meteo (free, no key).')),
+    h('button', { class: 'btn primary', onclick: async () => { try { const l = await api('POST', '/api/location', { name: i.value }); S.overview.settings.location = l; i.value = l.name; toast(`Saved: ${l.name}`); } catch (e) { toast(e.message, 'bad'); } } }, 'Save'));
+}
+function panelQuiet(o) {
+  const q = o.settings.quietHours || { enabled: false, start: '22:30', end: '07:00' };
+  const on = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Quiet hours', 'aria-checked': String(!!q.enabled) }), a = h('input', { type: 'time', id: 'q-a', value: q.start }), b = h('input', { type: 'time', id: 'q-b', value: q.end });
+  on.addEventListener('click', () => on.setAttribute('aria-checked', String(on.getAttribute('aria-checked') !== 'true')));
+  return panel('Quiet hours',
+    h('div', { class: 'perm' }, h('span', {}, 'At night ORBIT speaks softly and keeps answers short'), on),
+    h('div', { class: 'row' }, h('label', { class: 'label', for: 'q-a' }, 'From'), a, h('label', { class: 'label', for: 'q-b' }, 'to'), b),
+    h('button', { class: 'btn primary', onclick: async () => { S.overview.settings = await api('PATCH', '/api/settings', { quietHours: { enabled: on.getAttribute('aria-checked') === 'true', start: a.value || '22:30', end: b.value || '07:00' } }); toast('Saved.'); } }, 'Save'));
+}
+function panelSpotify() {
+  const body = h('div', { class: 'stack' }, h('p', { class: 'muted' }, 'Loading…'));
+  const draw = async () => {
+    const st = await api('GET', '/api/spotify').catch(() => null);
+    if (!st) return body.replaceChildren(empty('Not available.'));
+    if (st.connected) return body.replaceChildren(h('p', {}, `Connected${st.user ? ` as ${st.user}` : ''}. Try "play my liked songs" or "play Daft Punk on Spotify".`), h('button', { class: 'btn danger', onclick: async () => { await api('DELETE', '/api/spotify'); draw(); } }, 'Disconnect'));
+    const id = h('input', { id: 'sp-id', value: st.clientId, placeholder: 'Client ID (32 characters)' }), back = h('input', { id: 'sp-back', placeholder: 'Paste the address here' });
+    body.replaceChildren(
+      h('ol', { class: 'muted steps' },
+        h('li', {}, 'Open developer.spotify.com/dashboard, sign in and choose "Create app" (any name; tick Web API).'),
+        h('li', {}, 'Under Redirect URIs add exactly: ', h('code', {}, st.redirect)),
+        h('li', {}, 'Copy the app\'s Client ID into the box below and press Connect.'),
+        h('li', {}, 'Approve in the Spotify page. If the page after that doesn\'t load, copy its whole address from the address bar and paste it below.')),
+      h('div', { class: 'field' }, h('label', { class: 'label', for: 'sp-id' }, 'Client ID'), id),
+      h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('POST', '/api/spotify/start', { clientId: id.value }); window.open(r.url, '_blank'); } catch (e) { toast(e.message, 'bad'); } } }, 'Connect'),
+      h('div', { class: 'field' }, h('label', { class: 'label', for: 'sp-back' }, 'Address after approving'), back),
+      h('button', { class: 'btn', onclick: async () => { try { await api('POST', '/api/spotify/finish', { url: back.value }); toast('Spotify connected.'); draw(); } catch (e) { toast(e.message, 'bad'); } } }, 'Finish'),
+      h('p', { class: 'muted' }, 'Controlling playback needs Spotify Premium.'));
+  };
+  draw();
+  return panel('Spotify', body);
+}
+function panelVoiceId() {
+  const body = h('div', { class: 'stack' });
+  const draw = async () => {
+    const st = await api('GET', '/api/voiceid').catch(() => ({ enrolled: false }));
+    body.replaceChildren(
+      h('p', { class: 'muted' }, 'Once ORBIT knows your voice, only you can confirm risky spoken commands (shut down, run commands, send messages, approve AI actions). Typed commands from your signed-in devices still work. Only a voice fingerprint is stored, never a recording. Works on the Raspberry Pi, phones and browsers.'),
+      st.enrolled
+        ? h('div', { class: 'row' }, h('span', { class: 'tag ok' }, 'Your voice is set up'), h('button', { class: 'btn small', onclick: () => utter('learn my voice', 'text') }, 'Redo'), h('button', { class: 'btn small danger', onclick: async () => { await api('DELETE', '/api/voiceid'); draw(); } }, 'Remove'))
+        : h('div', { class: 'row' }, h('span', { class: 'tag' }, 'Not set up'), h('span', { class: 'muted' }, 'Say "Hey Orbit, learn my voice" and follow the steps.')));
+  };
+  draw();
+  return panel('Voice ID', body);
+}
+
 // Screen sleep: after a quiet spell the screen goes black and all drawing stops (saves heat and
 // power on an always-on screen like the Raspberry Pi). Any touch, key, wake word or reply wakes it.
 const kiosk = /[?&]kiosk=1/.test(location.hash) || (() => { try { return localStorage.getItem('orbit.kiosk') === '1'; } catch { return false; } })();
@@ -746,6 +812,7 @@ const bedside = (() => {
   const remember = (v) => { try { localStorage.setItem('orbit.bedside', v ? '1' : '0'); } catch {} };
   function enter() {
     on = true; el.hidden = false; Core.paused = true; remember(true); grab();
+    if (!getRoom()) setRoom('Bedroom');
     const mic = $('#mic-toggle'); if (mic && mic.getAttribute('aria-pressed') !== 'true') mic.click();
     setTimeout(() => { hint.style.opacity = '0'; }, 5000); hint.style.opacity = '';
   }

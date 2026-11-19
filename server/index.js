@@ -19,11 +19,15 @@ import { Automations } from './automations.js';
 import { Engine } from './engine.js';
 import { Agent } from './agent.js';
 import { createPhoneSpeech } from './phone-speech.js';
+import { Spotify, SPOTIFY_REDIRECT } from './spotify.js';
+import { VoiceId, ENROLL_COUNT } from './voiceid.js';
+import { weather, geocode, hostHealth } from './features.js';
 
 export function createOrbit(cfg = config) {
   const settingsStore = new JsonStore(cfg.dataDir, 'settings', {
     userName: '', tone: 'composed', fullControl: false, customInstructions: '', voice: { name: '', rate: 1.05, pitch: 0.95 },
     wakeWord: true, proactive: { briefing: true, reminders: true, deviceAlerts: true }, retentionDays: 30,
+    quietHours: { enabled: false, start: '22:30', end: '07:00' }, location: null, projectorRoom: 'Desk',
   });
   const settings = { get data() { return settingsStore.data; }, ackTimeoutMs: cfg.deviceAckTimeoutMs };
   const audit = new AuditLog(cfg.dataDir);
@@ -41,6 +45,26 @@ export function createOrbit(cfg = config) {
   const engine = new Engine({ brain, memory, devices, home, automations, audit, settings });
   engine.agent = new Agent({ engine, brain, memory, devices, audit, settings });
   engine.agent.broadcast = (type, data) => broadcast(type, data);
+  const spotify = new Spotify(cfg.dataDir);
+  const voiceId = new VoiceId(cfg.dataDir);
+  engine.settingsSave = () => settingsStore.save();
+  // Rooms: each screen/phone tells ORBIT which room it is in (Settings > This device).
+  const roomOf = (c) => (c.meta?.room || '').trim();
+  engine.extras = {
+    spotify, voiceId,
+    rooms: () => [...new Set([...uiClients].map(roomOf).filter(Boolean))],
+    announce: (room, text, fromSession) => {
+      let n = 0;
+      for (const c of uiClients) {
+        if (c.readyState !== 1 || c.sessionId === fromSession) continue;
+        if (room && roomOf(c).toLowerCase() !== room.toLowerCase()) continue;
+        c.send(JSON.stringify({ type: 'announce', text, from: [...uiClients].find((x) => x.sessionId === fromSession)?.meta?.room || '' })); n++;
+      }
+      audit.write({ kind: 'intercom', room: room || 'all', delivered: n });
+      return n;
+    },
+    project: (content, seconds) => broadcast('project', { content, seconds }),
+  };
   const uiClients = new Set();
   const heatWarned = new Map();
   const phoneSpeech = createPhoneSpeech(cfg, { keyring, settings, saveSettings: () => settingsStore.save() });
@@ -134,7 +158,7 @@ export function createOrbit(cfg = config) {
     'POST /api/reminders/:id/done': (b, id) => automations.completeReminder(id),
     'GET /api/audit': () => audit.tail(100),
     'GET /api/settings': () => settings.data,
-    'PATCH /api/settings': (b) => { const allowed = ['userName', 'tone', 'voice', 'wakeWord', 'proactive', 'retentionDays', 'fullControl', 'customInstructions'];
+    'PATCH /api/settings': (b) => { const allowed = ['userName', 'tone', 'voice', 'wakeWord', 'proactive', 'retentionDays', 'fullControl', 'customInstructions', 'quietHours', 'projectorRoom'];
       if ('fullControl' in b) audit.write({ kind: 'security', action: b.fullControl ? 'full control ON' : 'full control off' }); for (const k of allowed) if (k in b) settings.data[k] = b[k]; settingsStore.save(); return settings.data; },
     'GET /api/ai/providers': () => Object.fromEntries(Object.entries(PROVIDERS).map(([id, p]) => [id, { note: p.note || '', kind: p.kind, extra: p.extra ? { label: p.extra.label, placeholder: p.extra.placeholder } : null, label: p.label, keyHint: p.keyHint, keyOptional: !!p.keyOptional, needsBaseUrl: !!p.needsBaseUrl, baseUrl: p.baseUrl || '', models: p.models, vision: !!p.vision, keysUrl: p.keysUrl || '' }])),
     'GET /api/ai/keys': () => keyring.list(),
@@ -163,6 +187,20 @@ export function createOrbit(cfg = config) {
     'GET /api/phones': () => phones.data.phones.map(({ id, name, createdAt, lastSeen }) => ({ id, name, createdAt, lastSeen })),
     'DELETE /api/phones/:id': (b, id) => { phones.data.phones = phones.data.phones.filter((p) => p.id !== id); phones.flush(); audit.write({ kind: 'security', action: 'phone removed', id }); return { ok: true }; },
     'PATCH /api/ai/routes': (b) => (keyring.setRoutes(b), brain.status()),
+    'POST /api/location': async (b) => { const loc = await geocode(String(b.name || '')); if (!loc) throw new Error(`Couldn't find ${b.name}.`); settings.data.location = loc; settingsStore.save(); return loc; },
+    'GET /api/ambient': async () => {
+      const now = new Date();
+      const next = automations.reminders().filter((r) => !r.done && r.at && new Date(r.at) > now).sort((a, z) => new Date(a.at) - new Date(z.at))[0] || null;
+      const w = settings.data.location ? await weather(settings.data.location).catch(() => null) : null;
+      return { weather: w && { temp: w.now.temp, text: w.now.text, place: w.place.split(',')[0] }, next: next && { text: next.text, at: next.at }, quiet: engine.quiet() };
+    },
+    'GET /api/spotify': () => ({ ...spotify.status(), redirect: SPOTIFY_REDIRECT }),
+    'POST /api/spotify/start': (b) => spotify.start(b.clientId),
+    'POST /api/spotify/finish': (b) => spotify.finish(b.url),
+    'DELETE /api/spotify': () => (spotify.disconnect(), spotify.status()),
+    'GET /api/voiceid': () => voiceId.status(),
+    'DELETE /api/voiceid': () => { voiceId.reset(); audit.write({ kind: 'security', action: 'voice ID removed' }); return voiceId.status(); },
+    'PATCH /api/voiceid': (b) => { if (b.threshold >= 0.3 && b.threshold <= 0.8) { voiceId.store.data.threshold = +b.threshold; voiceId.store.save(); } return voiceId.status(); },
   };
 
   const handleRequest = async (req, res) => {
@@ -182,6 +220,13 @@ export function createOrbit(cfg = config) {
         return json(res, r ? 200 : 401, r || { error: 'Invalid or expired pairing code' });
       }
       if (url.pathname === '/api/health') return json(res, 200, { ok: true });
+      if (url.pathname === '/spotify' && req.method === 'GET') {
+        let msg = 'Spotify is connected. You can close this page.';
+        try { if (!url.searchParams.get('state') || url.searchParams.get('state') !== spotify.data.state) throw new Error('This sign-in link is old. Start again from ORBIT.'); await spotify.finish(`http://x${req.url}`); }
+        catch (e) { msg = e.message; }
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+        return res.end(`<!doctype html><meta name=viewport content="width=device-width"><title>ORBIT</title><body style="font:16px system-ui;background:#0b0b0f;color:#eee;padding:32px"><p>${msg.replace(/[<>&]/g, '')}</p>`);
+      }
       if (url.pathname === '/api/phone/pair' && req.method === 'POST') {
         const b = await readBody(req);
         const i = phones.data.codes.findIndex((c) => c.expiresAt > Date.now() && safeEq(c.codeHash, hash(String(b.code || ''))));
@@ -254,20 +299,58 @@ export function createOrbit(cfg = config) {
     return { on: true, port: phoneAccess.port, urls: lanUrls(phoneAccess.port) };
   }
 
+  // Several screens/phones may hear the same sentence. Within a short window only the one that heard
+  // it loudest (closest to you) answers; the others go quiet.
+  const arb = { items: [], timer: null };
+  const similar = (a, b) => { const A = new Set(a.toLowerCase().match(/\w+/g) || []), B = b.toLowerCase().match(/\w+/g) || []; if (!A.size || !B.length) return true; return B.filter((w) => A.has(w)).length / Math.max(A.size, B.length) >= 0.5; };
+  function arbitrate(ws, msg, heard, emit) {
+    const listeners = [...uiClients].filter((c) => c.meta?.voice && c.readyState === 1).length;
+    if (listeners < 2) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      arb.items.push({ ws, text: msg.text, level: heard?.level ?? 0, resolve, emit });
+      if (arb.timer) return;
+      arb.timer = setTimeout(() => {
+        const items = arb.items; arb.items = []; arb.timer = null;
+        const winner = items.reduce((a, b) => (b.level > a.level ? b : a));
+        for (const it of items) {
+          if (it === winner || !similar(winner.text, it.text)) { it.resolve(true); continue; }
+          it.emit('done', { text: '', ok: true, interrupted: true, answeredElsewhere: true }); it.emit('state', { state: 'idle' });
+          it.resolve(false);
+        }
+      }, 450);
+    });
+  }
+
   function onUi(ws) {
     uiClients.add(ws);
     const sessionId = crypto.randomUUID();
     const speech = phoneSpeech.attach(ws);
+    ws.sessionId = sessionId; ws.meta = {};
     ws.send(JSON.stringify({ type: 'hello', sessionId, overview: overview() }));
     ws.on('message', async (raw, isBinary) => {
       if (isBinary) return speech.onAudio(raw);
       let msg; try { msg = JSON.parse(raw); } catch { return; }
       if (msg.type?.startsWith('speech-')) return speech.onMessage(msg);
       const emit = (type, data) => { if (ws.readyState === 1) ws.send(JSON.stringify({ type, ...data })); };
-      if (msg.type === 'approve') engine.agent.resolveApproval(msg.id, msg, sessionId);
+      if (msg.type === 'client-info') { ws.meta = { room: String(msg.room || '').slice(0, 30), voice: !!msg.voice }; return; }
+      if (msg.type === 'approve') {
+        // A spoken "approve" counts only from the owner's voice once voice ID is set up.
+        if (msg.ok && msg.spoken && engine.voiceVerdict?.get(sessionId) === false) { emit('notify', { text: "I don't recognise your voice, so I won't approve that.", speak: true }); return; }
+        engine.agent.resolveApproval(msg.id, msg, sessionId);
+      }
       if (msg.type === 'new-session') engine.agent.reset(sessionId);
       if (msg.type === 'utterance') {
-        await engine.handle({ text: msg.text, sessionId, source: msg.source, emit, mode: msg.mode === 'code' ? 'code' : 'chat' });
+        const heard = msg.source === 'voice' ? speech.lastHeard() : null;
+        // Voice ID setup: the next few spoken sentences teach ORBIT this voice.
+        if (voiceId.isEnrolling(sessionId) && msg.source === 'voice') {
+          const r = voiceId.addSample(sessionId, heard?.print);
+          const text = r.error ? "I couldn't get a clear sample. Say it again, a bit longer." : r.done ? "Done. I'll recognise your voice now, and only you can confirm risky commands by voice." : `Got it. ${r.left} more.`;
+          if (r.done) audit.write({ kind: 'security', action: 'voice ID set up' });
+          emit('done', { text, ok: !r.error }); emit('state', { state: 'idle' });
+          return;
+        }
+        if (msg.source === 'voice' && !(await arbitrate(ws, msg, heard, emit))) return;
+        await engine.handle({ text: msg.text, sessionId, source: msg.source, emit, mode: msg.mode === 'code' ? 'code' : 'chat', voice: heard });
         broadcast('recent', { recent: engine.recent.slice(0, 12) });
       }
       if (msg.type === 'interrupt') engine.cancel(sessionId);
@@ -313,11 +396,24 @@ export function createOrbit(cfg = config) {
     for (const r of automations.due()) { r.fired = true; automations.store.save(); broadcast('notify', { level: 'info', text: `Reminder: ${r.text}`, speak: true, reminderId: r.id }); }
   }, 15000);
 
+  // Warn before ORBIT's own machine (the Pi) gets hot enough to slow down (it throttles at 80 °C).
+  let hostWarnAt = 0;
+  const hostTimer = setInterval(async () => {
+    if (!settings.data.proactive.deviceAlerts) return;
+    const h = await hostHealth().catch(() => null);
+    if (!h || Date.now() - hostWarnAt < 30 * 60e3) return;
+    const hot = h.temperature >= 75 || h.overheating || h.throttled;
+    if (!hot && !h.underVoltage) return;
+    hostWarnAt = Date.now();
+    broadcast('notify', { level: 'warn', speak: !engine.quiet(), text: h.underVoltage ? `${h.name}'s power supply is too weak. Use the official 5V 3A supply.` : `${h.name} is getting hot (${h.temperature} °C). Check the fan and give it some air before it slows down.` });
+  }, 120e3);
+  hostTimer.unref?.();
+
   if (settings.data.phoneAccess) setPhoneAccess(true).catch(() => {});
   return {
     setPhoneAccess, server, engine, devices, memory, automations, brain, keyring,
     listen: (port = cfg.port, host = cfg.host) => new Promise((r) => server.listen(port, host, () => r(server.address()))),
-    close: () => { if (phoneAccess.server) phoneAccess.server.close(); clearInterval(heartbeat); clearInterval(reminderTimer); for (const c of wss.clients) c.terminate(); return new Promise((r) => server.close(r)); },
+    close: () => { if (phoneAccess.server) phoneAccess.server.close(); clearInterval(heartbeat); clearInterval(reminderTimer); clearInterval(hostTimer); for (const c of wss.clients) c.terminate(); return new Promise((r) => server.close(r)); },
   };
 }
 

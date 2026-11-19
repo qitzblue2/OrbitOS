@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import dgram from 'node:dgram';
 import { parseIntent, stripWake } from './intents.js';
 import { CAPABILITIES } from './devices.js';
+import { weather, weatherSentence, weatherCard, geocode, hostHealth, healthSentence, healthCard, isQuiet } from './features.js';
 
 const AGENTY = /\b(create|build|make me|make a|write (?:me )?(?:a|an|the|some)|set up|setup|install|scaffold|generate|code|program|script|website|web ?site|web ?page|app\b|project|refactor|debug|fix (?:my|the|this)|organi[sz]e (?:my )?files|rename (?:my )?files)\b/i;
 const ACTIONY = /\b(open|launch|start|run|close|quit|exit|turn|switch|set|put|play|pause|resume|skip|next|mute|unmute|lock|shut|restart|search|google|look up|screenshot|dim|brighten|raise|lower|increase|decrease|louder|quieter|volume|lights?|music|song|playlist|text|message|activate|fire up|bring up|need)\b/i;
@@ -19,7 +20,17 @@ export class Engine {
     this.recent = [];           // recent commands for the dashboard
   }
 
-  persona() { return { userName: this.settings.data.userName, tone: this.settings.data.tone, customInstructions: this.settings.data.customInstructions }; }
+  persona() { return { userName: this.settings.data.userName, tone: this.settings.data.tone, customInstructions: this.settings.data.customInstructions, quiet: this.quiet() }; }
+  quiet(now = new Date()) { return isQuiet(this.settings.data.quietHours, now); }
+  // Optional extras wired in by the server: spotify, voiceId, rooms() -> [names], announce(room, text, from), project(md, seconds)
+  get x() { return this.extras || {}; }
+  // Online device allowed to do `capability`: the one named, else the Raspberry Pi, else any.
+  pickDevice(capability, hint) {
+    const all = this.devices.store.data.devices.filter((d) => !d.revoked && this.devices.sockets.has(d.id));
+    const ok = all.filter((d) => d.permissions.includes(capability));
+    const h = hint?.toLowerCase();
+    return (h && all.find((d) => d.name.toLowerCase().includes(h))) || ok.find((d) => /\bpi\b|raspberry/i.test(d.name)) || ok[0] || all.find((d) => /\bpi\b|raspberry/i.test(d.name)) || null;
+  }
 
   // ---- device transport ----------------------------------------------------
   sendToDevice(device, capability, params, timeoutMs) {
@@ -39,7 +50,12 @@ export class Engine {
 
   // ---- public entry --------------------------------------------------------
   // emit(event, payload) streams state to the UI: state | text | delta | done | action | confirm | error
-  async handle({ text, sessionId = 'default', source = 'text', emit = () => {}, mode = 'chat' }) {
+  async handle({ text, sessionId = 'default', source = 'text', emit: rawEmit = () => {}, mode = 'chat', voice = null }) {
+    // At night (quiet hours) replies are marked quiet so screens and phones speak softly.
+    const quiet = this.quiet();
+    const emit = quiet ? (type, data) => rawEmit(type, type === 'done' ? { ...data, quiet: true } : data) : rawEmit;
+    // Voice ID: true = the owner's voice, false = someone else, null = can't tell (typed, or not set up).
+    const voiceOk = source === 'voice' && this.x.voiceId ? this.x.voiceId.matches(voice?.print) : null;
     const started = performance.now();
     const said = String(text || '').trim();
     if (!said) return;
@@ -50,17 +66,18 @@ export class Engine {
     const conf = this.confirms.get(sessionId);
     if (conf && conf.expiresAt > Date.now()) {
       const bare = stripWake(said);
-      if (YES.test(bare)) { this.confirms.delete(sessionId); return this.finish(emit, await this.execute(conf.intent, { sessionId, emit, confirmed: true }), started, said); }
+      if (YES.test(bare)) { this.confirms.delete(sessionId); return this.finish(emit, await this.execute(conf.intent, { sessionId, emit, confirmed: true, voiceOk: conf.voiceOk }), started, said); }
       if (NO.test(bare)) { this.confirms.delete(sessionId); return this.finish(emit, { ok: true, say: 'Cancelled.' }, started, said); }
     }
     this.confirms.delete(sessionId);
 
     // Coding sessions, and multi-step tasks ("create me a website"), go to the agent with tools.
+    this.voiceVerdict = this.voiceVerdict || new Map(); this.voiceVerdict.set(sessionId, voiceOk);
     if (this.agent && (mode === 'code' || AGENTY.test(said)) && this.brain.status().provider !== 'offline') return this.runAgent({ said, sessionId, emit, started, mode });
 
     const intent = parseIntent(said);
     if (intent) {
-      const res = await this.execute(intent, { sessionId, emit, utterance: said });
+      const res = await this.execute(intent, { sessionId, emit, utterance: said, voiceOk });
       if (res?.handled) return;
       if (res) return this.finish(emit, res, started, said, intent);
     }
@@ -70,7 +87,7 @@ export class Engine {
       const second = routed && parseIntent(routed);
       if (second && second.type !== 'greeting') {
         emit('routed', { from: said, to: routed });
-        const res = await this.execute(second, { sessionId, emit, utterance: said });
+        const res = await this.execute(second, { sessionId, emit, utterance: said, voiceOk });
         if (res?.handled) return;
         if (res) return this.finish(emit, res, started, said, second);
       }
@@ -143,9 +160,80 @@ export class Engine {
       }
       case 'home.lights': case 'home.temperature': case 'home.thermostat': return this.homeAction(intent, emit);
       case 'wake.device': return this.wakeOnLan(intent.hint);
-      case 'action': return this.deviceAction(intent, ctx);
+      case 'action':
+        if (intent.capability === 'media.control' && !intent.hint && this.x.spotify?.connected) {
+          try { return await this.x.spotify.control(intent.params.action); } catch { /* fall back to the computer's media keys */ }
+        }
+        return this.deviceAction(intent, ctx);
+      case 'weather': case 'location.set': return this.weatherAction(intent);
+      case 'reminders.show': {
+        const list = this.automations.reminders().filter((r) => !r.done);
+        if (!list.length) return { ok: true, say: 'Your to-do list is empty.' };
+        const md = ['# To do', ...list.map((r) => `- ${r.text}${r.at ? ` (${new Date(r.at).toLocaleString('en', { weekday: 'short', hour: 'numeric', minute: '2-digit' })})` : ''}`)].join('\n');
+        this.x.project?.(md, 60);
+        return { ok: true, say: `You have ${list.length} thing${list.length > 1 ? 's' : ''} on your list. ${this.x.project ? "It's on the screen." : list.slice(0, 3).map((r) => r.text).join(', ')}` };
+      }
+      case 'project.clear': this.x.project?.('', 0); return { ok: true, say: 'Done.' };
+      case 'health': {
+        const h = await hostHealth();
+        if (intent.show || this.x.project) this.x.project?.(healthCard(h), 45);
+        return { ok: true, say: healthSentence(h), data: h };
+      }
+      case 'camera.look': {
+        const device = this.pickDevice('camera.capture', intent.hint);
+        if (!device) return { ok: false, say: 'No camera is connected. Plug a camera into the Pi, then turn on "Use the camera" for it under Security.' };
+        return this.deviceAction({ type: 'action', capability: 'camera.capture', params: { analyze: true }, hint: device.name, analyzeQuestion: `${intent.question}? Answer from the photo taken just now by the camera.` }, ctx);
+      }
+      case 'intercom': {
+        const rooms = this.x.rooms?.() || [];
+        if (intent.room) {
+          const r = intent.room.toLowerCase();
+          const room = rooms.find((x) => x.toLowerCase() === r || x.toLowerCase().includes(r) || r.includes(x.toLowerCase()));
+          if (!room) return null; // not a room name: let the AI handle "tell the story of..."
+          const n = this.x.announce(room, intent.message, ctx.sessionId);
+          return n ? { ok: true, say: `Told the ${room.toLowerCase()}.` } : { ok: false, say: `Nothing is listening in the ${room.toLowerCase()} right now.` };
+        }
+        const n = this.x.announce?.(null, intent.message, ctx.sessionId) || 0;
+        return n ? { ok: true, say: `Announced on ${n} device${n > 1 ? 's' : ''}.` } : { ok: false, say: 'No other devices are listening right now.' };
+      }
+      case 'bt': {
+        const cap = { pair: 'bt.pair', connect: 'bt.connect', disconnect: 'bt.disconnect' }[intent.action];
+        const device = this.pickDevice(cap, intent.hint);
+        if (!device) return { ok: false, say: "The Pi's companion isn't connected, so I can't reach Bluetooth." };
+        if (intent.action === 'pair') ctx.emit('notify', { text: 'Looking for speakers in pairing mode for 15 seconds…' });
+        return this.deviceAction({ type: 'action', capability: cap, params: { name: intent.name }, hint: device.name }, ctx);
+      }
+      case 'spotify': {
+        const sp = this.x.spotify;
+        if (!sp?.connected) return { ok: false, say: 'Spotify isn\'t connected yet. Connect it under Settings on the dashboard.' };
+        try {
+          if (intent.action === 'liked') return await sp.liked(intent);
+          if (intent.action === 'now') return await sp.now();
+          return await sp.play(intent);
+        } catch (e) { return { ok: false, say: e.message }; }
+      }
+      case 'voiceid.enroll':
+        if (!this.x.voiceId) return { ok: false, say: 'Voice ID isn\'t available here.' };
+        this.x.voiceId.startEnroll(ctx.sessionId);
+        return { ok: true, say: 'Okay. Say "Hey Orbit" and then any sentence, three times. For example: Hey Orbit, this is my voice.' };
       default: return null;
     }
+  }
+
+  async weatherAction(intent) {
+    if (intent.type === 'location.set') {
+      const loc = await geocode(intent.name).catch(() => null);
+      if (!loc) return { ok: false, say: `I couldn't find ${intent.name}.` };
+      this.settings.data.location = loc; this.settingsSave?.();
+      return { ok: true, say: `Got it, you're in ${loc.name}.` };
+    }
+    const loc = this.settings.data.location;
+    if (!loc?.lat) return { ok: false, say: 'Tell me where you live first, for example: set my location to Amsterdam.' };
+    try {
+      const w = await weather(loc);
+      if (intent.show) { this.x.project?.(weatherCard(w), 60); return { ok: true, say: `${weatherSentence(w)}${this.x.project ? ' The week is on the screen.' : ''}` }; }
+      return { ok: true, say: weatherSentence(w) };
+    } catch { return { ok: false, say: "I couldn't get the weather right now." }; }
   }
 
   async homeAction(intent, emit) {
@@ -180,8 +268,12 @@ export class Engine {
       this.audit.write({ kind: 'device', device: device.name, capability: intent.capability, ok: false, reason: 'not permitted' });
       return { ok: false, say: `${device.name} isn't allowed to ${capDef.label.toLowerCase()}. You can grant that in Security.` };
     }
+    if (capDef.sensitive && ctx.voiceOk === false) {
+      this.audit.write({ kind: 'security', action: 'voice not recognised', capability: intent.capability, device: device.name });
+      return { ok: false, say: "I don't recognise your voice, so I won't do that." };
+    }
     if (capDef.sensitive && !ctx.confirmed) {
-      this.confirms.set(ctx.sessionId, { intent, expiresAt: Date.now() + 30000 });
+      this.confirms.set(ctx.sessionId, { intent, expiresAt: Date.now() + 30000, voiceOk: ctx.voiceOk });
       const what = intent.capability === 'message.send' ? `send "${intent.params.body}" to ${intent.params.to}` : `${capDef.label.toLowerCase()} on ${device.name}`;
       return { ok: true, confirm: true, capability: intent.capability, say: `Shall I ${what}? Say yes to confirm.` };
     }
@@ -192,7 +284,7 @@ export class Engine {
     emit('action', { device: device.name, capability: intent.capability, status: r.ok ? 'ok' : 'failed', message: r.message });
     if (!r.ok) return { ok: false, say: r.message || `${device.name} reported a failure.` };
 
-    if (intent.capability === 'screen.capture' && intent.params.analyze && r.data?.image) {
+    if ((intent.capability === 'screen.capture' || intent.capability === 'camera.capture') && intent.params.analyze && r.data?.image) {
       await this.think({ text: intent.analyzeQuestion || 'What is on my screen? If there is an error, explain how to fix it.', sessionId: ctx.sessionId, emit, image: { data: r.data.image, mediaType: r.data.mediaType }, started: performance.now() });
       return { ok: true, say: null, handled: true };
     }

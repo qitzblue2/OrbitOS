@@ -8,6 +8,9 @@ apt-get update -qq
 apt-get install -y -qq curl ca-certificates gnupg git xz-utils bzip2 jq \
   cage seatd rsync fonts-dejavu-core pipewire pipewire-pulse wireplumber alsa-utils >/dev/null
 apt-get install -y -qq chromium-browser >/dev/null 2>&1 || apt-get install -y -qq chromium >/dev/null
+# Bluetooth speakers and cameras (Pi camera module or USB webcam)
+apt-get install -y -qq bluez libspa-0.2-bluetooth fswebcam >/dev/null || true
+apt-get install -y -qq rpicam-apps-lite >/dev/null 2>&1 || apt-get install -y -qq libcamera-apps-lite >/dev/null 2>&1 || true
 
 # Node.js 22
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
@@ -28,6 +31,7 @@ usermod -aG orbitd orbitui   # lets the screen read the dashboard sign-in token
 # "orbitagent" is the Pi's own Companion: what ORBIT's AI may do on this Pi (files in its ORBIT Workspace, commands).
 id orbitagent >/dev/null 2>&1 || useradd -m -d /var/lib/orbit-companion -s /bin/bash orbitagent
 usermod -aG audio orbitagent
+usermod -aG bluetooth,video orbitagent 2>/dev/null || true
 mkdir -p /var/lib/systemd/linger && touch /var/lib/systemd/linger/orbitui   # sound (PipeWire) for the screen
 
 # First-boot login so Raspberry Pi OS doesn't stop at its setup wizard (which would cover ORBIT):

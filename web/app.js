@@ -94,6 +94,7 @@ function onEvent(m) {
     case 'delta': S.pending = null; S.live += m.text; if (voice.mode !== 'off' || S.speakReplies) voice.feed(m.text); renderLive(); break;
     case 'done': {
       const text = m.text ?? S.live;
+      window.orbitBedside?.say(text);
       if (!S.live && text && (voice.mode !== 'off' || S.speakReplies)) voice.say(text); else voice.flush();
       if (text) S.chat.push({ role: 'orbit', text, ok: m.ok, ms: m.ms, route: m.route });
       report({ reply: text || '', phase: m.ok === false ? 'error' : 'idle' });
@@ -114,7 +115,7 @@ function onEvent(m) {
 function setState(s) {
   if (s === 'listening-ready') s = voice.mode === 'wake' ? 'idle' : 'idle';
   S.state = s; const shown = voice.mode === 'off' && s === 'idle' ? 'idle' : s;
-  report({ phase: shown });
+  report({ phase: shown }); window.orbitBedside?.state(shown);
   core?.setState(shown); mini?.setState(shown);
   const label = $('#core-state'); if (label) label.textContent = stateLabel(shown);
   clearTimeout(S.errTimer); if (s === 'error') S.errTimer = setTimeout(() => S.state === 'error' && setState('idle'), 4000);
@@ -731,12 +732,43 @@ setInterval(() => {
   if (Date.now() - lastActive > SLEEP_MIN * 60000) sleepScreen();
 }, 15000);
 
+// Bedside mode (for a phone next to the bed): the screen goes black apart from a tiny dim orb, the
+// phone is kept awake (Screen Wake Lock) so the microphone keeps listening, and replies show as dim
+// text for a few seconds. Double-tap to leave. Remembered on this device.
+const bedside = (() => {
+  const el = document.createElement('div'); el.className = 'bedside'; el.hidden = true; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Bedside mode. Double-tap to exit.');
+  const orb = document.createElement('div'); orb.className = 'bedside-orb';
+  const text = document.createElement('div'); text.className = 'bedside-text'; text.setAttribute('aria-live', 'polite');
+  const hint = document.createElement('div'); hint.className = 'bedside-hint'; hint.textContent = 'Double-tap to exit';
+  el.append(orb, text, hint); document.body.append(el);
+  let lock = null, on = false, textTimer = 0, lastTap = 0;
+  const grab = async () => { try { if (on && !lock && document.visibilityState === 'visible') { lock = await navigator.wakeLock?.request('screen'); lock?.addEventListener('release', () => { lock = null; }); } } catch {} };
+  const remember = (v) => { try { localStorage.setItem('orbit.bedside', v ? '1' : '0'); } catch {} };
+  function enter() {
+    on = true; el.hidden = false; Core.paused = true; remember(true); grab();
+    const mic = $('#mic-toggle'); if (mic && mic.getAttribute('aria-pressed') !== 'true') mic.click();
+    setTimeout(() => { hint.style.opacity = '0'; }, 5000); hint.style.opacity = '';
+  }
+  function exit() { on = false; el.hidden = true; Core.paused = false; remember(false); try { lock?.release(); } catch {} lock = null; wakeScreen(); }
+  el.addEventListener('pointerdown', (e) => { e.stopPropagation(); const t = Date.now(); if (t - lastTap < 400) exit(); lastTap = t; });
+  document.addEventListener('visibilitychange', grab);
+  return {
+    enter, exit, get on() { return on; },
+    state(st) { if (on) el.dataset.state = st || 'idle'; },
+    say(msg) { if (!on || !msg) return; text.textContent = String(msg).replace(/[#*_`>]/g, '').slice(0, 220); clearTimeout(textTimer); textTimer = setTimeout(() => { text.textContent = ''; }, 12000); },
+    resume() { try { if (localStorage.getItem('orbit.bedside') === '1') enter(); } catch {} },
+  };
+})();
+window.orbitBedside = bedside;
+$('#bedside-btn')?.addEventListener('click', () => bedside.enter());
+
 function start() {
   $('#login').hidden = true; $('#app').hidden = false;
   const wanted = location.hash.slice(1).split('?')[0];
   S.view = NAV.some((n) => n[0] === wanted) ? wanted : 'dashboard';
   buildNav(); mini = new Core($('#core-mini'), { mini: true });
   connect();
+  bedside.resume();
 }
 
 if ('serviceWorker' in navigator && !window.orbitNative && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) navigator.serviceWorker.register('sw.js').catch(() => {});

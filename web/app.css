@@ -170,3 +170,11 @@ pre.cmd{margin:0;padding:12px;border-radius:var(--r1);background:#020610;border:
 .approve-card{border:1px solid rgba(255,195,92,.45);background:rgba(255,195,92,.07);border-radius:var(--r2);padding:12px 14px;display:flex;flex-direction:column;gap:8px;max-width:720px}
 .msg.orbit{white-space:normal}
 .screen-sleep{position:fixed;inset:0;background:#000;z-index:100;cursor:none}
+
+/* Bedside mode: an all-black screen (OLED pixels off) with a tiny dim orb; the phone stays awake and listening. */
+.bedside{position:fixed;inset:0;z-index:110;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;cursor:none;touch-action:manipulation;user-select:none}
+.bedside-orb{width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#b9adff,#5b45c9 60%,#1d3a4a);opacity:.18;transition:opacity .4s,transform .4s}
+.bedside[data-state="listening"] .bedside-orb,.bedside[data-state="speaking"] .bedside-orb,.bedside[data-state="thinking"] .bedside-orb{opacity:.7;transform:scale(1.4)}
+.bedside-text{max-width:80vw;color:#6f6f7a;font-size:15px;line-height:1.5;text-align:center;min-height:1.5em;opacity:.8}
+.bedside-hint{position:absolute;bottom:22px;color:#2a2a30;font-size:12px}
+@media (prefers-reduced-motion:reduce){.bedside-orb{transition:none}}

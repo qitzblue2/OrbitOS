@@ -536,7 +536,17 @@ const VIEWS = {
           (() => { const b = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Start ORBIT when I log in', 'aria-checked': String(!!voice.info?.launchAtLogin) }); b.addEventListener('click', async () => { const on = await native.setLaunchAtLogin(b.getAttribute('aria-checked') !== 'true'); b.setAttribute('aria-checked', String(on)); if (voice.info) voice.info.launchAtLogin = on; }); return b; })()),
         h('li', {}, h('span', { class: 'grow' }, 'Global push to talk', h('div', { class: 'muted' }, `Press ${native.platform === 'darwin' ? '⌥ Space' : 'Alt+Space'} in any app, speak, press again to send.`))))) : null;
     return h('div', { class: 'grid2' },
-      nativePanel,
+      nativePanel || (S.overview?.serverSpeech ? panel('ORBIT voice engine (on the ORBIT server)',
+        h('ul', { class: 'list' }, (() => {
+          const sel = h('select', { id: 'stt-server', 'aria-label': 'Speech recognition' },
+            h('option', { value: 'device' }, 'On the ORBIT server (private)'),
+            h('option', { value: 'groq:whisper-large-v3-turbo' }, 'Groq Whisper large v3 turbo (fast, more accurate)'),
+            h('option', { value: 'groq:whisper-large-v3' }, 'Groq Whisper large v3 (most accurate)'));
+          const note = h('div', { class: 'muted' });
+          remoteSpeech.getInfo().then((i) => { sel.value = i?.stt || 'device'; note.textContent = i?.hasGroq ? '' : 'Groq options need a Groq key (free tier available) under AI configuration.'; });
+          sel.addEventListener('change', async () => { await remoteSpeech.setStt(sel.value); toast(sel.value === 'device' ? 'Speech recognition stays on the ORBIT server.' : 'What you say after "Hey Orbit" will be transcribed by Groq Whisper.'); });
+          return h('li', {}, h('span', { class: 'grow' }, 'Speech recognition', h('div', { class: 'muted' }, 'Used by the Raspberry Pi, phones and browsers. Groq Whisper understands names, accents and headset mics much better. If Groq is unavailable ORBIT uses the on-device result.'), note), sel);
+        })())) : null),
       panel('Listening',
         h('ul', { class: 'list' },
           h('li', {}, h('span', { class: 'grow' }, 'Wake phrase "Hey Orbit"', h('div', { class: 'muted' }, native ? 'Detected on this computer.' : 'In a browser this uses the browser\'s speech service. Install the ORBIT app for fully on-device listening.')), h('button', { class: 'btn small', onclick: () => voice.setMode(voice.mode === 'wake' ? 'off' : 'wake') }, voice.mode === 'wake' ? 'Turn off' : 'Turn on')),

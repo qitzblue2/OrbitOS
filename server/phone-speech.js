@@ -4,11 +4,23 @@
 import path from 'node:path';
 import { fork } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { bestTranscript } from './voice/stt.js';
 
 const require = createRequire(import.meta.url);
 const MAX_ENGINES = 3; // each loaded engine uses ~150 MB of memory
 
-export function createPhoneSpeech(cfg) {
+// Same as stripWake in app/speech.js (copied so the server doesn't load the speech engine itself).
+function stripWake(raw) {
+  const t = raw.trim().toLowerCase();
+  const m = t.match(/^(?:\S+\s+){0,2}?(?:orbit|orbits|orbet|or bit|or but|orbe|\S*bit|\S*orb\S*)\b[,.]?\s*/);
+  return (m ? t.slice(m[0].length) : t).replace(/^[a-z]\b\s*/, '').trim();
+}
+
+// keyring and settings are optional: with a Groq key and settings.data.stt = 'groq:<model>', the final
+// transcript comes from Groq Whisper (on-device text if that fails).
+export function createPhoneSpeech(cfg, { keyring, settings, saveSettings } = {}) {
+  const sttMode = () => settings?.data?.stt || 'device';
+  const hasGroq = () => !!keyring?.data.keys.some((k) => k.provider === 'groq' && k.enabled);
   const root = cfg.root;
   let modelsDir = null;
   try {
@@ -32,6 +44,10 @@ export function createPhoneSpeech(cfg) {
         if (m.type === 'ready') { ready = true; tell('ready', { tts: m.tts }); }
         else if (m.type === 'speech') { const done = pending.get(m.id); pending.delete(m.id); done?.(m); }
         else if (m.type === 'error') tell('error', m.message);
+        else if (m.type === 'utterance' && sttMode().startsWith('groq:') && m.audio && hasGroq()) {
+          bestTranscript({ local: m.data, audio: Float32Array.from(m.audio), keyring, model: sttMode().slice(5), stripWake })
+            .then((r) => tell('utterance', r.text || ''));
+        }
         else if (['wake', 'listening', 'partial', 'utterance'].includes(m.type)) tell(m.type, m.data);
       });
       worker.on('exit', () => { running--; worker = null; ready = false; for (const d of pending.values()) d(null); pending.clear(); });
@@ -40,7 +56,12 @@ export function createPhoneSpeech(cfg) {
 
     function onMessage(msg) {
       switch (msg.type) {
-        case 'speech-boot': boot(); tell('info', { speechReady: ready, available: !!modelsDir }); break;
+        case 'speech-boot': boot(); tell('info', { speechReady: ready, available: !!modelsDir, stt: sttMode(), hasGroq: hasGroq() }); break;
+        case 'speech-info': tell('info', { speechReady: ready, available: !!modelsDir, stt: sttMode(), hasGroq: hasGroq() }); break;
+        case 'speech-stt':
+          if (settings && /^(device|groq:whisper-large-v3(-turbo)?)$/.test(msg.value)) { settings.data.stt = msg.value; saveSettings?.(); }
+          tell('info', { speechReady: ready, available: !!modelsDir, stt: sttMode(), hasGroq: hasGroq() });
+          break;
         case 'speech-listen': listening = !!msg.on; if (!listening) worker?.send({ type: 'cancel' }); break;
         case 'speech-ptt': if (msg.down) listening = true; worker?.send({ type: 'ptt', down: !!msg.down }); break;
         case 'speech-followup': worker?.send({ type: 'followUp', ms: msg.ms || 8000 }); break;

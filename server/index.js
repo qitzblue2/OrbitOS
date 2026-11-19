@@ -43,7 +43,7 @@ export function createOrbit(cfg = config) {
   engine.agent.broadcast = (type, data) => broadcast(type, data);
   const uiClients = new Set();
   const heatWarned = new Map();
-  const phoneSpeech = createPhoneSpeech(cfg);
+  const phoneSpeech = createPhoneSpeech(cfg, { keyring, settings, saveSettings: () => settingsStore.save() });
   const broadcast = (type, data) => { const m = JSON.stringify({ type, ...data }); for (const c of uiClients) if (c.readyState === 1) c.send(m); };
 
   const webRoot = path.join(cfg.root, 'web');

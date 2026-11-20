@@ -26,10 +26,10 @@ function stripWake(raw) {
 }
 
 // Words a sentence rarely ends on: if you pause after one, you're probably not done yet.
-const OPEN_END = /\b(and|or|but|the|a|an|to|of|for|with|in|on|at|my|your|is|are|was|what|what's|whats|how|why|where|when|who|which|plus|puss|pus|plas|pluss|plush|minus|mines|times|time|divided|by|over|than|from|about|into|set|turn|open|play|tell|remind|me|um|uh|like|so|if|then|because|percent)$/i;
+const OPEN_END = /\b(and|or|but|the|a|an|to|of|for|with|in|on|at|my|your|is|are|was|what|what's|whats|how|why|where|when|who|which|plus|puss|pus|plas|pluss|plush|place|pass|minus|mines|times|time|divided|by|over|than|from|about|into|set|turn|open|play|tell|remind|me|um|uh|like|so|if|then|because|percent)$/i;
 const unfinished = (t) => OPEN_END.test(t.trim().replace(/[.,!?]+$/, ''));
 // Moonshine writes "Hey Orbit, what is 1 plus 1?": lower-case it and drop the wake phrase and final punctuation.
-const cleanFinal = (t) => stripWake(String(t || '').toLowerCase().replace(/[“”"]/g, '')).replace(/[.!?]+$/, '').trim();
+const cleanFinal = (t) => stripWake(String(t || '').toLowerCase().replace(/[“”"]/g, '').replace(/(?<=\w)[?!.,;:]+(?=\s)/g, '')).replace(/[.!?]+$/, '').trim();
 
 const MODELS = {
   speaker: 'wespeaker_en_voxceleb_CAM++.onnx', // optional: voice ID
@@ -102,7 +102,7 @@ class LocalSpeech extends EventEmitter {
       try {
         this.final = new sherpa.OfflineRecognizer({
           featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
-          modelConfig: { moonshine: { preprocessor: path.join(fd, 'preprocess.onnx'), encoder: path.join(fd, 'encode.int8.onnx'), uncachedDecoder: path.join(fd, 'uncached_decode.int8.onnx'), cachedDecoder: path.join(fd, 'cached_decode.int8.onnx') }, tokens: path.join(fd, 'tokens.txt'), numThreads: Math.max(1, Math.min(2, require('node:os').cpus().length - 1)), provider: 'cpu', debug: 0 },
+          modelConfig: { moonshine: { preprocessor: path.join(fd, 'preprocess.onnx'), encoder: path.join(fd, 'encode.int8.onnx'), uncachedDecoder: path.join(fd, 'uncached_decode.int8.onnx'), cachedDecoder: path.join(fd, 'cached_decode.int8.onnx') }, tokens: path.join(fd, 'tokens.txt'), numThreads: 1, provider: 'cpu', debug: 0 }, // one thread: the same audio always gives the same text
         });
       } catch { this.final = null; }
     }

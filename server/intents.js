@@ -58,9 +58,9 @@ export function simplify(text) {
 // Answered instantly on the device; no AI needed. Evaluated by a tiny parser (never eval()).
 export function spokenMath(t) {
   // "where's/where does" are common mishearings of "what's/what does" before a sum.
-  let x = t.toLowerCase().replace(/^(?:(?:what|where|was)(?:'s| is| does| was)?|whats|wheres|how much is|calculate|compute|work out)\s+/, '').replace(/\s*(?:equal|equals|make|come to)\s*$/, '').replace(/[?=]$/, '').trim();
+  let x = t.toLowerCase().replace(/(?<=\w)[?!,;:]+(?=\s)/g, '').replace(/^(?:(?:what|where|was)(?:'s| is| does| was)?|whats|wheres|how much is|calculate|compute|work out)\s+/, '').replace(/\s*(?:equal|equals|make|come to)\s*$/, '').replace(/[?=]$/, '').trim();
   // Common mishearings of the operators.
-  x = x.replace(/\b(?:puss|pus|plas|pluss|plush|plos|pluis|bliss)\b/g, 'plus').replace(/\b(?:minis|minas|mines|minors)\b/g, 'minus').replace(/\b(?:time|thymes)\b/g, 'times');
+  x = x.replace(/\b(?:puss|pus|plas|pluss|plush|plos|pluis|bliss|place|pass|plows)\b/g, 'plus').replace(/\b(?:minis|minas|mines|minors)\b/g, 'minus').replace(/\b(?:time|thymes)\b/g, 'times');
   x = x.replace(new RegExp(`\\b(${Object.keys(ONES).join('|')})\\b`, 'g'), (w) => String(ONES[w])).replace(/\b(\d+) point (\d+)\b/g, '$1.$2');
   let m;
   if ((m = x.match(/^(?:the )?square root of (\d+(?:\.\d+)?)$/))) return fmt(Math.sqrt(+m[1]));

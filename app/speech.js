@@ -26,7 +26,7 @@ function stripWake(raw) {
 }
 
 // Words a sentence rarely ends on: if you pause after one, you're probably not done yet.
-const OPEN_END = /\b(and|or|but|the|a|an|to|of|for|with|in|on|at|my|your|is|are|was|what|what's|whats|how|why|where|when|who|which|plus|minus|times|divided|by|over|than|from|about|into|set|turn|open|play|tell|remind|me|um|uh|like|so|if|then|because|percent)$/i;
+const OPEN_END = /\b(and|or|but|the|a|an|to|of|for|with|in|on|at|my|your|is|are|was|what|what's|whats|how|why|where|when|who|which|plus|puss|pus|plas|pluss|plush|minus|mines|times|time|divided|by|over|than|from|about|into|set|turn|open|play|tell|remind|me|um|uh|like|so|if|then|because|percent)$/i;
 const unfinished = (t) => OPEN_END.test(t.trim().replace(/[.,!?]+$/, ''));
 // Moonshine writes "Hey Orbit, what is 1 plus 1?": lower-case it and drop the wake phrase and final punctuation.
 const cleanFinal = (t) => stripWake(String(t || '').toLowerCase().replace(/[“”"]/g, '')).replace(/[.!?]+$/, '').trim();
@@ -177,7 +177,8 @@ class LocalSpeech extends EventEmitter {
     this.mode = 'command'; this.ptt = ptt; this.lastText = '';
     this.asrStream = this.asr.createStream();
     this.cmdAudio = []; this.cmdLen = 0;
-    if (preroll && this.ring) { const pre = this.preroll(); this.asrStream.acceptWaveform({ samples: pre, sampleRate: SAMPLE_RATE }); this.cmdAudio.push(pre); this.cmdLen = pre.length; }
+    this.wakeLen = 0;
+    if (preroll && this.ring) { const pre = this.preroll(); this.asrStream.acceptWaveform({ samples: pre, sampleRate: SAMPLE_RATE }); this.cmdAudio.push(pre); this.cmdLen = pre.length; this.wakeLen = Math.max(0, pre.length - SAMPLE_RATE * 0.15); }
     this.deadline = timeoutMs ? Date.now() + timeoutMs : 0;
     this.emit('listening', { ptt });
   }
@@ -207,8 +208,11 @@ class LocalSpeech extends EventEmitter {
     if (!this.final || audio.length < SAMPLE_RATE * 0.3) return fallback;
     if (!fallback) { let e = 0; for (let i = 0; i < audio.length; i++) e += audio[i] * audio[i]; if (Math.sqrt(e / audio.length) < 0.004) return fallback; } // silence
     try {
+      // Skip the wake phrase itself: "Hey Orbit, what is…" otherwise blurs into "where is…".
+      let a = this.wakeLen && audio.length - this.wakeLen > SAMPLE_RATE * 0.4 ? audio.subarray(this.wakeLen) : audio;
+      if (a.length > SAMPLE_RATE * 25) a = a.subarray(a.length - SAMPLE_RATE * 25);
       const st = this.final.createStream();
-      st.acceptWaveform({ samples: audio.length > SAMPLE_RATE * 25 ? audio.subarray(audio.length - SAMPLE_RATE * 25) : audio, sampleRate: SAMPLE_RATE });
+      st.acceptWaveform({ samples: Float32Array.from([...new Float32Array(SAMPLE_RATE * 0.2), ...a]), sampleRate: SAMPLE_RATE });
       this.final.decode(st);
       const t = cleanFinal(this.final.getResult(st).text);
       return t && !/^(you|thank you|thanks for watching|\.+)$/i.test(t) ? t : fallback;

@@ -1,12 +1,12 @@
 # Builds ORBIT OS for Raspberry Pi 4 (a flashable SD-card image with ORBIT built in).
-# Runs when files in pi/ change on OrbitAI, or from the Actions tab. Takes ~30-40 minutes.
+# Runs when ORBIT's code or pi/ changes on OrbitAI, or from the Actions tab. Takes ~30-40 minutes.
 name: Build ORBIT OS (Raspberry Pi 4)
 
 on:
   workflow_dispatch:
   push:
     branches: [OrbitAI]
-    paths: ['pi/**', '.github/workflows/build-pi.yml']
+    paths: ['pi/**', 'server/**', 'app/**', 'web/**', 'companion/**', 'package*.json', '.github/workflows/build-pi.yml']
 
 jobs:
   image:

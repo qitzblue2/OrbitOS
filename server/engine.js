@@ -92,7 +92,7 @@ export class Engine {
         if (res) return this.finish(emit, res, started, said, second);
       }
     }
-    return this.think({ text: stripWake(said) || said, sessionId, emit, started });
+    return this.think({ text: stripWake(said) || said, sessionId, emit, started, spoken: source === 'voice' });
   }
 
   async runAgent({ said, sessionId, emit, started, mode }) {
@@ -322,14 +322,14 @@ export class Engine {
   }
 
   // ---- AI reasoning --------------------------------------------------------
-  async think({ text, sessionId, emit, image = null, started }) {
+  async think({ text, sessionId, emit, image = null, started, spoken = false }) {
     const ctrl = new AbortController();
     this.active.set(sessionId, ctrl);
     const memories = this.memory.recall(text);
     if (memories.length) emit('memory', { recalled: memories.map((m) => m.id) });
     let full = '', meta = null, thinkingSent = false;
     try {
-      for await (const part of this.brain.answer({ text, image, history: this.memory.context(sessionId), memories, devices: this.devices.list(), persona: this.persona(), signal: ctrl.signal })) {
+      for await (const part of this.brain.answer({ text, image, history: this.memory.context(sessionId), memories, devices: this.devices.list(), persona: { ...this.persona(), spoken }, signal: ctrl.signal })) {
         if (part.thinking) { if (!thinkingSent) { thinkingSent = true; emit('thinking', {}); } continue; }
         if (part.meta) { meta = part.meta; emit('state', { state: 'speaking', ...meta }); continue; }
         full += part.delta;

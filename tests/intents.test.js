@@ -64,3 +64,13 @@ test('natural phrasing works without an AI', () => {
 test('more ways to ask for computer status', () => {
   for (const t of ['can you check my computer status for me', "what's my battery level", 'how is my laptop doing', 'how much battery is left', 'show me the system status']) assert.equal(p(t)?.capability, 'system.status', t);
 });
+
+test('spoken maths is answered locally', async () => {
+  const { parseIntent, spokenMath } = await import('../server/intents.js');
+  assert.equal(parseIntent('hey orbit what is one plus one').answer, '2.');
+  assert.equal(parseIntent('what is 2 plus 3 times 4').answer, '14.');
+  assert.equal(parseIntent('how much is fifteen percent of eighty').answer, '12.');
+  assert.equal(spokenMath('square root of 81'), '9');
+  assert.equal(parseIntent('what is the capital of france'), null);
+  assert.equal(parseIntent('turn off the lights and the tv')?.math, undefined);
+});

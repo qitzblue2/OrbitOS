@@ -54,6 +54,26 @@ export function simplify(text) {
   return t;
 }
 
+// Spoken arithmetic: "what is 1 plus 1", "15 percent of 80", "square root of 81", "12 times 7".
+// Answered instantly on the device; no AI needed. Evaluated by a tiny parser (never eval()).
+export function spokenMath(t) {
+  let x = t.toLowerCase().replace(/^(?:what(?:'s| is)|whats|how much is|calculate|compute|work out|what does)\s+/, '').replace(/\s*(?:equal|equals|make|come to)\s*$/, '').replace(/[?=]$/, '').trim();
+  x = x.replace(new RegExp(`\\b(${Object.keys(ONES).join('|')})\\b`, 'g'), (w) => String(ONES[w])).replace(/\b(\d+) point (\d+)\b/g, '$1.$2');
+  let m;
+  if ((m = x.match(/^(?:the )?square root of (\d+(?:\.\d+)?)$/))) return fmt(Math.sqrt(+m[1]));
+  if ((m = x.match(/^(\d+(?:\.\d+)?) ?(?:%|percent) of (\d+(?:\.\d+)?)$/))) return fmt((+m[1] * +m[2]) / 100);
+  if ((m = x.match(/^(\d+(?:\.\d+)?) (squared|cubed)$/))) return fmt(Number(m[1]) ** (m[2] === 'squared' ? 2 : 3));
+  x = x.replace(/,(?=\d{3})/g, '').replace(/\bmultiplied by\b|\btimes\b|×|\bx\b/g, '*').replace(/\bdivided by\b|\bover\b|÷/g, '/')
+    .replace(/\bplus\b|\band\b/g, '+').replace(/\bminus\b|\btake away\b/g, '-').replace(/\s+/g, ' ').trim();
+  if (!/^[\d.+\-*/() ]+$/.test(x) || !/[+\-*/]/.test(x) || !/\d/.test(x)) return null;
+  const tok = x.match(/\d+(?:\.\d+)?|[+\-*/()]/g); let i = 0;
+  const num = () => { const k = tok[i++]; if (k === '(') { const v = sum(); i++; return v; } if (k === '-') return -num(); return +k; };
+  const prod = () => { let v = num(); while (tok[i] === '*' || tok[i] === '/') { const op = tok[i++], r = num(); v = op === '*' ? v * r : v / r; } return v; };
+  const sum = () => { let v = prod(); while (tok[i] === '+' || tok[i] === '-') { const op = tok[i++], r = prod(); v = op === '+' ? v + r : v - r; } return v; };
+  try { const v = sum(); return i === tok.length && Number.isFinite(v) ? fmt(v) : null; } catch { return null; }
+}
+const fmt = (v) => String(Math.round(v * 1e6) / 1e6);
+
 export function parseIntent(raw, now = new Date()) {
   const clean = simplify(normalizeSpeech(stripWake(raw)));
   if (!clean) return { type: 'greeting' };
@@ -70,6 +90,8 @@ export function parseIntent(raw, now = new Date()) {
     return { type: 'local', answer: `It's ${now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` };
   if (/^what(?:'s| is) (?:the |today's )?date|^what day is (?:it|today)/.test(t))
     return { type: 'local', answer: `It's ${now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}.` };
+
+  { const ans = spokenMath(t); if (ans != null) return { type: 'local', answer: `${ans}.`, math: true }; }
 
   // Memory
   if ((m = t.match(/^remember (?:that )?(.+)$/))) return { type: 'memory.add', text: text.slice(text.toLowerCase().indexOf(m[1])) };

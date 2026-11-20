@@ -25,10 +25,17 @@ function stripWake(raw) {
   return (m ? t.slice(m[0].length) : t).replace(/^[a-z]\b\s*/, '').trim(); // drop a stray fragment like the "t" of "orbit"
 }
 
+// Words a sentence rarely ends on: if you pause after one, you're probably not done yet.
+const OPEN_END = /\b(and|or|but|the|a|an|to|of|for|with|in|on|at|my|your|is|are|was|what|what's|whats|how|why|where|when|who|which|plus|minus|times|divided|by|over|than|from|about|into|set|turn|open|play|tell|remind|me|um|uh|like|so|if|then|because|percent)$/i;
+const unfinished = (t) => OPEN_END.test(t.trim().replace(/[.,!?]+$/, ''));
+// Moonshine writes "Hey Orbit, what is 1 plus 1?": lower-case it and drop the wake phrase and final punctuation.
+const cleanFinal = (t) => stripWake(String(t || '').toLowerCase().replace(/[“”"]/g, '')).replace(/[.!?]+$/, '').trim();
+
 const MODELS = {
   speaker: 'wespeaker_en_voxceleb_CAM++.onnx', // optional: voice ID
   kws: 'sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01',
   asr: 'sherpa-onnx-streaming-zipformer-en-20M-2023-02-17',
+  asrFinal: 'sherpa-onnx-moonshine-tiny-en-int8', // optional: re-reads each sentence far more accurately (fast or slow speech)
   tts: 'vits-piper-en_GB-alan-medium', // default voice, bundled
 };
 
@@ -85,9 +92,21 @@ class LocalSpeech extends EventEmitter {
       decodingMethod: 'greedy_search',
       enableEndpoint: true,
       rule1MinTrailingSilence: 3.0,       // after the wake word, wait up to 3 s for you to start
-      rule2MinTrailingSilence: patience,  // end of turn after this much silence (adjustable: pauses mid-sentence)
+      rule2MinTrailingSilence: patience + 1.2, // hard stop; the usual end of turn is decided in accept() (smart wait)
       rule3MinUtteranceLength: 20,        // hard cap per utterance
     });
+    // Second pass: when you stop talking, a stronger (non-streaming) model re-reads the whole
+    // sentence. The streaming model above is only used for live captions and end-of-speech.
+    const fd = path.join(modelsDir, MODELS.asrFinal);
+    if (fs.existsSync(path.join(fd, 'encode.int8.onnx'))) {
+      try {
+        this.final = new sherpa.OfflineRecognizer({
+          featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
+          modelConfig: { moonshine: { preprocessor: path.join(fd, 'preprocess.onnx'), encoder: path.join(fd, 'encode.int8.onnx'), uncachedDecoder: path.join(fd, 'uncached_decode.int8.onnx'), cachedDecoder: path.join(fd, 'cached_decode.int8.onnx') }, tokens: path.join(fd, 'tokens.txt'), numThreads: Math.max(1, Math.min(2, require('node:os').cpus().length - 1)), provider: 'cpu', debug: 0 },
+        });
+      } catch { this.final = null; }
+    }
+    this.patience = patience;
     this.setVoice(voice);
     this.kwsStream = this.kws.createStream();
     this.mode = 'wake';       // wake | command
@@ -131,6 +150,19 @@ class LocalSpeech extends EventEmitter {
     const text = stripWake(this.asr.getResult(this.asrStream).text);
     if (text && text !== this.lastText) { this.lastText = text; this.deadline = 0; this.emit('partial', text.toLowerCase()); }
     if (this.ptt) return; // push-to-talk ends on release, not on silence
+    // Smart end of turn: after `patience` seconds of silence, stop only if the sentence sounds
+    // finished. "What is one plus…" or "turn off the…" gets up to 1.2 s more, for slow talkers.
+    let e = 0; for (let i = 0; i < samples.length; i++) e += samples[i] * samples[i];
+    const rms = Math.sqrt(e / Math.max(1, samples.length));
+    const speaking = rms > Math.max((this.floor || 0) * 2.5, 0.003);
+    this.silent = speaking ? 0 : (this.silent || 0) + samples.length / SAMPLE_RATE;
+    if (speaking) this.checked = false;
+    if (text && this.silent >= this.patience && !this.checked) {
+      // Decide with the accurate model's reading of everything said so far (live captions lag).
+      this.checked = true;
+      const heard = this.final ? this.reread(this.joinAudio(), text) : text;
+      if (!unfinished(heard)) return this.finishCommand();
+    }
     if (this.asr.isEndpoint(this.asrStream) || (this.deadline && !text && Date.now() > this.deadline)) this.finishCommand();
   }
 
@@ -150,7 +182,13 @@ class LocalSpeech extends EventEmitter {
     this.emit('listening', { ptt });
   }
 
-  finishCommand() {
+  joinAudio() {
+    const audio = new Float32Array(this.cmdLen); let o = 0;
+    for (const c of this.cmdAudio) { audio.set(c.subarray(0, Math.min(c.length, audio.length - o)), o); o += c.length; if (o >= audio.length) break; }
+    return audio;
+  }
+
+  finishCommand(already = null) {
     if (this.mode !== 'command') return;
     const tail = new Float32Array(SAMPLE_RATE * 0.3); // flush the model with a little silence
     this.asrStream.acceptWaveform({ samples: tail, sampleRate: SAMPLE_RATE });
@@ -159,10 +197,22 @@ class LocalSpeech extends EventEmitter {
     const text = stripWake(this.asr.getResult(this.asrStream).text);
     this.asrStream = null; this.mode = 'wake'; this.ptt = false;
     this.kwsStream = this.kws.createStream(); // fresh wake detector for the next turn
-    const audio = new Float32Array(this.cmdLen); let o = 0;
-    for (const c of this.cmdAudio) { audio.set(c.subarray(0, Math.min(c.length, audio.length - o)), o); o += c.length; if (o >= audio.length) break; }
-    this.cmdAudio = []; this.cmdLen = 0;
-    this.emit('utterance', text, audio);
+    const audio = this.joinAudio();
+    this.cmdAudio = []; this.cmdLen = 0; this.silent = 0; this.checked = false;
+    this.emit('utterance', already ?? this.reread(audio, text), audio);
+  }
+
+  // Second pass with the stronger model; keeps the streaming result if it fails or hears nothing.
+  reread(audio, fallback) {
+    if (!this.final || audio.length < SAMPLE_RATE * 0.3) return fallback;
+    if (!fallback) { let e = 0; for (let i = 0; i < audio.length; i++) e += audio[i] * audio[i]; if (Math.sqrt(e / audio.length) < 0.004) return fallback; } // silence
+    try {
+      const st = this.final.createStream();
+      st.acceptWaveform({ samples: audio.length > SAMPLE_RATE * 25 ? audio.subarray(audio.length - SAMPLE_RATE * 25) : audio, sampleRate: SAMPLE_RATE });
+      this.final.decode(st);
+      const t = cleanFinal(this.final.getResult(st).text);
+      return t && !/^(you|thank you|thanks for watching|\.+)$/i.test(t) ? t : fallback;
+    } catch { return fallback; }
   }
 
   // After ORBIT replies, listen briefly for a follow-up without requiring the wake word.
@@ -209,4 +259,4 @@ function resample(x, from, to = SAMPLE_RATE) {
   return y;
 }
 
-module.exports = { resample, LocalSpeech, modelsPresent, voiceInstalled, stripWake, MODELS, VOICES, SAMPLE_RATE };
+module.exports = { resample, LocalSpeech, modelsPresent, voiceInstalled, stripWake, unfinished, cleanFinal, MODELS, VOICES, SAMPLE_RATE };

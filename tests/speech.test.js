@@ -109,3 +109,13 @@ test('quiet speech: boosting rescues wake words that would be missed', { skip: !
   assert.ok(after >= 3, `with boost: woke ${after}/4 (without: ${before}/4)`);
   assert.ok(after >= before);
 });
+
+test('fast, slow and paused speech are understood (second-pass model)', { skip: !(ready && fs.existsSync(path.resolve('models', 'sherpa-onnx-moonshine-tiny-en-int8'))) && 'second-pass model not downloaded' }, () => {
+  const sp = new LocalSpeech(path.resolve('models'), { voice: 'alan' }), tts = new LocalSpeech(path.resolve('models'));
+  const say = (t, v, speed) => { tts.setVoice(v); const o = tts.synthesize(t, { speed }); return resample(o.samples, o.sampleRate); };
+  const z = (s) => new Float32Array(16000 * s);
+  let got = []; sp.on('utterance', (t) => got.push(t));
+  const run = (parts) => { got = []; const a = Float32Array.from([...z(0.8), ...say('Hey Orbit.', 'alan', 1), ...z(0.25), ...parts, ...z(2.8)]); for (let i = 0; i < a.length; i += 1600) sp.accept(a.subarray(i, i + 1600)); return got[0] || ''; };
+  for (const v of ['alan', 'lessac']) for (const speed of [0.7, 1.6]) assert.match(run(say('What is one plus one?', v, speed)), /what is (one|1) plus (one|1)/, `${v} at ${speed}x`);
+  assert.match(run([...say('What is one plus', 'alan', 0.8), ...z(1.3), ...say('one?', 'alan', 0.8)]), /what is (one|1) plus (one|1)$/, 'a pause mid-sentence does not cut you off');
+});

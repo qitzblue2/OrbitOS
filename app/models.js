@@ -14,6 +14,7 @@ const SOURCES = {
   [MODELS.asr]: `${BASE}/asr-models/${MODELS.asr}.tar.bz2`,
   [MODELS.tts]: tts(MODELS.tts),
   [VOICES.lessac.dir]: tts(VOICES.lessac.dir),
+  [MODELS.asrFinal]: `${BASE}/asr-models/${MODELS.asrFinal}.tar.bz2`, // optional, ~120 MB: accurate second pass
   [MODELS.speaker]: `${BASE}/speaker-recongition-models/${MODELS.speaker}`, // (sic) the release tag's spelling
 };
 const REQUIRED = [MODELS.kws, MODELS.asr, MODELS.tts];
@@ -38,6 +39,7 @@ async function download(dir, onProgress = () => {}, sources = SOURCES) {
     if (single) { fs.renameSync(tmp, path.join(dir, name)); continue; }
     await new Promise((resolve, reject) => execFile('tar', ['-xjf', tmp, '-C', dir], (e) => (e ? reject(e) : resolve())));
     fs.unlinkSync(tmp);
+    fs.rmSync(path.join(dir, name, 'test_wavs'), { recursive: true, force: true }); // sample recordings, not needed
   }
   return dir;
 }

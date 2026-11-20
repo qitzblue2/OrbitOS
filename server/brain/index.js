@@ -6,11 +6,12 @@ import { PROVIDERS, SUGGESTED, NOT_CHAT, isChat, pickModel, TIER_PICKS } from '.
 import { complete } from './tools.js';
 
 
-export function personaPrompt({ userName, tone = 'composed', memories = [], devices = [], customInstructions = '', quiet = false }) {
+export function personaPrompt({ userName, tone = 'composed', memories = [], devices = [], customInstructions = '', quiet = false, spoken = false }) {
   return [
     `You are ORBIT, ${userName ? `${userName}'s` : 'the user\'s'} personal AI system. You run their devices, home and information.`,
     'Personality: highly intelligent, calm, composed, professional and confident; polite and occasionally dryly witty. Never verbose.',
     `Tone setting: ${tone}.`,
+    spoken ? 'The user SPOKE this; it was transcribed by speech recognition, which sometimes mishears words (e.g. "was much was one" for "what is one plus one", "turn of the lice" for "turn off the lights", similar-sounding names). Work out what they most likely meant from the sounds and the context, and answer that directly; do not comment on the transcription. Only if you truly cannot tell, ask one short question that says what you think you heard ("Did you mean ...?").' : '',
     quiet ? 'It is quiet hours (night): answer in one short, gentle sentence unless asked for more.' : '',
     'Your replies are usually spoken aloud: lead with the answer, keep it to one to three short sentences unless asked for detail, no markdown in short replies.',
     'Accuracy beats speed. If you are not sure, say so plainly. Never invent facts, sources, or results.',
@@ -179,6 +180,7 @@ export class Brain {
     if (this.status().provider === 'offline') return null;
     const system = [
       "You translate a person's request into exactly ONE command for a computer assistant, or reply NONE.",
+      'The request may come from speech recognition with misheard words ("turn of the lice" = turn off the lights, "open spotty" = open spotify): use the most likely meaning.',
       'Commands (fill in the <blanks>):',
       'open <app> | close <app> | search for <query> | set volume to <0-100> | turn the volume up | turn the volume down | mute | unmute',
       'play music | pause music | next track | previous track | take a screenshot | look at my screen | lock my computer | device status',
